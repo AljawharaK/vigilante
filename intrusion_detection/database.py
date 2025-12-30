@@ -1,7 +1,7 @@
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 import json
 from dotenv import load_dotenv
@@ -98,11 +98,9 @@ class DatabaseManager:
                         is_active BOOLEAN DEFAULT TRUE,
                         CONSTRAINT users_username_unique UNIQUE(username)
                     );
-                    
-                    -- Create index for faster username lookups
-                    CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-                    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
                 """)
+                
+                print("✅ Created users table")
                 
                 # Create models table if not exists
                 cursor.execute("""
@@ -125,12 +123,9 @@ class DatabaseManager:
                         is_active BOOLEAN DEFAULT TRUE,
                         CONSTRAINT fk_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
                     );
-                    
-                    -- Create indexes for models
-                    CREATE INDEX IF NOT EXISTS idx_models_user_id ON models(user_id);
-                    CREATE INDEX IF NOT EXISTS idx_models_created_at ON models(created_at DESC);
-                    CREATE INDEX IF NOT EXISTS idx_models_name ON models(name);
                 """)
+                
+                print("✅ Created models table")
                 
                 # Create detection_history table if not exists
                 cursor.execute("""
@@ -146,12 +141,9 @@ class DatabaseManager:
                         CONSTRAINT fk_detection_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
                         CONSTRAINT fk_detection_model FOREIGN KEY(model_id) REFERENCES models(id) ON DELETE CASCADE
                     );
-                    
-                    -- Create indexes for detection_history
-                    CREATE INDEX IF NOT EXISTS idx_detection_history_user_id ON detection_history(user_id);
-                    CREATE INDEX IF NOT EXISTS idx_detection_history_model_id ON detection_history(model_id);
-                    CREATE INDEX IF NOT EXISTS idx_detection_history_processed_at ON detection_history(processed_at DESC);
                 """)
+                
+                print("✅ Created detection_history table")
                 
                 # Create sessions table if not exists
                 cursor.execute("""
@@ -165,17 +157,9 @@ class DatabaseManager:
                         CONSTRAINT sessions_token_unique UNIQUE(session_token),
                         CONSTRAINT fk_sessions_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
                     );
-                    
-                    -- Create indexes for sessions
-                    CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
-                    CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-                    CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
-                    
-                    -- Create index for faster session validation
-                    CREATE INDEX IF NOT EXISTS idx_sessions_valid_expired 
-                    ON sessions(session_token) 
-                    WHERE is_valid = TRUE AND expires_at > CURRENT_TIMESTAMP;
                 """)
+                
+                print("✅ Created sessions table")
                 
                 # Create model_versions table for versioning support
                 cursor.execute("""
@@ -190,9 +174,12 @@ class DatabaseManager:
                         CONSTRAINT unique_model_version UNIQUE(model_id, version),
                         CONSTRAINT fk_model_version FOREIGN KEY(model_id) REFERENCES models(id) ON DELETE CASCADE
                     );
-                    
-                    CREATE INDEX IF NOT EXISTS idx_model_versions_model_id ON model_versions(model_id);
                 """)
+                
+                print("✅ Created model_versions table")
+                
+                # Now create indexes separately (after tables exist)
+                self.create_indexes(cursor)
                 
                 self.conn.commit()
                 print("✅ Database tables initialized/verified")
@@ -214,6 +201,153 @@ class DatabaseManager:
             # Try to get more details about the error
             import traceback
             print(f"Full traceback:\n{traceback.format_exc()}")
+            
+            # Try simpler initialization
+            self.init_database_simple()
+    
+    def create_indexes(self, cursor):
+        """Create indexes for better performance"""
+        try:
+            # Create indexes for users table
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_users_username 
+                ON users(username);
+                
+                CREATE INDEX IF NOT EXISTS idx_users_email 
+                ON users(email);
+            """)
+            print("✅ Created indexes for users table")
+            
+            # Create indexes for models table
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_models_user_id 
+                ON models(user_id);
+                
+                CREATE INDEX IF NOT EXISTS idx_models_created_at 
+                ON models(created_at DESC);
+                
+                CREATE INDEX IF NOT EXISTS idx_models_name 
+                ON models(name);
+            """)
+            print("✅ Created indexes for models table")
+            
+            # Create indexes for detection_history table
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_detection_history_user_id 
+                ON detection_history(user_id);
+                
+                CREATE INDEX IF NOT EXISTS idx_detection_history_model_id 
+                ON detection_history(model_id);
+                
+                CREATE INDEX IF NOT EXISTS idx_detection_history_processed_at 
+                ON detection_history(processed_at DESC);
+            """)
+            print("✅ Created indexes for detection_history table")
+            
+            # Create indexes for sessions table
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_sessions_token 
+                ON sessions(session_token);
+                
+                CREATE INDEX IF NOT EXISTS idx_sessions_user_id 
+                ON sessions(user_id);
+                
+                CREATE INDEX IF NOT EXISTS idx_sessions_expires_at 
+                ON sessions(expires_at);
+            """)
+            print("✅ Created indexes for sessions table")
+            
+            # Create index for model_versions table
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_model_versions_model_id 
+                ON model_versions(model_id);
+            """)
+            print("✅ Created indexes for model_versions table")
+            
+        except Exception as e:
+            print(f"⚠️ Warning: Some indexes could not be created: {e}")
+            print("The application will still work, but may be slower for large datasets.")
+    
+    def init_database_simple(self):
+        """Simpler database initialization without problematic indexes"""
+        try:
+            print("\n🔄 Trying simpler database initialization...")
+            
+            with self.conn.cursor() as cursor:
+                # Drop tables if they exist (for clean start)
+                cursor.execute("DROP TABLE IF EXISTS model_versions CASCADE;")
+                cursor.execute("DROP TABLE IF EXISTS detection_history CASCADE;")
+                cursor.execute("DROP TABLE IF EXISTS sessions CASCADE;")
+                cursor.execute("DROP TABLE IF EXISTS models CASCADE;")
+                cursor.execute("DROP TABLE IF EXISTS users CASCADE;")
+                
+                # Create users table
+                cursor.execute("""
+                    CREATE TABLE users (
+                        id SERIAL PRIMARY KEY,
+                        username VARCHAR(50) UNIQUE NOT NULL,
+                        password_hash VARCHAR(255) NOT NULL,
+                        email VARCHAR(100),
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        last_login TIMESTAMP WITH TIME ZONE,
+                        is_active BOOLEAN DEFAULT TRUE
+                    );
+                """)
+                
+                # Create models table
+                cursor.execute("""
+                    CREATE TABLE models (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                        name VARCHAR(100) NOT NULL,
+                        description TEXT,
+                        model_path VARCHAR(255) NOT NULL,
+                        model_type VARCHAR(50) DEFAULT 'dca_dae',
+                        accuracy DECIMAL(5,4),
+                        precision DECIMAL(5,4),
+                        recall DECIMAL(5,4),
+                        f1_score DECIMAL(5,4),
+                        training_samples INTEGER,
+                        features_count INTEGER,
+                        parameters JSONB,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        is_active BOOLEAN DEFAULT TRUE
+                    );
+                """)
+                
+                # Create detection_history table
+                cursor.execute("""
+                    CREATE TABLE detection_history (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                        model_id INTEGER REFERENCES models(id) ON DELETE CASCADE,
+                        input_file VARCHAR(255),
+                        total_samples INTEGER DEFAULT 0,
+                        anomalies_detected INTEGER DEFAULT 0,
+                        detection_results JSONB,
+                        processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                
+                # Create sessions table
+                cursor.execute("""
+                    CREATE TABLE sessions (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                        session_token VARCHAR(255) UNIQUE NOT NULL,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                        is_valid BOOLEAN DEFAULT TRUE
+                    );
+                """)
+                
+                self.conn.commit()
+                print("✅ Database tables created successfully (simple version)")
+                
+        except Exception as e:
+            self.conn.rollback()
+            print(f"❌ Simple initialization also failed: {e}")
             raise
     
     def create_user(self, username: str, password_hash: str, email: Optional[str] = None) -> int:
@@ -425,7 +559,6 @@ class DatabaseManager:
     def create_session(self, user_id: int, session_token: str, expires_hours: int = 24) -> int:
         """Create a new session"""
         try:
-            from datetime import datetime, timedelta, timezone
             expires_at = datetime.now(timezone.utc) + timedelta(hours=expires_hours)
             
             with self.conn.cursor() as cursor:
