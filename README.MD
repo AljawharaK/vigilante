@@ -14,7 +14,4 @@ A command-line tool for intrusion detection using Deterministic DCA + Denoising 
 
 ```bash
 # Install via pipx (recommended)
-pipx install intrusion-detection-cli
-
-# Or install locally
-pip install -e .
+pipx install git+https://github.com/AljawharaK/vigilante
