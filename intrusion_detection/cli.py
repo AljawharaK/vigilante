@@ -1251,7 +1251,7 @@ Examples:
     def handle_version(self, args):
         """Display version information"""
         console.print("[bold cyan]Vigilante Intrusion Detection System[/bold cyan]")
-        console.print("Version: 2.0.0")
+        console.print("Version: 1.0.0")
         console.print("Model: Deterministic DCA + Denoising Autoencoder")
         console.print("Database: PostgreSQL (Neon)")
         console.print("Roles: Administrator, Analyst")

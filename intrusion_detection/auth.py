@@ -126,7 +126,8 @@ class AuthManager:
                 return {"success": False, "message": "Invalid username or password"}
             
             # Check if password needs to be changed
-            if user['must_change_password']:
+            must_change = user.get('must_change_password', False)
+            if must_change:
                 return {
                     "success": False, 
                     "message": "Password must be changed",

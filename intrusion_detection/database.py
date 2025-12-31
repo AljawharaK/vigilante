@@ -193,7 +193,7 @@ class DatabaseManager:
                 # Create admin user if not exists
                 cursor.execute("""
                     INSERT INTO users (username, password_hash, email, role_id, must_change_password)
-                    SELECT 'admin1', 'test123', 'aljawharakqs@gmail.com', 1, FALSE
+                    SELECT 'admin1', '$2a$12$9tjqutyvxOG5HXBcWRJpmeoY.xdl38L1eqZri3Ahu0ppfcic1B7JW', 'aljawharakqs@gmail.com', 1, FALSE
                     WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin1');
                 """)
                 
@@ -233,15 +233,19 @@ class DatabaseManager:
         except Exception as e:
             self.conn.rollback()
             raise
-    
+
     def get_user(self, username: str) -> Optional[Dict]:
         """Get user by username"""
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
-                    SELECT id, username, password_hash, email, created_at, last_login, is_active
-                    FROM users 
-                    WHERE username = %s AND is_active = TRUE
+                    SELECT u.id, u.username, u.password_hash, u.email, 
+                           u.role_id, u.is_active, u.must_change_password,
+                           u.failed_login_attempts, u.last_login, u.created_at,
+                           r.name as role_name, r.permissions
+                    FROM users u
+                    LEFT JOIN roles r ON u.role_id = r.id
+                    WHERE u.username = %s AND u.is_active = TRUE
                 """, (username,))
                 user = cursor.fetchone()
                 return dict(user) if user else None
