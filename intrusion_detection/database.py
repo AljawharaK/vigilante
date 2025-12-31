@@ -340,23 +340,30 @@ class DatabaseManager:
             print(f"Error updating failed attempts: {e}")
     
     def save_model(self, user_id: int, model_name: str, model_path: str, 
-                   metrics: Dict[str, Any], parameters: Dict[str, Any]) -> int:
+                   dataset_name: str = None, metrics: Dict[str, Any] = None,
+                   features: List[str] = None, parameters: Dict[str, Any] = None) -> int:
         """Save model metadata to database"""
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute("""
                     INSERT INTO models (
-                        user_id, name, model_path, accuracy, precision,
-                        recall, f1_score, training_samples, features_count,
-                        parameters, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        user_id, name, model_path, dataset_name,
+                        accuracy, precision, recall, f1_score,
+                        training_samples, features_count,
+                        features, parameters, metrics, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                     RETURNING id
                 """, (
-                    user_id, model_name, model_path,
-                    metrics.get('accuracy'), metrics.get('precision'),
-                    metrics.get('recall'), metrics.get('f1_score'),
-                    metrics.get('training_samples'), metrics.get('features_count'),
-                    json.dumps(parameters)
+                    user_id, model_name, model_path, dataset_name,
+                    metrics.get('accuracy') if metrics else None,
+                    metrics.get('precision') if metrics else None,
+                    metrics.get('recall') if metrics else None,
+                    metrics.get('f1_score') if metrics else None,
+                    metrics.get('training_samples') if metrics else None,
+                    metrics.get('features_count') if metrics else None,
+                    json.dumps(features) if features else None,
+                    json.dumps(parameters) if parameters else None,
+                    json.dumps(metrics) if metrics else None
                 ))
                 model_id = cursor.fetchone()[0]
                 self.conn.commit()

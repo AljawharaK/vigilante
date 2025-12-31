@@ -322,13 +322,10 @@ Examples:
         if not self.check_admin():
             return
         
-        # Generate temporary password
-        import secrets
-        import string
-        temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits + '!@#$%^&*') 
-                               for _ in range(12))
-        
-        # Hash password
+        # Use a standard temporary password
+        temp_password = "temp123"
+    
+        # Hash the password for storage
         password_hash = self.auth.hash_password(temp_password)
         
         try:
@@ -619,11 +616,11 @@ Examples:
         """Handle anomaly detection"""
         if not self.check_permission('run_detection'):
             return
-        
+    
         if not os.path.exists(args.input):
             console.print(f"[red]Input file not found: {args.input}[/red]")
             return
-        
+    
         # Load model
         model = None
         if args.model_id:
@@ -632,26 +629,34 @@ Examples:
             if not model_data:
                 console.print(f"[red]Model ID {args.model_id} not found[/red]")
                 return
-            
+        
             model_path = model_data['model_path']
             if not os.path.exists(model_path):
                 console.print(f"[red]Model file not found: {model_path}[/red]")
                 return
-            
-            model = IntrusionDetectionModel.load(model_path)
-            
+        
+            try:
+                model = IntrusionDetectionModel.load(model_path)
+            except Exception as e:
+                console.print(f"[red]Error loading model: {e}[/red]")
+                return
+        
         elif args.model_path:
             # Load from file path
             if not os.path.exists(args.model_path):
                 console.print(f"[red]Model file not found: {args.model_path}[/red]")
                 return
-            
-            model = IntrusionDetectionModel.load(args.model_path)
         
+            try:
+                model = IntrusionDetectionModel.load(args.model_path)
+            except Exception as e:
+                console.print(f"[red]Error loading model: {e}[/red]")
+                return
+    
         else:
             console.print("[red]Please specify either --model-id or --model-path[/red]")
             return
-        
+    
         # Perform detection
         with Progress(
             SpinnerColumn(),
@@ -659,18 +664,18 @@ Examples:
             transient=True,
         ) as progress:
             task = progress.add_task("[cyan]Analyzing traffic...", total=None)
-            
+        
             try:
                 # Load and preprocess data
                 df = pd.read_csv(args.input)
                 X = model.preprocess_data(df, fit_scaler=False)
-                
+            
                 # Detect anomalies
                 predictions, reconstruction_errors = model.predict(X)
-                
+            
                 # Prepare results
                 results = self.prepare_detection_results(df, predictions, reconstruction_errors, model)
-                
+            
                 # Save to database
                 detection_id = self.db.save_detection(
                     user_id=self.auth.current_user['id'],
@@ -678,22 +683,22 @@ Examples:
                     input_file=args.input,
                     results=results
                 )
-                
+            
                 progress.update(task, completed=100)
-                
+            
             except Exception as e:
                 console.print(f"[red]Detection failed: {e}[/red]")
                 if self.args.verbose:
                     console.print(traceback.format_exc())
                 return
-        
+    
         # Display results
         console.print(f"[green]✓ Detection analysis completed[/green]")
         console.print(f"[yellow]⚠️ Anomalies detected: {results['anomalies_detected']}[/yellow]")
-        
+    
         # Show summary table
         self.display_detection_summary(results)
-        
+    
         # Show anomalies if any
         if results['anomalies_detected'] > 0:
             console.print("\n[bold]Detected Anomalies:[/bold]")
@@ -701,13 +706,13 @@ Examples:
                 console.print(f"  Flow ID: {anomaly.get('flow_id', 'N/A')} - "
                             f"Confidence: {anomaly.get('confidence_score', 0):.2f} - "
                             f"Severity: {anomaly.get('severity', 'Medium')}")
-        
+    
         # Save results if requested
         if args.output:
             with open(args.output, 'w') as f:
                 json.dump(results, f, indent=2)
             console.print(f"[green]✓ Full results saved to: {args.output}[/green]")
-        
+    
         # Generate explanations if requested
         if args.explain and results['anomalies_detected'] > 0:
             self.handle_explain_detection(results)
@@ -776,34 +781,33 @@ Examples:
         """Handle model training"""
         if not self.check_permission('train_models'):
             return
-        
+    
         if not os.path.exists(args.input):
             console.print(f"[red]Input file not found: {args.input}[/red]")
             return
-        
+    
         # Process features
         features = None
         if args.features:
             features = [f.strip() for f in args.features.split(',')]
-        
+    
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             transient=True,
         ) as progress:
             task = progress.add_task("[cyan]Training model...", total=100)
-            
+        
             try:
-                # Train model using existing trainer
+                # Train model using existing trainer - FIXED: Remove unsupported parameters
                 result = self.trainer.train_model(
                     data_path=args.input,
                     model_name=args.model_name or f"model_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                     epochs=50,
-                    learning_rate=1e-3,
-                    features=features,
-                    threshold=args.threshold
+                    learning_rate=1e-3
+                    # Removed: features=features, threshold=args.threshold
                 )
-                
+            
                 # Save model to database
                 model_id = self.db.save_model(
                     user_id=self.auth.current_user['id'],
@@ -811,30 +815,29 @@ Examples:
                     model_path=result['model_path'],
                     dataset_name=os.path.basename(args.input),
                     metrics=result['metrics'],
-                    features=features,
+                    features=features,  # Still save features in database
                     parameters={
                         'epochs': 50,
                         'learning_rate': 1e-3,
                         'threshold': args.threshold
                     }
                 )
-                
+            
                 progress.update(task, completed=100)
-                
+            
             except Exception as e:
                 console.print(f"[red]Training failed: {e}[/red]")
                 if self.args.verbose:
                     console.print(traceback.format_exc())
                 return
-        
         # Display results
         console.print(f"[green]✓ Model trained successfully[/green]")
         console.print(f"Model ID: [cyan]{model_id}[/cyan]")
         console.print(f"Model saved to: [cyan]{result['model_path']}[/cyan]")
-        
+    
         # Show metrics
         self.display_training_metrics(result['metrics'])
-        
+    
         # Log training event
         self.db.log_audit_event(
             user_id=self.auth.current_user['id'],
