@@ -26,7 +26,35 @@ class IntrusionDetectionCLI:
         self.auth = AuthManager(self.db)
         self.trainer = ModelTrainer()
         self.current_model = None
+        
+        # Load session from environment or file
+        self.load_session()
         self.setup_argparse()
+    
+    def load_session(self):
+        """Load session from environment variable or file"""
+        import os
+        session_file = os.path.join(os.path.expanduser("~"), ".ids_session")
+        
+        if os.path.exists(session_file):
+            try:
+                with open(session_file, 'r') as f:
+                    session_token = f.read().strip()
+                    
+                if session_token and self.auth.validate_session(session_token):
+                    print(f"📝 Session loaded for user: {self.auth.current_user['username']}")
+                    return True
+            except:
+                pass
+        return False
+    
+    def save_session(self):
+        """Save session to file"""
+        import os
+        if self.auth.current_session:
+            session_file = os.path.join(os.path.expanduser("~"), ".ids_session")
+            with open(session_file, 'w') as f:
+                f.write(self.auth.current_session)
     
     def setup_argparse(self):
         """Setup argument parser"""
@@ -116,7 +144,7 @@ Examples:
             args.username = input("Username: ")
         if not args.password:
             args.password = getpass("Password: ")
-        
+    
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -124,13 +152,30 @@ Examples:
         ) as progress:
             progress.add_task(description="Logging in...", total=None)
             result = self.auth.login(args.username, args.password)
-        
+    
         if result['success']:
             console.print(f"[green]✓ Login successful! Welcome {args.username}[/green]")
             console.print(f"User ID: [cyan]{result['user_id']}[/cyan]")
+        
+            # Save session for future use
+            self.save_session()
         else:
             console.print(f"[red]✗ {result['message']}[/red]")
-    
+    def handle_logout(self, args):
+        """Handle user logout"""
+        if self.auth.current_session:
+            self.auth.logout(self.auth.current_session)
+        
+            # Remove session file
+            import os
+            session_file = os.path.join(os.path.expanduser("~"), ".ids_session")
+            if os.path.exists(session_file):
+                os.remove(session_file)
+            
+            console.print("[green]✓ Logged out successfully[/green]")
+        else:
+            console.print("[yellow]You are not logged in[/yellow]")
+
     def handle_train(self, args):
         """Handle model training"""
         if not self.check_auth():
