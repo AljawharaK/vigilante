@@ -748,7 +748,126 @@ class DatabaseManager:
         except Exception as e:
             self.conn.rollback()
             raise
+        
+    def count_admins(self) -> int:
+        """Count active Administrators"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT COUNT(*) as admin_count
+                    FROM users u
+                    JOIN roles r ON u.role_id = r.id
+                    WHERE r.name = 'Administrator' 
+                    AND u.is_active = TRUE
+                """)
+                result = cursor.fetchone()
+                return result[0] if result else 0
+        except Exception as e:
+            print(f"Error counting admins: {e}")
+            return 0
     
+    def get_user_activity(self, period_days: int) -> Dict:
+        """Get user activity statistics"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT 
+                        COUNT(DISTINCT CASE WHEN action = 'login' THEN id END) as total_logins,
+                        COUNT(DISTINCT CASE WHEN action = 'model_train' THEN id END) as models_trained,
+                        COUNT(DISTINCT CASE WHEN action = 'detect' THEN id END) as detection_jobs_run
+                    FROM audit_logs
+                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                """, (period_days,))
+                result = cursor.fetchone()
+                return dict(result) if result else {}
+        except Exception as e:
+            print(f"Error getting user activity: {e}")
+            return {}
+    
+    def get_recent_anomalies(self, period_days: int, limit: int = 20):
+        """Get recent anomalies"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT 
+                        dr.created_at as detected_at,
+                        dr.results->'anomalies' as anomalies_data
+                    FROM detection_results dr
+                    WHERE dr.created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                    AND dr.anomalies_detected > 0
+                    ORDER BY dr.created_at DESC
+                    LIMIT %s
+                """, (period_days, limit))
+                
+                results = []
+                for row in cursor.fetchall():
+                    anomalies = json.loads(row['anomalies_data']) if row['anomalies_data'] else []
+                    for anomaly in anomalies[:5]:  # Get up to 5 per detection
+                        anomaly['detected_at'] = row['detected_at']
+                        results.append(anomaly)
+                
+                return results[:limit]  # Ensure we don't exceed limit
+        except Exception as e:
+            print(f"Error getting recent anomalies: {e}")
+            return []
+    
+    def get_user_anomalies(self, user_id: int, period_days: int):
+        """Get user's anomalies"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT 
+                        dr.created_at as detected_at,
+                        dr.results->'anomalies' as anomalies_data
+                    FROM detection_results dr
+                    WHERE dr.user_id = %s
+                    AND dr.created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                    AND dr.anomalies_detected > 0
+                    ORDER BY dr.created_at DESC
+                    LIMIT 10
+                """, (user_id, period_days))
+                
+                results = []
+                for row in cursor.fetchall():
+                    anomalies = json.loads(row['anomalies_data']) if row['anomalies_data'] else []
+                    for anomaly in anomalies[:5]:  # Get up to 5 per detection
+                        anomaly['detected_at'] = row['detected_at']
+                        results.append(anomaly)
+                
+                return results[:10]
+        except Exception as e:
+            print(f"Error getting user anomalies: {e}")
+            return []
+    
+    def get_user_by_id(self, user_id: int) -> Optional[Dict]:
+        """Get user by ID"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT u.*, r.name as role_name
+                    FROM users u
+                    LEFT JOIN roles r ON u.role_id = r.id
+                    WHERE u.id = %s
+                """, (user_id,))
+                return cursor.fetchone()
+        except Exception as e:
+            print(f"Error getting user by ID: {e}")
+            return None
+    
+    def update_user_failed_attempts(self, user_id: int):
+        """Update user's failed login attempts"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE users 
+                    SET failed_login_attempts = failed_login_attempts + 1
+                    WHERE id = %s
+                """, (user_id,))
+                self.conn.commit()
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Error updating failed attempts: {e}")
+
     def close(self):
         """Close database connection"""
         if self.conn:

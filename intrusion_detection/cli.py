@@ -123,28 +123,15 @@ Examples:
         explain_parser.add_argument('--detection-id', type=int, help='Detection ID')
         explain_parser.add_argument('--input', help='Detection results JSON')
         
-        # Training commands
-        train_parser = subparsers.add_parser('train', help='Train model')
-        train_parser.add_argument('--input', required=True, help='Training data CSV')
-        train_parser.add_argument('--threshold', type=float, default=0.8, help='Anomaly threshold')
-        train_parser.add_argument('--features', help='Comma-separated features')
-        train_parser.add_argument('--model-name', help='Model name')
-        train_parser.add_argument('--output', help='Output model path')
-        
-        # Analysis commands
-        summary_parser = subparsers.add_parser('summary', help='Get detection summary')
-        summary_parser.add_argument('--period', default='7d', help='Period')
-        summary_parser.add_argument('--output', help='Output JSON file')
-        
-        explain_parser = subparsers.add_parser('explain', help='Explain detection results')
-        explain_parser.add_argument('--detection-id', type=int, help='Detection ID')
-        explain_parser.add_argument('--input', help='Detection results JSON')
-        
         # Model management
         list_parser = subparsers.add_parser('list-models', help='List available models')
         
         # System info
         subparsers.add_parser('status', help='Show system status')
+        
+        # Version flag (outside subparsers)
+        parser.add_argument('--version', action='store_true', help='Show version information')
+        parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
         
         self.parser = parser
     
@@ -685,7 +672,7 @@ Examples:
                 results = self.prepare_detection_results(df, predictions, reconstruction_errors, model)
                 
                 # Save to database
-                detection_id = self.db.save_detection_results(
+                detection_id = self.db.save_detection(
                     user_id=self.auth.current_user['id'],
                     model_id=args.model_id if args.model_id else None,
                     input_file=args.input,
@@ -857,6 +844,29 @@ Examples:
             status="success",
             details={"model_id": model_id, "model_name": result['model_name']}
         )
+    
+    def display_training_metrics(self, metrics):
+        """Display training metrics"""
+        table = Table(title="Training Metrics", box=ROUNDED)
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
+        
+        if 'accuracy' in metrics:
+            table.add_row("Accuracy", f"{metrics['accuracy']:.4f}")
+        if 'precision' in metrics:
+            table.add_row("Precision", f"{metrics['precision']:.4f}")
+        if 'recall' in metrics:
+            table.add_row("Recall", f"{metrics['recall']:.4f}")
+        if 'f1_score' in metrics:
+            table.add_row("F1 Score", f"{metrics['f1_score']:.4f}")
+        if 'final_loss' in metrics:
+            table.add_row("Final Loss", f"{metrics['final_loss']:.6f}")
+        if 'training_samples' in metrics:
+            table.add_row("Training Samples", str(metrics['training_samples']))
+        if 'features_count' in metrics:
+            table.add_row("Features Count", str(metrics['features_count']))
+        
+        console.print(table)
     
     # Summary Command
     def handle_summary(self, args):
@@ -1091,6 +1101,11 @@ Examples:
         self.args = args
         
         try:
+            # Handle version flag first
+            if args.version:
+                self.handle_version(args)
+                return
+            
             if not args.command:
                 self.parser.print_help()
                 return
@@ -1232,6 +1247,16 @@ Examples:
         
         console.print("[green]✓ Password changed successfully[/green]")
         console.print("[cyan]Please log in again with your new password[/cyan]")
+    
+    def handle_version(self, args):
+        """Display version information"""
+        console.print("[bold cyan]Vigilante Intrusion Detection System[/bold cyan]")
+        console.print("Version: 2.0.0")
+        console.print("Model: Deterministic DCA + Denoising Autoencoder")
+        console.print("Database: PostgreSQL (Neon)")
+        console.print("Roles: Administrator, Analyst")
+        console.print("Author: Aljawhara Al-Qasem")
+        console.print("License: MIT")
 
 
 def main():
