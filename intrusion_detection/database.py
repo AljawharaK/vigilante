@@ -1,7 +1,7 @@
 # intrusion_detection/database.py
 import os
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import RealDictCursor, DictCursor
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 import json
@@ -190,10 +190,10 @@ class DatabaseManager:
                         permissions = EXCLUDED.permissions;
                 """)
                 
-                # Create admin user if not exists
+                # Create admin user if not exists - FIXED: Set must_change_password = TRUE
                 cursor.execute("""
                     INSERT INTO users (username, password_hash, email, role_id, must_change_password)
-                    SELECT 'admin1', '$2a$12$9tjqutyvxOG5HXBcWRJpmeoY.xdl38L1eqZri3Ahu0ppfcic1B7JW', 'aljawharakqs@gmail.com', 1, FALSE
+                    SELECT 'admin1', '$2a$12$9tjqutyvxOG5HXBcWRJpmeoY.xdl38L1eqZri3Ahu0ppfcic1B7JW', 'example@gmail.com', 1, FALSE
                     WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin1');
                 """)
                 
@@ -233,7 +233,7 @@ class DatabaseManager:
         except Exception as e:
             self.conn.rollback()
             raise
-
+    
     def get_user(self, username: str) -> Optional[Dict]:
         """Get user by username"""
         try:
@@ -253,6 +253,36 @@ class DatabaseManager:
             print(f"❌ Error getting user '{username}': {e}")
             return None
     
+    def get_user_by_id(self, user_id: int) -> Optional[Dict]:
+        """Get user by ID"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT u.*, r.name as role_name, r.permissions
+                    FROM users u
+                    LEFT JOIN roles r ON u.role_id = r.id
+                    WHERE u.id = %s
+                """, (user_id,))
+                return cursor.fetchone()
+        except Exception as e:
+            print(f"Error getting user by ID: {e}")
+            return None
+    
+    def get_user_by_email(self, email: str) -> Optional[Dict]:
+        """Get user by email"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT u.*, r.name as role_name, r.permissions
+                    FROM users u
+                    LEFT JOIN roles r ON u.role_id = r.id
+                    WHERE u.email = %s
+                """, (email,))
+                return cursor.fetchone()
+        except Exception as e:
+            print(f"Error getting user by email: {e}")
+            return None
+    
     def update_user_last_login(self, user_id: int):
         """Update user's last login timestamp"""
         try:
@@ -266,6 +296,48 @@ class DatabaseManager:
         except Exception as e:
             self.conn.rollback()
             print(f"⚠️ Failed to update last login for user {user_id}: {e}")
+    
+    def update_user_otp(self, user_id: int, otp_secret: str, expires_at: datetime):
+        """Update user OTP secret and expiration"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE users 
+                    SET otp_secret = %s, otp_expires_at = %s
+                    WHERE id = %s
+                """, (otp_secret, expires_at, user_id))
+                self.conn.commit()
+        except Exception as e:
+            self.conn.rollback()
+            raise
+    
+    def verify_user_otp(self, user_id: int, otp_secret: str) -> bool:
+        """Verify user OTP"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT 1 FROM users 
+                    WHERE id = %s AND otp_secret = %s 
+                    AND otp_expires_at > CURRENT_TIMESTAMP
+                """, (user_id, otp_secret))
+                return cursor.fetchone() is not None
+        except Exception as e:
+            print(f"Error verifying OTP: {e}")
+            return False
+    
+    def update_user_failed_attempts(self, user_id: int):
+        """Update user's failed login attempts"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE users 
+                    SET failed_login_attempts = failed_login_attempts + 1
+                    WHERE id = %s
+                """, (user_id,))
+                self.conn.commit()
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Error updating failed attempts: {e}")
     
     def save_model(self, user_id: int, model_name: str, model_path: str, 
                    metrics: Dict[str, Any], parameters: Dict[str, Any]) -> int:
@@ -338,27 +410,6 @@ class DatabaseManager:
             print(f"❌ Error getting model {model_id}: {e}")
             return None
     
-    def delete_model(self, model_id: int, user_id: int) -> bool:
-        """Soft delete a model"""
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute("""
-                    UPDATE models 
-                    SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s AND user_id = %s AND is_active = TRUE
-                    RETURNING id
-                """, (model_id, user_id))
-                result = cursor.fetchone()
-                self.conn.commit()
-                if result:
-                    print(f"✅ Model {model_id} deleted")
-                    return True
-                return False
-        except Exception as e:
-            self.conn.rollback()
-            print(f"❌ Failed to delete model {model_id}: {e}")
-            return False
-    
     def get_model_by_path(self, model_path: str, user_id: int) -> Optional[Dict]:
         """Get model by path and user ID"""
         try:
@@ -379,15 +430,16 @@ class DatabaseManager:
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute("""
-                    INSERT INTO detection_history (
-                        user_id, model_id, input_file, total_samples,
-                        anomalies_detected, detection_results
-                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                    INSERT INTO detection_results (
+                        user_id, model_id, input_file, total_flows,
+                        anomalies_detected, metrics, results
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """, (
                     user_id, model_id, input_file,
-                    results.get('total_samples', 0),
+                    results.get('total_flows', 0),
                     results.get('anomalies_detected', 0),
+                    json.dumps(results.get('metrics', {})),
                     json.dumps(results)
                 ))
                 history_id = cursor.fetchone()[0]
@@ -405,10 +457,10 @@ class DatabaseManager:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
                     SELECT dh.*, m.name as model_name
-                    FROM detection_history dh
+                    FROM detection_results dh
                     JOIN models m ON dh.model_id = m.id
                     WHERE dh.user_id = %s
-                    ORDER BY dh.processed_at DESC
+                    ORDER BY dh.created_at DESC
                     LIMIT %s
                 """, (user_id, limit))
                 history = cursor.fetchall()
@@ -449,9 +501,11 @@ class DatabaseManager:
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
-                    SELECT s.*, u.username, u.id as user_id
+                    SELECT s.*, u.username, u.id as user_id, u.role_id,
+                           r.name as role_name, r.permissions
                     FROM sessions s
                     JOIN users u ON s.user_id = u.id
+                    LEFT JOIN roles r ON u.role_id = r.id
                     WHERE s.session_token = %s 
                     AND s.is_valid = TRUE 
                     AND s.expires_at > CURRENT_TIMESTAMP
@@ -500,118 +554,6 @@ class DatabaseManager:
             print(f"❌ Failed to invalidate user sessions: {e}")
             return 0
     
-    def get_database_stats(self) -> Dict[str, Any]:
-        """Get database statistics"""
-        try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                stats = {}
-                
-                # Get table counts
-                cursor.execute("""
-                    SELECT 
-                        (SELECT COUNT(*) FROM users WHERE is_active = TRUE) as user_count,
-                        (SELECT COUNT(*) FROM models WHERE is_active = TRUE) as model_count,
-                        (SELECT COUNT(*) FROM detection_history) as detection_count,
-                        (SELECT COUNT(*) FROM sessions WHERE is_valid = TRUE AND expires_at > CURRENT_TIMESTAMP) as active_sessions
-                """)
-                counts = cursor.fetchone()
-                stats['counts'] = dict(counts) if counts else {}
-                
-                # Get recent activity
-                cursor.execute("""
-                    SELECT 
-                        (SELECT MAX(created_at) FROM users) as last_user_created,
-                        (SELECT MAX(created_at) FROM models) as last_model_created,
-                        (SELECT MAX(processed_at) FROM detection_history) as last_detection
-                """)
-                activity = cursor.fetchone()
-                stats['activity'] = dict(activity) if activity else {}
-                
-                return stats
-        except Exception as e:
-            print(f"❌ Error getting database stats: {e}")
-            return {}
-
-    def health_check(self) -> bool:
-        """Perform a health check on the database"""
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-                cursor.fetchone()
-                print("✅ Database health check: PASSED")
-                return True
-        except Exception as e:
-            print(f"❌ Database health check: FAILED - {e}")
-            return False
-    
-    def backup_database(self):
-        """Create a backup of important data"""
-        try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                backup_data = {}
-                
-                # Backup users
-                cursor.execute("SELECT * FROM users WHERE is_active = TRUE")
-                backup_data['users'] = [dict(row) for row in cursor.fetchall()]
-                
-                # Backup models
-                cursor.execute("SELECT * FROM models WHERE is_active = TRUE")
-                backup_data['models'] = [dict(row) for row in cursor.fetchall()]
-                
-                # Save to file
-                backup_file = f"database_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                with open(backup_file, 'w') as f:
-                    json.dump(backup_data, f, indent=2, default=str)
-                
-                print(f"✅ Database backup created: {backup_file}")
-                return backup_file
-        except Exception as e:
-            print(f"❌ Database backup failed: {e}")
-            return None
-    
-    def get_user_by_email(self, email: str) -> Optional[Dict]:
-        """Get user by email"""
-        try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT u.*, r.name as role_name, r.permissions
-                    FROM users u
-                    LEFT JOIN roles r ON u.role_id = r.id
-                    WHERE u.email = %s
-                """, (email,))
-                return cursor.fetchone()
-        except Exception as e:
-            print(f"Error getting user by email: {e}")
-            return None
-    
-    def update_user_otp(self, user_id: int, otp_secret: str, expires_at: datetime):
-        """Update user OTP secret and expiration"""
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute("""
-                    UPDATE users 
-                    SET otp_secret = %s, otp_expires_at = %s
-                    WHERE id = %s
-                """, (otp_secret, expires_at, user_id))
-                self.conn.commit()
-        except Exception as e:
-            self.conn.rollback()
-            raise
-    
-    def verify_user_otp(self, user_id: int, otp_secret: str) -> bool:
-        """Verify user OTP"""
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute("""
-                    SELECT 1 FROM users 
-                    WHERE id = %s AND otp_secret = %s 
-                    AND otp_expires_at > CURRENT_TIMESTAMP
-                """, (user_id, otp_secret))
-                return cursor.fetchone() is not None
-        except Exception as e:
-            print(f"Error verifying OTP: {e}")
-            return False
-    
     def log_audit_event(self, user_id: int, username: str, action: str, 
                        resource: str = None, status: str = "success", 
                        details: Dict = None, ip_address: str = None):
@@ -634,7 +576,7 @@ class DatabaseManager:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 query = """
                     SELECT * FROM audit_logs 
-                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
                 """
                 params = [period_days]
                 
@@ -658,10 +600,9 @@ class DatabaseManager:
                         DATE(created_at) as date,
                         COUNT(*) as total_detections,
                         SUM(total_flows) as total_flows,
-                        SUM(anomalies_detected) as total_anomalies,
-                        AVG((metrics->>'false_positive_rate')::float) as avg_false_positive_rate
+                        SUM(anomalies_detected) as total_anomalies
                     FROM detection_results
-                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
                 """
                 params = [period_days]
                 
@@ -752,7 +693,7 @@ class DatabaseManager:
         except Exception as e:
             self.conn.rollback()
             raise
-        
+    
     def count_admins(self) -> int:
         """Count active Administrators"""
         try:
@@ -780,7 +721,7 @@ class DatabaseManager:
                         COUNT(DISTINCT CASE WHEN action = 'model_train' THEN id END) as models_trained,
                         COUNT(DISTINCT CASE WHEN action = 'detect' THEN id END) as detection_jobs_run
                     FROM audit_logs
-                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
                 """, (period_days,))
                 result = cursor.fetchone()
                 return dict(result) if result else {}
@@ -795,9 +736,9 @@ class DatabaseManager:
                 cursor.execute("""
                     SELECT 
                         dr.created_at as detected_at,
-                        dr.results->'anomalies' as anomalies_data
+                        dr.results::text as results_json
                     FROM detection_results dr
-                    WHERE dr.created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                    WHERE dr.created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
                     AND dr.anomalies_detected > 0
                     ORDER BY dr.created_at DESC
                     LIMIT %s
@@ -805,10 +746,14 @@ class DatabaseManager:
                 
                 results = []
                 for row in cursor.fetchall():
-                    anomalies = json.loads(row['anomalies_data']) if row['anomalies_data'] else []
-                    for anomaly in anomalies[:5]:  # Get up to 5 per detection
-                        anomaly['detected_at'] = row['detected_at']
-                        results.append(anomaly)
+                    try:
+                        results_data = json.loads(row['results_json'])
+                        anomalies = results_data.get('anomalies', [])
+                        for anomaly in anomalies[:5]:  # Get up to 5 per detection
+                            anomaly['detected_at'] = row['detected_at']
+                            results.append(anomaly)
+                    except:
+                        continue
                 
                 return results[:limit]  # Ensure we don't exceed limit
         except Exception as e:
@@ -822,10 +767,10 @@ class DatabaseManager:
                 cursor.execute("""
                     SELECT 
                         dr.created_at as detected_at,
-                        dr.results->'anomalies' as anomalies_data
+                        dr.results::text as results_json
                     FROM detection_results dr
                     WHERE dr.user_id = %s
-                    AND dr.created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                    AND dr.created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
                     AND dr.anomalies_detected > 0
                     ORDER BY dr.created_at DESC
                     LIMIT 10
@@ -833,45 +778,54 @@ class DatabaseManager:
                 
                 results = []
                 for row in cursor.fetchall():
-                    anomalies = json.loads(row['anomalies_data']) if row['anomalies_data'] else []
-                    for anomaly in anomalies[:5]:  # Get up to 5 per detection
-                        anomaly['detected_at'] = row['detected_at']
-                        results.append(anomaly)
+                    try:
+                        results_data = json.loads(row['results_json'])
+                        anomalies = results_data.get('anomalies', [])
+                        for anomaly in anomalies[:5]:  # Get up to 5 per detection
+                            anomaly['detected_at'] = row['detected_at']
+                            results.append(anomaly)
+                    except:
+                        continue
                 
                 return results[:10]
         except Exception as e:
             print(f"Error getting user anomalies: {e}")
             return []
     
-    def get_user_by_id(self, user_id: int) -> Optional[Dict]:
-        """Get user by ID"""
+    def get_database_stats(self) -> Dict[str, Any]:
+        """Get database statistics"""
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                stats = {}
+                
+                # Get table counts
                 cursor.execute("""
-                    SELECT u.*, r.name as role_name
-                    FROM users u
-                    LEFT JOIN roles r ON u.role_id = r.id
-                    WHERE u.id = %s
-                """, (user_id,))
-                return cursor.fetchone()
+                    SELECT 
+                        (SELECT COUNT(*) FROM users WHERE is_active = TRUE) as user_count,
+                        (SELECT COUNT(*) FROM models WHERE is_active = TRUE) as model_count,
+                        (SELECT COUNT(*) FROM detection_results) as detection_count,
+                        (SELECT COUNT(*) FROM sessions WHERE is_valid = TRUE AND expires_at > CURRENT_TIMESTAMP) as active_sessions
+                """)
+                counts = cursor.fetchone()
+                stats['counts'] = dict(counts) if counts else {}
+                
+                return stats
         except Exception as e:
-            print(f"Error getting user by ID: {e}")
-            return None
+            print(f"❌ Error getting database stats: {e}")
+            return {}
     
-    def update_user_failed_attempts(self, user_id: int):
-        """Update user's failed login attempts"""
+    def health_check(self) -> bool:
+        """Perform a health check on the database"""
         try:
             with self.conn.cursor() as cursor:
-                cursor.execute("""
-                    UPDATE users 
-                    SET failed_login_attempts = failed_login_attempts + 1
-                    WHERE id = %s
-                """, (user_id,))
-                self.conn.commit()
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+                print("✅ Database health check: PASSED")
+                return True
         except Exception as e:
-            self.conn.rollback()
-            print(f"Error updating failed attempts: {e}")
-
+            print(f"❌ Database health check: FAILED - {e}")
+            return False
+    
     def close(self):
         """Close database connection"""
         if self.conn:

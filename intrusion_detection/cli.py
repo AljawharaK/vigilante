@@ -1214,10 +1214,18 @@ Examples:
         ))
     
     def handle_password_change_interactive(self, user_id):
-        """Handle interactive password change"""
+        """Handle interactive password change during login"""
         console.print("\n[bold yellow]Password Change Required[/bold yellow]")
         console.print("You must change your password before proceeding.\n")
         
+        # Get user info
+        user = self.db.get_user_by_id(user_id)
+        if not user:
+            console.print("[red]User not found[/red]")
+            return
+        
+        # For first login, we can't verify old password since it's a temporary one
+        # We'll just set a new password
         while True:
             new_password = getpass("New password: ")
             confirm_password = getpass("Confirm new password: ")
@@ -1230,23 +1238,16 @@ Examples:
                 console.print("[red]Password must be at least 8 characters[/red]")
                 continue
             
-            # Verify with current user
-            user = self.db.get_user_by_id(user_id)
-            if not user:
-                console.print("[red]User not found[/red]")
-                return
-            
-            # For first-time login, we need to verify with temporary password
-            # This would be handled differently in production
-            
             break
         
         # Update password
         password_hash = self.auth.hash_password(new_password)
-        self.db.reset_user_password(user_id, password_hash, must_change=False)
-        
-        console.print("[green]✓ Password changed successfully[/green]")
-        console.print("[cyan]Please log in again with your new password[/cyan]")
+        try:
+            self.db.reset_user_password(user_id, password_hash, must_change=False)
+            console.print("[green]✓ Password changed successfully[/green]")
+            console.print("[cyan]Please log in again with your new password[/cyan]")
+        except Exception as e:
+            console.print(f"[red]Failed to change password: {e}[/red]")
     
     def handle_version(self, args):
         """Display version information"""

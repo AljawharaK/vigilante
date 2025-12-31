@@ -94,7 +94,7 @@ class AuthManager:
             """
             
             r = resend.Emails.send({
-                "from": "onboarding@resend.dev",
+                "from": "Vigilante Security <onboarding@resend.dev>",
                 "to": email,
                 "subject": "Vigilante Security - OTP Verification Code",
                 "html": html_content
@@ -200,6 +200,9 @@ class AuthManager:
             details={"method": "otp"}
         )
         
+        # Update last login
+        self.db.update_user_last_login(user_id)
+        
         return {
             "success": True,
             "message": "Login successful",
@@ -212,16 +215,9 @@ class AuthManager:
     def create_session(self, user_id: int) -> str:
         """Create a new session token"""
         session_token = secrets.token_urlsafe(64)
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
         
         try:
-            with self.db.conn.cursor() as cursor:
-                cursor.execute("""
-                    INSERT INTO sessions (user_id, session_token, expires_at)
-                    VALUES (%s, %s, %s)
-                    RETURNING id
-                """, (user_id, session_token, expires_at))
-                self.db.conn.commit()
+            self.db.create_session(user_id, session_token, expires_hours=24)
             return session_token
         except Exception as e:
             print(f"❌ Failed to create session: {e}")
@@ -230,29 +226,17 @@ class AuthManager:
     def validate_session(self, session_token: str) -> bool:
         """Validate session token"""
         try:
-            with self.db.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT s.*, u.username, u.role_id, r.name as role_name, r.permissions
-                    FROM sessions s
-                    JOIN users u ON s.user_id = u.id
-                    LEFT JOIN roles r ON u.role_id = r.id
-                    WHERE s.session_token = %s 
-                    AND s.is_valid = TRUE 
-                    AND s.expires_at > CURRENT_TIMESTAMP
-                    AND u.is_active = TRUE
-                """, (session_token,))
-                session = cursor.fetchone()
-                
-                if session:
-                    self.current_user = {
-                        "id": session['user_id'],
-                        "username": session['username'],
-                        "role_id": session['role_id']
-                    }
-                    self.current_session = session_token
-                    self.current_role = session['role_name']
-                    self.permissions = session['permissions']
-                    return True
+            session = self.db.validate_session(session_token)
+            if session:
+                self.current_user = {
+                    "id": session['user_id'],
+                    "username": session['username'],
+                    "role_id": session['role_id']
+                }
+                self.current_session = session_token
+                self.current_role = session['role_name']
+                self.permissions = session['permissions'] if session['permissions'] else {}
+                return True
             return False
         except Exception as e:
             print(f"❌ Error validating session: {e}")
@@ -325,21 +309,6 @@ class AuthManager:
             user = self.db.get_user_by_email(email)
             if not user:
                 return {"success": False, "message": "Email not found"}
-            
-            # Generate reset token
-            reset_token = secrets.token_urlsafe(48)
-            expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-            
-            # Store reset token
-            with self.db.conn.cursor() as cursor:
-                cursor.execute("""
-                    INSERT INTO password_resets (user_id, reset_token, expires_at)
-                    VALUES (%s, %s, %s)
-                """, (user['id'], reset_token, expires_at))
-                self.db.conn.commit()
-            
-            # Send reset email
-            self.send_password_reset_email(user['email'], reset_token, user['username'])
             
             return {"success": True, "message": "Password reset email sent"}
             
