@@ -1,7 +1,8 @@
+# intrusion_detection/database.py
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 import json
 from dotenv import load_dotenv
@@ -10,7 +11,7 @@ import urllib.parse
 load_dotenv()
 
 class DatabaseManager:
-    """Manage PostgreSQL database operations"""
+    """Manage PostgreSQL database operations with enhanced schema"""
     
     def __init__(self):
         self.conn = None
@@ -20,22 +21,13 @@ class DatabaseManager:
     def connect(self):
         """Connect to Neon PostgreSQL database"""
         try:
-            # Direct Neon PostgreSQL connection string
-            connection_string = (
+            connection_string = os.getenv(
+                "DATABASE_URL",
                 "postgresql://neondb_owner:npg_xwSq6emIHk2v@"
                 "ep-jolly-hall-abac7zg7-pooler.eu-west-2.aws.neon.tech/"
                 "neondb?sslmode=require&channel_binding=require"
             )
             
-            # Parse the connection string for debugging
-            parsed_url = urllib.parse.urlparse(connection_string)
-            
-            print(f"🔌 Connecting to Neon PostgreSQL...")
-            print(f"   Host: {parsed_url.hostname}")
-            print(f"   Database: {parsed_url.path[1:]}")
-            print(f"   User: {parsed_url.username}")
-            
-            # Connect using the connection string directly
             self.conn = psycopg2.connect(
                 connection_string,
                 connect_timeout=10,
@@ -45,115 +37,125 @@ class DatabaseManager:
                 keepalives_count=5
             )
             
-            # Set connection parameters for Neon
             self.conn.autocommit = False
+            print("✅ Connected to database")
             
-            # Test the connection
-            with self.conn.cursor() as cursor:
-                cursor.execute("SELECT version();")
-                version = cursor.fetchone()[0]
-                print(f"✅ Connected to Neon PostgreSQL")
-                print(f"   PostgreSQL Version: {version}")
-                
-                # Check current database
-                cursor.execute("SELECT current_database();")
-                db_name = cursor.fetchone()[0]
-                print(f"   Current Database: {db_name}")
-                
-                # List existing tables
-                cursor.execute("""
-                    SELECT table_name 
-                    FROM information_schema.tables 
-                    WHERE table_schema = 'public'
-                    ORDER BY table_name;
-                """)
-                tables = cursor.fetchall()
-                print(f"   Existing tables: {[t[0] for t in tables] if tables else 'None'}")
-                
-        except psycopg2.OperationalError as e:
-            print(f"❌ Database connection failed: {e}")
-            print("\nTroubleshooting tips:")
-            print("1. Check if your Neon database is running")
-            print("2. Verify the connection string is correct")
-            print("3. Check if your IP is allowed in Neon project settings")
-            print("4. Ensure you have sufficient credits in your Neon account")
-            raise
         except Exception as e:
-            print(f"❌ Unexpected error: {e}")
+            print(f"❌ Database connection failed: {e}")
             raise
     
     def init_database(self):
-        """Initialize database tables (idempotent)"""
+        """Initialize database tables with enhanced schema"""
         try:
             with self.conn.cursor() as cursor:
-                # Create users table if not exists
+                # Create roles table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS roles (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(50) UNIQUE NOT NULL,
+                        description TEXT,
+                        permissions JSONB DEFAULT '{}',
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                
+                # Create users table with role support
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id SERIAL PRIMARY KEY,
                         username VARCHAR(50) UNIQUE NOT NULL,
                         password_hash VARCHAR(255) NOT NULL,
-                        email VARCHAR(100),
-                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                        last_login TIMESTAMP WITH TIME ZONE,
+                        email VARCHAR(100) UNIQUE NOT NULL,
+                        role_id INTEGER REFERENCES roles(id) DEFAULT 2, -- Default to Analyst
                         is_active BOOLEAN DEFAULT TRUE,
-                        CONSTRAINT users_username_unique UNIQUE(username)
+                        must_change_password BOOLEAN DEFAULT TRUE,
+                        failed_login_attempts INTEGER DEFAULT 0,
+                        last_login TIMESTAMP WITH TIME ZONE,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        otp_secret VARCHAR(100),
+                        otp_expires_at TIMESTAMP WITH TIME ZONE,
+                        CONSTRAINT users_username_unique UNIQUE(username),
+                        CONSTRAINT users_email_unique UNIQUE(email)
                     );
-                
-                    -- Create index for faster username lookups
+                    
                     CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
                     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+                    CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
                 """)
-            
-                # Create models table if not exists
+                
+                # Create models table
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS models (
                         id SERIAL PRIMARY KEY,
                         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                         name VARCHAR(100) NOT NULL,
-                        description TEXT,
-                        model_path VARCHAR(255) NOT NULL,
+                        model_path VARCHAR(500) NOT NULL,
                         model_type VARCHAR(50) DEFAULT 'dca_dae',
+                        dataset_name VARCHAR(100),
                         accuracy DECIMAL(5,4),
                         precision DECIMAL(5,4),
                         recall DECIMAL(5,4),
                         f1_score DECIMAL(5,4),
                         training_samples INTEGER,
-                        features_count INTEGER,
+                        features JSONB,
                         parameters JSONB,
+                        metrics JSONB,
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                         is_active BOOLEAN DEFAULT TRUE,
+                        version INTEGER DEFAULT 1,
                         CONSTRAINT fk_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
                     );
-                
-                    -- Create indexes for models
+                    
                     CREATE INDEX IF NOT EXISTS idx_models_user_id ON models(user_id);
                     CREATE INDEX IF NOT EXISTS idx_models_created_at ON models(created_at DESC);
-                    CREATE INDEX IF NOT EXISTS idx_models_name ON models(name);
                 """)
-            
-                # Create detection_history table if not exists
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS detection_history (
-                        id SERIAL PRIMARY KEY,
-                        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                        model_id INTEGER REFERENCES models(id) ON DELETE CASCADE,
-                        input_file VARCHAR(255),
-                        total_samples INTEGER DEFAULT 0,
-                        anomalies_detected INTEGER DEFAULT 0,
-                        detection_results JSONB,
-                        processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                        CONSTRAINT fk_detection_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
-                        CONSTRAINT fk_detection_model FOREIGN KEY(model_id) REFERENCES models(id) ON DELETE CASCADE
-                    );
                 
-                    -- Create indexes for detection_history
-                    CREATE INDEX IF NOT EXISTS idx_detection_history_user_id ON detection_history(user_id);
-                    CREATE INDEX IF NOT EXISTS idx_detection_history_model_id ON detection_history(model_id);
-                    CREATE INDEX IF NOT EXISTS idx_detection_history_processed_at ON detection_history(processed_at DESC);
+                # Create audit_logs table for immutable logging
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS audit_logs (
+                        id BIGSERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id),
+                        username VARCHAR(50),
+                        action VARCHAR(100) NOT NULL,
+                        resource VARCHAR(500),
+                        status VARCHAR(50),
+                        details JSONB,
+                        ip_address VARCHAR(45),
+                        user_agent TEXT,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        CONSTRAINT audit_logs_immutable CHECK (created_at <= CURRENT_TIMESTAMP)
+                    );
+                    
+                    CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+                    CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+                    CREATE INDEX IF NOT EXISTS idx_audit_logs_status ON audit_logs(status);
                 """)
-            
-                # FIXED: Create sessions table without problematic partial index
+                
+                # Create detection_results table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS detection_results (
+                        id BIGSERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id),
+                        model_id INTEGER REFERENCES models(id),
+                        input_file VARCHAR(500),
+                        total_flows INTEGER,
+                        anomalies_detected INTEGER,
+                        false_positives INTEGER,
+                        false_negatives INTEGER,
+                        execution_time_seconds DECIMAL(10,2),
+                        metrics JSONB,
+                        results JSONB,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    );
+                    
+                    CREATE INDEX IF NOT EXISTS idx_detection_results_user_id ON detection_results(user_id);
+                    CREATE INDEX IF NOT EXISTS idx_detection_results_created_at ON detection_results(created_at DESC);
+                """)
+                
+                # Create sessions table
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS sessions (
                         id SERIAL PRIMARY KEY,
@@ -161,85 +163,75 @@ class DatabaseManager:
                         session_token VARCHAR(255) UNIQUE NOT NULL,
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                         expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                        last_activity TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                         is_valid BOOLEAN DEFAULT TRUE,
                         CONSTRAINT sessions_token_unique UNIQUE(session_token),
                         CONSTRAINT fk_sessions_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
                     );
-                
-                    -- Create indexes for sessions (FIXED: removed partial index with CURRENT_TIMESTAMP)
+                    
                     CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
                     CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
                     CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
-                
-                    -- Create index for faster session validation (FIXED version)
-                    CREATE INDEX IF NOT EXISTS idx_sessions_valid ON sessions(session_token) 
-                    WHERE is_valid = TRUE;
                 """)
-            
-                # Create model_versions table for versioning support
+                
+                # Insert default roles
                 cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS model_versions (
-                        id SERIAL PRIMARY KEY,
-                        model_id INTEGER REFERENCES models(id) ON DELETE CASCADE,
-                        version INTEGER NOT NULL,
-                        model_path VARCHAR(255) NOT NULL,
-                        accuracy DECIMAL(5,4),
-                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                        notes TEXT,
-                        CONSTRAINT unique_model_version UNIQUE(model_id, version),
-                        CONSTRAINT fk_model_version FOREIGN KEY(model_id) REFERENCES models(id) ON DELETE CASCADE
-                    );
-                
-                    CREATE INDEX IF NOT EXISTS idx_model_versions_model_id ON model_versions(model_id);
+                    INSERT INTO roles (id, name, description, permissions) VALUES
+                    (1, 'Administrator', 'Cybersecurity Administrator with full system access',
+                     '{"manage_users": true, "manage_models": true, "view_audit_logs": true, 
+                       "generate_reports": true, "system_config": true, "train_models": true, 
+                       "run_detection": true, "view_summary": true, "generate_explanations": true}'),
+                    (2, 'Analyst', 'Security Analyst with detection and analysis capabilities',
+                     '{"train_models": true, "run_detection": true, "view_summary": true, 
+                       "generate_explanations": true}')
+                    ON CONFLICT (id) DO UPDATE SET 
+                        name = EXCLUDED.name,
+                        description = EXCLUDED.description,
+                        permissions = EXCLUDED.permissions;
                 """)
-            
+                
+                # Create admin user if not exists
+                cursor.execute("""
+                    INSERT INTO users (username, password_hash, email, role_id, must_change_password)
+                    SELECT 'admin1', 'test123', 'aljawharakqs@gmail.com', 1, FALSE
+                    WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin1');
+                """)
+                
                 self.conn.commit()
-                print("✅ Database tables initialized/verified")
-            
-                # Verify tables were created
-                cursor.execute("""
-                    SELECT table_name 
-                    FROM information_schema.tables 
-                    WHERE table_schema = 'public' 
-                    AND table_name IN ('users', 'models', 'detection_history', 'sessions', 'model_versions')
-                    ORDER BY table_name;
-                """)
-                existing_tables = [row[0] for row in cursor.fetchall()]
-                print(f"   Available tables: {existing_tables}")
-            
+                print("✅ Database tables initialized successfully")
+                
         except Exception as e:
             self.conn.rollback()
             print(f"❌ Database initialization failed: {e}")
-            # Try to get more details about the error
-            import traceback
-            print(f"Full traceback:\n{traceback.format_exc()}")
             raise
     
-    def create_user(self, username: str, password_hash: str, email: Optional[str] = None) -> int:
-        """Create a new user"""
+    def create_user(self, username: str, password_hash: str, email: str, 
+                   role: str = 'Analyst', created_by: int = None) -> int:
+        """Create a new user with simplified roles"""
         try:
+            # Map role name to role_id
+            role_map = {
+                'Administrator': 1,
+                'Analyst': 2
+            }
+            
+            if role not in role_map:
+                raise ValueError(f"Invalid role. Must be 'Administrator' or 'Analyst'")
+            
+            role_id = role_map[role]
+            
             with self.conn.cursor() as cursor:
                 cursor.execute("""
-                    INSERT INTO users (username, password_hash, email, last_login)
-                    VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-                    ON CONFLICT (username) DO NOTHING
+                    INSERT INTO users (username, password_hash, email, role_id, created_at)
+                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
                     RETURNING id
-                """, (username, password_hash, email))
+                """, (username, password_hash, email, role_id))
                 
-                result = cursor.fetchone()
-                if result:
-                    user_id = result[0]
-                    self.conn.commit()
-                    print(f"✅ User '{username}' created with ID: {user_id}")
-                    return user_id
-                else:
-                    # User already exists
-                    self.conn.rollback()
-                    raise ValueError(f"User '{username}' already exists")
-                    
+                user_id = cursor.fetchone()[0]
+                self.conn.commit()
+                return user_id
         except Exception as e:
             self.conn.rollback()
-            print(f"❌ Failed to create user '{username}': {e}")
             raise
     
     def get_user(self, username: str) -> Optional[Dict]:
@@ -535,20 +527,6 @@ class DatabaseManager:
         except Exception as e:
             print(f"❌ Error getting database stats: {e}")
             return {}
-    
-    def close(self):
-        """Close database connection"""
-        if self.conn:
-            try:
-                # Check if connection is still alive
-                with self.conn.cursor() as cursor:
-                    cursor.execute("SELECT 1")
-                print("✅ Database connection healthy")
-            except Exception as e:
-                print(f"⚠️ Database connection issue: {e}")
-            
-            self.conn.close()
-            print("✅ Database connection closed")
 
     def health_check(self) -> bool:
         """Perform a health check on the database"""
@@ -586,3 +564,193 @@ class DatabaseManager:
         except Exception as e:
             print(f"❌ Database backup failed: {e}")
             return None
+    
+    def get_user_by_email(self, email: str) -> Optional[Dict]:
+        """Get user by email"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT u.*, r.name as role_name, r.permissions
+                    FROM users u
+                    LEFT JOIN roles r ON u.role_id = r.id
+                    WHERE u.email = %s
+                """, (email,))
+                return cursor.fetchone()
+        except Exception as e:
+            print(f"Error getting user by email: {e}")
+            return None
+    
+    def update_user_otp(self, user_id: int, otp_secret: str, expires_at: datetime):
+        """Update user OTP secret and expiration"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE users 
+                    SET otp_secret = %s, otp_expires_at = %s
+                    WHERE id = %s
+                """, (otp_secret, expires_at, user_id))
+                self.conn.commit()
+        except Exception as e:
+            self.conn.rollback()
+            raise
+    
+    def verify_user_otp(self, user_id: int, otp_secret: str) -> bool:
+        """Verify user OTP"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT 1 FROM users 
+                    WHERE id = %s AND otp_secret = %s 
+                    AND otp_expires_at > CURRENT_TIMESTAMP
+                """, (user_id, otp_secret))
+                return cursor.fetchone() is not None
+        except Exception as e:
+            print(f"Error verifying OTP: {e}")
+            return False
+    
+    def log_audit_event(self, user_id: int, username: str, action: str, 
+                       resource: str = None, status: str = "success", 
+                       details: Dict = None, ip_address: str = None):
+        """Log audit event"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO audit_logs 
+                    (user_id, username, action, resource, status, details, ip_address, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                """, (user_id, username, action, resource, status, 
+                     json.dumps(details) if details else None, ip_address))
+                self.conn.commit()
+        except Exception as e:
+            print(f"Error logging audit event: {e}")
+    
+    def get_audit_logs(self, period_days: int = 30, user_id: int = None) -> List[Dict]:
+        """Get audit logs for period"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                query = """
+                    SELECT * FROM audit_logs 
+                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                """
+                params = [period_days]
+                
+                if user_id:
+                    query += " AND user_id = %s"
+                    params.append(user_id)
+                
+                query += " ORDER BY created_at DESC"
+                cursor.execute(query, tuple(params))
+                return cursor.fetchall()
+        except Exception as e:
+            print(f"Error getting audit logs: {e}")
+            return []
+    
+    def get_detection_summary(self, user_id: int = None, period_days: int = 7):
+        """Get detection summary for period"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                query = """
+                    SELECT 
+                        DATE(created_at) as date,
+                        COUNT(*) as total_detections,
+                        SUM(total_flows) as total_flows,
+                        SUM(anomalies_detected) as total_anomalies,
+                        AVG((metrics->>'false_positive_rate')::float) as avg_false_positive_rate
+                    FROM detection_results
+                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                """
+                params = [period_days]
+                
+                if user_id:
+                    query += " AND user_id = %s"
+                    params.append(user_id)
+                
+                query += " GROUP BY DATE(created_at) ORDER BY date DESC"
+                cursor.execute(query, tuple(params))
+                return cursor.fetchall()
+        except Exception as e:
+            print(f"Error getting detection summary: {e}")
+            return []
+    
+    def get_role_permissions(self, role_id: int) -> Dict:
+        """Get permissions for a role"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT permissions FROM roles WHERE id = %s
+                """, (role_id,))
+                result = cursor.fetchone()
+                return result['permissions'] if result else {}
+        except Exception as e:
+            print(f"Error getting role permissions: {e}")
+            return {}
+    
+    def update_user_role(self, user_id: int, role: str, updated_by: int):
+        """Update user role (simplified)"""
+        try:
+            # Map role name to role_id
+            role_map = {
+                'Administrator': 1,
+                'Analyst': 2
+            }
+            
+            if role not in role_map:
+                raise ValueError(f"Invalid role. Must be 'Administrator' or 'Analyst'")
+            
+            role_id = role_map[role]
+            
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE users 
+                    SET role_id = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    RETURNING username
+                """, (role_id, user_id))
+                username = cursor.fetchone()[0]
+                self.conn.commit()
+                return username
+        except Exception as e:
+            self.conn.rollback()
+            raise
+    
+    def deactivate_user(self, user_id: int, updated_by: int):
+        """Deactivate user"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE users 
+                    SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    RETURNING username
+                """, (user_id,))
+                username = cursor.fetchone()[0]
+                self.conn.commit()
+                return username
+        except Exception as e:
+            self.conn.rollback()
+            raise
+    
+    def reset_user_password(self, user_id: int, password_hash: str, must_change: bool = True):
+        """Reset user password"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE users 
+                    SET password_hash = %s, 
+                        must_change_password = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    RETURNING username
+                """, (password_hash, must_change, user_id))
+                username = cursor.fetchone()[0]
+                self.conn.commit()
+                return username
+        except Exception as e:
+            self.conn.rollback()
+            raise
+    
+    def close(self):
+        """Close database connection"""
+        if self.conn:
+            self.conn.close()
+            print("✅ Database connection closed")

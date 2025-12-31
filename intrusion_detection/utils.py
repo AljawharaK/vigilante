@@ -1,119 +1,199 @@
-"""Utility functions for the intrusion detection system"""
-
+# intrusion_detection/utils.py
 import os
 import json
-import yaml
-import hashlib
-from datetime import datetime
-from typing import Dict, Any, Optional
 import pandas as pd
+from datetime import datetime
+from typing import Dict, Any, List
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from rich.table import Table as RichTable
+from rich.console import Console
 
-def get_file_hash(file_path: str) -> str:
-    """Calculate SHA256 hash of a file"""
-    sha256_hash = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-    return sha256_hash.hexdigest()
+console = Console()
 
-def save_results(results: Dict[str, Any], output_path: str, format: str = 'json'):
-    """Save results to file in specified format"""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
+    """Generate PDF report for system statistics - simplified roles"""
     
-    if format.lower() == 'json':
-        with open(output_path, 'w') as f:
-            json.dump(results, f, indent=2)
-    elif format.lower() == 'yaml':
-        with open(output_path, 'w') as f:
-            yaml.dump(results, f, default_flow_style=False)
-    elif format.lower() == 'csv':
-        # Convert results to DataFrame if possible
-        if 'predictions' in results:
-            df = pd.DataFrame(results['predictions'])
-            df.to_csv(output_path, index=False)
-        else:
-            raise ValueError("Results cannot be converted to CSV")
+    doc = SimpleDocTemplate(
+        output_path,
+        pagesize=A4,
+        rightMargin=72,
+        leftMargin=72,
+        topMargin=72,
+        bottomMargin=72
+    )
+    
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Title with simplified role mention
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30,
+        alignment=1,
+        textColor=colors.HexColor('#1a237e')  # Dark blue
+    )
+    
+    story.append(Paragraph("Vigilante Security - System Report", title_style))
+    story.append(Paragraph("Administrator Report - Role-Based Access System", 
+                          ParagraphStyle('Subtitle', parent=styles['Heading3'], alignment=1)))
+    
+    # Report period
+    period = report_data.get('report_period', {})
+    period_text = f"Report Period: {period.get('start', 'N/A')} to {period.get('end', 'N/A')}"
+    story.append(Paragraph(period_text, styles['Normal']))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+    story.append(Spacer(1, 20))
+    
+    # Detection Summary
+    story.append(Paragraph("Detection Summary", styles['Heading2']))
+    
+    detection_summary = report_data.get('detection_summary', {})
+    detection_data = [
+        ["Metric", "Value"],
+        ["Total Flows Analyzed", f"{detection_summary.get('total_flows_analyzed', 0):,}"],
+        ["Total Anomalies Detected", detection_summary.get('total_anomalies_detected', 0)],
+        ["Avg False Positive Rate", f"{detection_summary.get('avg_false_positive_rate', 0):.2f}%"],
+        ["Predominant Severity", detection_summary.get('predominant_severity', 'Low')]
+    ]
+    
+    detection_table = Table(detection_data)
+    detection_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(detection_table)
+    story.append(Spacer(1, 20))
+    
+    # User Activity
+    story.append(Paragraph("User Activity", styles['Heading2']))
+    
+    user_activity = report_data.get('user_activity', {})
+    activity_data = [
+        ["Activity", "Count"],
+        ["Total Logins", user_activity.get('total_logins', 0)],
+        ["Models Trained", user_activity.get('models_trained', 0)],
+        ["Detection Jobs Run", user_activity.get('detection_jobs_run', 0)]
+    ]
+    
+    activity_table = Table(activity_data)
+    activity_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(activity_table)
+    story.append(Spacer(1, 20))
+    
+    # Recent Anomalies
+    story.append(Paragraph("Recent Anomalies", styles['Heading2']))
+    
+    anomalies = report_data.get('recent_anomalies', [])
+    if anomalies:
+        anomaly_data = [["Flow ID", "Source IP", "Destination IP", "Confidence", "Severity"]]
+        
+        for anomaly in anomalies[:10]:  # Show top 10
+            anomaly_data.append([
+                anomaly.get('flow_id', 'N/A'),
+                anomaly.get('src_ip', 'N/A'),
+                anomaly.get('dst_ip', 'N/A'),
+                f"{anomaly.get('confidence_score', 0):.2f}",
+                anomaly.get('severity', 'Medium')
+            ])
+        
+        anomaly_table = Table(anomaly_data, colWidths=[1*inch, 1.5*inch, 1.5*inch, 1*inch, 1*inch])
+        anomaly_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ('FONTSIZE', (0, 1), (-1, -1), 8)
+        ]))
+        story.append(anomaly_table)
     else:
-        raise ValueError(f"Unsupported format: {format}")
+        story.append(Paragraph("No anomalies detected in the period.", styles['Normal']))
     
-    print(f"Results saved to: {output_path}")
+    # Footer
+    story.append(Spacer(1, 40))
+    story.append(Paragraph("Confidential - For authorized personnel only", 
+                          ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=1)))
+    
+    # Build PDF
+    doc.build(story)
+    
+    return output_path
 
-def validate_data_file(file_path: str, required_columns: Optional[list] = None) -> bool:
-    """Validate data file structure"""
-    if not os.path.exists(file_path):
-        print(f"Error: File not found: {file_path}")
-        return False
+def format_table(data: List[Dict], title: str = "") -> RichTable:
+    """Format data as a rich table"""
+    if not data:
+        table = RichTable(title=title)
+        table.add_column("No data", style="yellow")
+        return table
     
-    try:
-        # Try to read the file
-        df = pd.read_csv(file_path, nrows=1)  # Only read first row to check columns
-        
-        if required_columns:
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
-                print(f"Error: Missing required columns: {missing_columns}")
-                return False
-        
-        return True
+    # Create table with columns from first data item
+    table = RichTable(title=title, show_header=True, header_style="bold cyan")
     
-    except Exception as e:
-        print(f"Error reading file: {e}")
-        return False
-
-def create_model_directory(model_name: str, base_dir: str = "models") -> str:
-    """Create directory structure for a model"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    model_dir = os.path.join(base_dir, f"{model_name}_{timestamp}")
+    # Add columns
+    for key in data[0].keys():
+        table.add_column(str(key), style="green")
     
-    os.makedirs(model_dir, exist_ok=True)
-    os.makedirs(os.path.join(model_dir, "checkpoints"), exist_ok=True)
-    os.makedirs(os.path.join(model_dir, "logs"), exist_ok=True)
-    os.makedirs(os.path.join(model_dir, "results"), exist_ok=True)
+    # Add rows
+    for item in data:
+        table.add_row(*[str(item.get(key, '')) for key in data[0].keys()])
     
-    return model_dir
-
-def load_config(config_path: str) -> Dict[str, Any]:
-    """Load configuration from YAML or JSON file"""
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"Config file not found: {config_path}")
-    
-    with open(config_path, 'r') as f:
-        if config_path.endswith('.yaml') or config_path.endswith('.yml'):
-            return yaml.safe_load(f)
-        elif config_path.endswith('.json'):
-            return json.load(f)
-        else:
-            raise ValueError("Config file must be YAML or JSON")
-
-def format_bytes(size: float) -> str:
-    """Format bytes to human readable string"""
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if size < 1024.0:
-            return f"{size:.2f} {unit}"
-        size /= 1024.0
-    return f"{size:.2f} PB"
+    return table
 
 def get_system_info() -> Dict[str, Any]:
     """Get system information"""
     import platform
     import psutil
+    import torch
     
     info = {
-        "platform": platform.platform(),
+        "system": platform.system(),
+        "release": platform.release(),
         "python_version": platform.python_version(),
-        "processor": platform.processor(),
         "cpu_count": psutil.cpu_count(),
-        "total_memory": format_bytes(psutil.virtual_memory().total),
-        "available_memory": format_bytes(psutil.virtual_memory().available),
+        "total_memory": f"{psutil.virtual_memory().total / (1024**3):.2f} GB",
+        "available_memory": f"{psutil.virtual_memory().available / (1024**3):.2f} GB",
+        "torch_version": torch.__version__,
+        "cuda_available": torch.cuda.is_available(),
     }
     
-    # Try to get GPU info if available
-    try:
-        import torch
-        if torch.cuda.is_available():
-            info["gpu"] = torch.cuda.get_device_name(0)
-            info["gpu_memory"] = format_bytes(torch.cuda.get_device_properties(0).total_memory)
-    except ImportError:
-        pass
+    if torch.cuda.is_available():
+        info["gpu_name"] = torch.cuda.get_device_name(0)
+        info["gpu_memory"] = f"{torch.cuda.get_device_properties(0).total_memory / (1024**3):.2f} GB"
     
     return info
+
+def save_detection_to_csv(results: Dict[str, Any], output_path: str):
+    """Save detection results to CSV"""
+    # Extract anomalies
+    anomalies = results.get('anomalies', [])
+    
+    if not anomalies:
+        # Create empty CSV with headers
+        pd.DataFrame(columns=['flow_id', 'src_ip', 'dst_ip', 'confidence_score', 'severity']).to_csv(output_path, index=False)
+    else:
+        # Convert to DataFrame and save
+        df = pd.DataFrame(anomalies)
+        df.to_csv(output_path, index=False)
+    
+    return output_path
