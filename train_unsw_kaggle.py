@@ -406,7 +406,7 @@ def train_enhanced_model():
     print(f"     FN: {cm[1,0]}, TP: {cm[1,1]}")
     
     # ========================
-    # Save Model
+    # Save to Database
     # ========================
     print("\n💾 Saving model...")
     
@@ -468,16 +468,6 @@ def train_enhanced_model():
         }
     }
     
-    metadata_path = os.path.join(model_dir, "metadata.json")
-    with open(metadata_path, 'w') as f:
-        json.dump(metadata, f, indent=2)
-    
-    print(f"✅ Model saved to: {model_dir}")
-    
-    # ========================
-    # Save to Database
-    # ========================
-    print("\n💾 Saving to database...")
     user = auth.get_current_user()
     
     try:
@@ -503,15 +493,6 @@ def train_enhanced_model():
             
     except Exception as e:
         print(f"❌ Error saving to database: {e}")
-    
-    # ========================
-    # Save Session
-    # ========================
-    print("\n🔐 Saving session for CLI use...")
-    session_file = os.path.join(os.path.expanduser("~"), ".ids_session")
-    with open(session_file, 'w') as f:
-        f.write(auth.current_session)
-    print(f"✅ Session saved to: {session_file}")
     
     # ========================
     # Summary
