@@ -7,14 +7,14 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 setup(
-    name="intrusion-detection-cli",
+    name="vigilante",
     version="1.0.0",
     author="Intrusion Detection Team",
-    author_email="support@intrusion-detection.com",
-    description="A CLI tool for intrusion detection using DCA+Denoising Autoencoder",
+    author_email="aljawharakqs@gmail.com",
+    description="A CLI tool for intrusion detection using computational intelligence artificial immune system algorithms.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/intrusion-detection-cli",
+    url="https://github.com/AljawharaK/vigilante",
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -25,7 +25,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "ids-cli=intrusion_detection.cli:main",
+            "vigilante=intrusion_detection.cli:main",
         ],
     },
     include_package_data=True,

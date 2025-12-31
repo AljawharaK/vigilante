@@ -111,7 +111,7 @@ Examples:
         """Check if user is authenticated"""
         if not self.auth.is_authenticated():
             console.print("[red]Error: You must be logged in to perform this action[/red]")
-            console.print("Use [cyan]ids-cli --login --username USER --password PASS[/cyan]")
+            console.print("Use [cyan]vigilante --login --username USER --password PASS[/cyan]")
             return False
         return True
     
@@ -479,7 +479,7 @@ Examples:
                     self.parser.print_help()
                 else:
                     console.print("[red]Error: No valid command specified[/red]")
-                    console.print("Use [cyan]ids-cli --help[/cyan] for usage information")
+                    console.print("Use [cyan]vigilante --help[/cyan] for usage information")
         
         except KeyboardInterrupt:
             console.print("\n[yellow]Operation cancelled by user[/yellow]")
