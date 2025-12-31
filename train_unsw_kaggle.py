@@ -506,7 +506,6 @@ def train_enhanced_model():
     print(f"   Recall:    {recall:.2%}")
     print(f"   F1-Score:  {f1:.2%}")
     print(f"\n📁 Model Location: {model_dir}")
-    print(f"🔐 Session: {session_file}")
     print(f"\n🚀 Next steps:")
     print(f"   1. Use CLI: ids-cli --list-models")
     print(f"   2. Detect anomalies: ids-cli --detect --model-path {model_dir} --data-file YOUR_DATA.csv")
