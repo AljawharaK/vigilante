@@ -566,7 +566,6 @@ Examples:
                 "total_anomalies_detected": total_anomalies,
                 "anomaly_rate": total_anomalies / total_flows if total_flows > 0 else 0,
                 "avg_false_positive_rate": self.calculate_avg_fpr(detection_summary),
-                "predominant_severity": self.get_predominant_severity(recent_anomalies)
             },
             "user_activity": user_activity,
             "recent_anomalies": recent_anomalies[:10]  # Top 10
@@ -771,9 +770,22 @@ Examples:
         anomalies = []
         anomaly_indices = np.where(predictions == 1)[0]
     
+        # Normalize reconstruction errors for confidence calculation
+        if len(reconstruction_errors) > 0:
+            max_error = np.max(reconstruction_errors) if np.max(reconstruction_errors) > 0 else 1.0
+            normalized_errors = reconstruction_errors / max_error
+        else:
+            normalized_errors = reconstruction_errors
+    
         for idx in anomaly_indices:
             row = df.iloc[idx]
-            confidence = reconstruction_errors[idx] / model.threshold
+        
+            # Calculate confidence score: 1 - normalized reconstruction error
+            # Clamp between 0 and 1
+            if idx < len(normalized_errors):
+                confidence = max(0.0, min(1.0, 1.0 - normalized_errors[idx]))
+            else:
+                confidence = 0.5  # Default if index out of bounds
         
             # Convert numpy types to Python native types
             anomaly = {
@@ -781,7 +793,7 @@ Examples:
                 'src_ip': str(row.get('srcip', 'N/A')),
                 'dst_ip': str(row.get('dstip', 'N/A')),
                 'protocol': str(row.get('proto', 'N/A')),
-                'confidence_score': float(min(1.0, confidence)),  # Convert to float
+                'confidence_score': float(confidence),  # Use proper confidence calculation
                 'severity': self.calculate_severity(confidence),
                 'reconstruction_error': float(reconstruction_errors[idx]),  # Convert to float
                 'features': self.get_important_features(row, model)
@@ -992,38 +1004,38 @@ Examples:
         """Handle detection explanation"""
         if not self.check_permission('generate_explanations'):
             return
-        
+    
         detection_data = None
-        
+    
         if args.detection_id:
             # Load from database
             detection = self.db.get_detection(args.detection_id, self.auth.current_user['id'])
             if not detection:
                 console.print(f"[red]Detection ID {args.detection_id} not found[/red]")
                 return
-            
+        
             detection_data = detection['results']
-            
+        
         elif args.input:
             # Load from file
             if not os.path.exists(args.input):
                 console.print(f"[red]Input file not found: {args.input}[/red]")
                 return
-            
+        
             with open(args.input, 'r') as f:
                 detection_data = json.load(f)
-        
+    
         else:
             console.print("[red]Please specify either --detection-id or --input[/red]")
             return
-        
+    
         # Generate explanations
         console.print("[cyan]Generating explanations for detected anomalies...[/cyan]\n")
-        
-        if not detection_data.get('anomalies'):
+    
+        if not detection_data or not detection_data.get('anomalies'):
             console.print("[yellow]No anomalies to explain[/yellow]")
             return
-        
+    
         for i, anomaly in enumerate(detection_data['anomalies'][:5]):  # Explain first 5
             self.explain_anomaly(anomaly, i+1)
     
@@ -1087,15 +1099,17 @@ Examples:
         return fpr_sum / len(detection_summary) if detection_summary else 0.0
     
     def calculate_severity(self, confidence):
-        """Calculate severity based on confidence score"""
-        if confidence > 0.9:
+        """Calculate severity based on confidence score (0-1 scale)"""
+        if confidence >= 0.95:
             return "Critical"
-        elif confidence > 0.7:
+        elif confidence >= 0.85:
             return "High"
-        elif confidence > 0.5:
+        elif confidence >= 0.70:
             return "Medium"
-        else:
+        elif confidence >= 0.50:
             return "Low"
+        else:
+            return "Minimal"
     
     def get_important_features(self, row, model):
         """Get important features for explanation with JSON serializable values"""
@@ -1116,15 +1130,6 @@ Examples:
     
         # Return sorted features (converted to regular dict)
         return dict(sorted(features.items(), key=lambda x: x[1], reverse=True)[:5])
-    
-    def get_predominant_severity(self, anomalies):
-        """Get predominant severity from anomalies"""
-        if not anomalies:
-            return "Low"
-        
-        severities = [a.get('severity', 'Low') for a in anomalies]
-        counter = Counter(severities)
-        return counter.most_common(1)[0][0]
     
     def run(self):
         """Main CLI runner"""
