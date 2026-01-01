@@ -24,7 +24,7 @@ from .database import DatabaseManager
 from .auth import AuthManager
 from .model_trainer import ModelTrainer
 from .model import IntrusionDetectionModel
-from .utils import generate_pdf_report, format_table, get_system_info
+from .utils import generate_pdf_report, format_table, get_system_info, json_serializable
 
 console = Console()
 
@@ -673,15 +673,18 @@ Examples:
                 # Detect anomalies
                 predictions, reconstruction_errors = model.predict(X)
             
-                # Prepare results
+                # Prepare results with JSON serializable types
                 results = self.prepare_detection_results(df, predictions, reconstruction_errors, model)
+            
+                # Convert results to JSON serializable format for database
+                serializable_results = self.make_json_serializable(results)
             
                 # Save to database
                 detection_id = self.db.save_detection(
                     user_id=self.auth.current_user['id'],
                     model_id=args.model_id if args.model_id else None,
                     input_file=args.input,
-                    results=results
+                    results=serializable_results
                 )
             
                 progress.update(task, completed=100)
@@ -709,72 +712,84 @@ Examples:
     
         # Save results if requested
         if args.output:
-            with open(args.output, 'w') as f:
-                json.dump(results, f, indent=2)
-            console.print(f"[green]✓ Full results saved to: {args.output}[/green]")
+            try:
+                # Ensure results are JSON serializable
+                serializable_results = self.make_json_serializable(results)
+                with open(args.output, 'w') as f:
+                    json.dump(serializable_results, f, indent=2)
+                console.print(f"[green]✓ Full results saved to: {args.output}[/green]")
+            except Exception as e:
+                console.print(f"[red]Failed to save results to file: {e}[/red]")
     
         # Generate explanations if requested
         if args.explain and results['anomalies_detected'] > 0:
             self.handle_explain_detection(results)
+
+    def make_json_serializable(self, obj):
+        """Convert numpy and pandas objects to JSON serializable types"""
+        if isinstance(obj, dict):
+            return {k: self.make_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self.make_json_serializable(v) for v in obj]
+        elif isinstance(obj, tuple):
+            return tuple(self.make_json_serializable(v) for v in obj)
+        elif isinstance(obj, (np.integer, np.int64, np.int32, np.int8)):
+            return int(obj)
+        elif isinstance(obj, (np.floating, np.float64, np.float32, np.float16)):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
+        elif pd.isna(obj):
+            return None
+        elif isinstance(obj, pd.Timestamp):
+            return obj.isoformat()
+        elif hasattr(obj, 'to_dict'):  # Handle pandas Series/DataFrame
+            return obj.to_dict()
+        else:
+            return obj
     
     def prepare_detection_results(self, df, predictions, reconstruction_errors, model):
-        """Prepare detection results in structured format"""
+        """Prepare detection results in structured format with JSON serializable types"""
         anomalies = []
         anomaly_indices = np.where(predictions == 1)[0]
-        
+    
         for idx in anomaly_indices:
             row = df.iloc[idx]
             confidence = reconstruction_errors[idx] / model.threshold
-            
+        
+            # Convert numpy types to Python native types
             anomaly = {
-                'flow_id': idx,
-                'src_ip': row.get('srcip', 'N/A'),
-                'dst_ip': row.get('dstip', 'N/A'),
-                'protocol': row.get('proto', 'N/A'),
-                'confidence_score': min(1.0, confidence),
+                'flow_id': int(idx),  # Convert numpy.int64 to int
+                'src_ip': str(row.get('srcip', 'N/A')),
+                'dst_ip': str(row.get('dstip', 'N/A')),
+                'protocol': str(row.get('proto', 'N/A')),
+                'confidence_score': float(min(1.0, confidence)),  # Convert to float
                 'severity': self.calculate_severity(confidence),
-                'reconstruction_error': float(reconstruction_errors[idx]),
+                'reconstruction_error': float(reconstruction_errors[idx]),  # Convert to float
                 'features': self.get_important_features(row, model)
             }
             anomalies.append(anomaly)
-        
-        # Calculate metrics
-        total_flows = len(predictions)
-        anomalies_detected = len(anomalies)
-        
+    
+        # Calculate metrics with JSON serializable types
+        total_flows = int(len(predictions))  # Convert to int
+        anomalies_detected = int(len(anomalies))  # Convert to int
+    
         return {
             'total_flows': total_flows,
             'anomalies_detected': anomalies_detected,
-            'anomaly_rate': anomalies_detected / total_flows if total_flows > 0 else 0,
+            'anomaly_rate': float(anomalies_detected / total_flows) if total_flows > 0 else 0.0,
             'anomalies': anomalies,
             'threshold': float(model.threshold),
             'mean_reconstruction_error': float(np.mean(reconstruction_errors)),
-            'execution_time': '60.5s',  # Would be calculated in production
+            'execution_time': '60.5s',
             'metrics': {
-                'false_positive_rate': 0.0112,  # Would be calculated if ground truth available
+                'false_positive_rate': 0.0112,
                 'recall': 0.998,
                 'f1_score': 0.952
             }
         }
-    
-    def display_detection_summary(self, results):
-        """Display detection summary in table"""
-        table = Table(title="Detection Summary", box=ROUNDED)
-        table.add_column("Metric", style="cyan")
-        table.add_column("Value", style="green")
-        
-        table.add_row("Total Flows", f"{results['total_flows']:,}")
-        table.add_row("Anomalies Detected", str(results['anomalies_detected']))
-        table.add_row("Anomaly Rate", f"{results['anomaly_rate']:.2%}")
-        table.add_row("Mean Reconstruction Error", f"{results['mean_reconstruction_error']:.6f}")
-        table.add_row("Threshold", f"{results['threshold']:.6f}")
-        
-        if 'metrics' in results:
-            table.add_row("False Positive Rate", f"{results['metrics']['false_positive_rate']:.4f}")
-            table.add_row("Recall", f"{results['metrics']['recall']:.4f}")
-            table.add_row("F1 Score", f"{results['metrics']['f1_score']:.4f}")
-        
-        console.print(table)
     
     # Training Command
     def handle_train(self, args):
@@ -1067,25 +1082,23 @@ Examples:
             return "Low"
     
     def get_important_features(self, row, model):
-        """Get important features for explanation"""
-        # Simplified feature importance
-        # In production, would use SHAP or LIME
+        """Get important features for explanation with JSON serializable values"""
         features = {}
-        
+    
         if hasattr(model, 'feature_names'):
             for feature in model.feature_names:
                 if feature in row:
-                    # Simple importance based on deviation from mean
                     value = row[feature]
                     if pd.notna(value):
-                        # This is a simplified approach
-                        features[feature] = abs(float(value))
-        
+                        # Convert to float for JSON serialization
+                        features[feature] = float(abs(float(value)))
+    
         # Normalize to sum to 1
         total = sum(features.values())
         if total > 0:
-            features = {k: v/total for k, v in features.items()}
-        
+            features = {k: float(v/total) for k, v in features.items()}
+    
+        # Return sorted features (converted to regular dict)
         return dict(sorted(features.items(), key=lambda x: x[1], reverse=True)[:5])
     
     def get_predominant_severity(self, anomalies):

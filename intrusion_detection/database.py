@@ -5,6 +5,8 @@ from psycopg2.extras import RealDictCursor, DictCursor
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 import json
+import numpy as np
+import pandas as pd
 from dotenv import load_dotenv
 import urllib.parse
 
@@ -99,6 +101,7 @@ class DatabaseManager:
                         f1_score DECIMAL(5,4),
                         training_samples INTEGER,
                         features JSONB,
+                        features_count INTEGER,
                         parameters JSONB,
                         metrics JSONB,
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -433,8 +436,11 @@ class DatabaseManager:
     
     def save_detection(self, user_id: int, model_id: int, input_file: str,
                       results: Dict[str, Any]) -> int:
-        """Save detection results to history"""
+        """Save detection results to history with proper JSON serialization"""
         try:
+            # Convert results to JSON serializable format
+            serializable_results = self._make_json_serializable(results)
+        
             with self.conn.cursor() as cursor:
                 cursor.execute("""
                     INSERT INTO detection_results (
@@ -443,11 +449,13 @@ class DatabaseManager:
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """, (
-                    user_id, model_id, input_file,
-                    results.get('total_flows', 0),
-                    results.get('anomalies_detected', 0),
-                    json.dumps(results.get('metrics', {})),
-                    json.dumps(results)
+                    user_id, 
+                    model_id, 
+                    input_file,
+                    serializable_results.get('total_flows', 0),
+                    serializable_results.get('anomalies_detected', 0),
+                    json.dumps(serializable_results.get('metrics', {})),
+                    json.dumps(serializable_results)
                 ))
                 history_id = cursor.fetchone()[0]
                 self.conn.commit()
@@ -457,6 +465,25 @@ class DatabaseManager:
             self.conn.rollback()
             print(f"❌ Failed to save detection: {e}")
             raise
+
+    def _make_json_serializable(self, obj):
+        """Convert numpy types to JSON serializable types"""
+        if isinstance(obj, dict):
+            return {k: self._make_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._make_json_serializable(v) for v in obj]
+        elif isinstance(obj, tuple):
+            return tuple(self._make_json_serializable(v) for v in obj)
+        elif isinstance(obj, (np.integer, np.int64, np.int32)):
+            return int(obj)
+        elif isinstance(obj, (np.floating, np.float64, np.float32)):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif pd.isna(obj):
+            return None
+        else:
+            return obj
     
     def get_detection_history(self, user_id: int, limit: int = 10) -> List[Dict]:
         """Get detection history for a user"""

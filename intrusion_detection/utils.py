@@ -197,3 +197,31 @@ def save_detection_to_csv(results: Dict[str, Any], output_path: str):
         df.to_csv(output_path, index=False)
     
     return output_path
+
+def json_serializable(obj):
+    """Convert numpy and pandas objects to JSON serializable types"""
+    import numpy as np
+    import pandas as pd
+    
+    if isinstance(obj, dict):
+        return {k: json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [json_serializable(v) for v in obj]
+    elif isinstance(obj, tuple):
+        return tuple(json_serializable(v) for v in obj)
+    elif isinstance(obj, (np.integer, np.int64, np.int32, np.int8)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32, np.float16)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif pd.isna(obj):
+        return None
+    elif isinstance(obj, pd.Timestamp):
+        return obj.isoformat()
+    elif hasattr(obj, 'to_dict'):  # Handle pandas Series/DataFrame
+        return obj.to_dict()
+    else:
+        return obj
