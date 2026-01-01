@@ -11,6 +11,7 @@ from getpass import getpass
 from typing import Optional
 import traceback
 from pathlib import Path
+from collections import Counter
 
 from rich.console import Console
 from rich.table import Table
@@ -723,7 +724,7 @@ Examples:
     
         # Generate explanations if requested
         if args.explain and results['anomalies_detected'] > 0:
-            self.handle_explain_detection(results)
+            self.handle_explain(results)
 
     def make_json_serializable(self, obj):
         """Convert numpy and pandas objects to JSON serializable types"""
@@ -750,6 +751,21 @@ Examples:
         else:
             return obj
     
+    def display_detection_summary(self, results):
+        """Display detection summary table"""
+        table = Table(title="Detection Summary", box=ROUNDED)
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green", justify="right")
+        
+        table.add_row("Total Flows Analyzed", f"{results['total_flows']:,}")
+        table.add_row("Anomalies Detected", str(results['anomalies_detected']))
+        table.add_row("Anomaly Rate", f"{results['anomaly_rate']:.2%}")
+        table.add_row("Detection Threshold", f"{results['threshold']:.6f}")
+        table.add_row("Mean Reconstruction Error", f"{results['mean_reconstruction_error']:.6f}")
+        table.add_row("Execution Time", results['execution_time'])
+        
+        console.print(table)
+
     def prepare_detection_results(self, df, predictions, reconstruction_errors, model):
         """Prepare detection results in structured format with JSON serializable types"""
         anomalies = []
@@ -830,7 +846,7 @@ Examples:
                     model_path=result['model_path'],
                     dataset_name=os.path.basename(args.input),
                     metrics=result['metrics'],
-                    features=features,  # Still save features in database
+                    features=features,
                     parameters={
                         'epochs': 50,
                         'learning_rate': 1e-3,
@@ -1107,7 +1123,6 @@ Examples:
             return "Low"
         
         severities = [a.get('severity', 'Low') for a in anomalies]
-        from collections import Counter
         counter = Counter(severities)
         return counter.most_common(1)[0][0]
     

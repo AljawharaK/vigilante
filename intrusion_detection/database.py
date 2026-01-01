@@ -651,6 +651,23 @@ class DatabaseManager:
             print(f"Error getting detection summary: {e}")
             return []
     
+    def get_detection(self, detection_id: int, user_id: int) -> Optional[Dict]:
+        """Get detection by ID for a specific user"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT * FROM detection_results 
+                    WHERE id = %s AND user_id = %s
+                """, (detection_id, user_id))
+                detection = cursor.fetchone()
+                if detection and detection.get('results'):
+                    # Parse JSON results
+                    detection['results'] = json.loads(detection['results'])
+                return dict(detection) if detection else None
+        except Exception as e:
+            print(f"Error getting detection: {e}")
+            return None
+    
     def get_role_permissions(self, role_id: int) -> Dict:
         """Get permissions for a role"""
         try:
