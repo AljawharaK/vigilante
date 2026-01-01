@@ -803,7 +803,10 @@ Examples:
         # Calculate metrics with JSON serializable types
         total_flows = int(len(predictions))  # Convert to int
         anomalies_detected = int(len(anomalies))  # Convert to int
-    
+        
+        # Get metrics from model if available
+        metrics = model.metrics
+
         return {
             'total_flows': total_flows,
             'anomalies_detected': anomalies_detected,
@@ -811,12 +814,7 @@ Examples:
             'anomalies': anomalies,
             'threshold': float(model.threshold),
             'mean_reconstruction_error': float(np.mean(reconstruction_errors)),
-            'execution_time': '60.5s',
-            'metrics': {
-                'false_positive_rate': 0.0112,
-                'recall': 0.998,
-                'f1_score': 0.952
-            }
+            'metrics': metrics
         }
     
     # Training Command
