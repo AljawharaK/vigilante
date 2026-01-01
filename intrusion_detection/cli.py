@@ -579,8 +579,7 @@ Examples:
             f"Total Flows Analyzed: [green]{total_flows:,}[/green]\n"
             f"Total Anomalies: [yellow]{total_anomalies}[/yellow]\n"
             f"Anomaly Rate: [magenta]{report_data['detection_summary']['anomaly_rate']:.2%}[/magenta]\n"
-            f"Avg False Positive Rate: {report_data['detection_summary']['avg_false_positive_rate']:.2f}%\n"
-            f"Predominant Severity: {report_data['detection_summary']['predominant_severity']}",
+            f"Avg False Positive Rate: {report_data['detection_summary']['avg_false_positive_rate']:.2f}%\n",
             title="Report Summary",
             border_style="cyan"
         ))
@@ -733,7 +732,14 @@ Examples:
 
         # Generate explanations if requested
         if args.explain and results['anomalies_detected'] > 0:
-            self.handle_explain(results)
+        # Instead of calling handle_explain directly, show the anomalies from current results
+            console.print("\n[bold cyan]Anomaly Explanations:[/bold cyan]")
+        for i, anomaly in enumerate(results['anomalies'][:5]):  # Show first 5
+            self.explain_anomaly(anomaly, i+1)
+    
+        # Tell user how to get full explanations later
+        console.print(f"\n[yellow]For full explanations, use:[/yellow]")
+        console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
 
     # Add this new method to format execution time
     def format_execution_time(self, seconds):

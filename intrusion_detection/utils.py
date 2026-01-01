@@ -59,7 +59,6 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         ["Total Flows Analyzed", f"{detection_summary.get('total_flows_analyzed', 0):,}"],
         ["Total Anomalies Detected", detection_summary.get('total_anomalies_detected', 0)],
         ["Avg False Positive Rate", f"{detection_summary.get('avg_false_positive_rate', 0):.2f}%"],
-        ["Predominant Severity", detection_summary.get('predominant_severity', 'Low')]
     ]
     
     detection_table = Table(detection_data)

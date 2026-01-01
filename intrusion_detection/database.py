@@ -435,11 +435,14 @@ class DatabaseManager:
             return None
     
     def save_detection(self, user_id: int, model_id: int, input_file: str,
-                      results: Dict[str, Any]) -> int:
+                  results: Dict[str, Any]) -> int:
         """Save detection results to history with proper JSON serialization"""
         try:
-            # Convert results to JSON serializable format
-            serializable_results = self._make_json_serializable(results)
+            # Ensure results is properly JSON serialized
+            if isinstance(results, dict):
+                results_json = json.dumps(results)
+            else:
+                results_json = str(results)
         
             with self.conn.cursor() as cursor:
                 cursor.execute("""
@@ -452,10 +455,10 @@ class DatabaseManager:
                     user_id, 
                     model_id, 
                     input_file,
-                    serializable_results.get('total_flows', 0),
-                    serializable_results.get('anomalies_detected', 0),
-                    json.dumps(serializable_results.get('metrics', {})),
-                    json.dumps(serializable_results)
+                    results.get('total_flows', 0),
+                    results.get('anomalies_detected', 0),
+                    json.dumps(results.get('metrics', {})),
+                    results_json  # Already JSON string
                 ))
                 history_id = cursor.fetchone()[0]
                 self.conn.commit()
@@ -660,10 +663,21 @@ class DatabaseManager:
                     WHERE id = %s AND user_id = %s
                 """, (detection_id, user_id))
                 detection = cursor.fetchone()
-                if detection and detection.get('results'):
-                    # Parse JSON results
-                    detection['results'] = json.loads(detection['results'])
-                return dict(detection) if detection else None
+            
+                if detection:
+                    # Convert to regular dict
+                    detection_dict = dict(detection)
+                
+                    # Handle results field - check if it's already a dict or needs parsing
+                    if detection_dict.get('results'):
+                        results = detection_dict['results']
+                        if isinstance(results, str):
+                            # Parse JSON string
+                            detection_dict['results'] = json.loads(results)
+                        # If it's already a dict, leave it as is
+                
+                    return detection_dict
+                return None
         except Exception as e:
             print(f"Error getting detection: {e}")
             return None
@@ -787,25 +801,30 @@ class DatabaseManager:
                 cursor.execute("""
                     SELECT 
                         dr.created_at as detected_at,
-                        dr.results::text as results_json
+                        dr.results
                     FROM detection_results dr
                     WHERE dr.created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
                     AND dr.anomalies_detected > 0
                     ORDER BY dr.created_at DESC
                     LIMIT %s
                 """, (period_days, limit))
-                
+            
                 results = []
                 for row in cursor.fetchall():
                     try:
-                        results_data = json.loads(row['results_json'])
+                        # Handle results - could be string or dict
+                        results_data = row['results']
+                        if isinstance(results_data, str):
+                            results_data = json.loads(results_data)
+                    
                         anomalies = results_data.get('anomalies', [])
                         for anomaly in anomalies[:5]:  # Get up to 5 per detection
                             anomaly['detected_at'] = row['detected_at']
                             results.append(anomaly)
-                    except:
+                    except Exception as e:
+                        print(f"Warning: Could not parse results for row: {e}")
                         continue
-                
+            
                 return results[:limit]  # Ensure we don't exceed limit
         except Exception as e:
             print(f"Error getting recent anomalies: {e}")
@@ -818,7 +837,7 @@ class DatabaseManager:
                 cursor.execute("""
                     SELECT 
                         dr.created_at as detected_at,
-                        dr.results::text as results_json
+                        dr.results
                     FROM detection_results dr
                     WHERE dr.user_id = %s
                     AND dr.created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
@@ -826,18 +845,23 @@ class DatabaseManager:
                     ORDER BY dr.created_at DESC
                     LIMIT 10
                 """, (user_id, period_days))
-                
+            
                 results = []
                 for row in cursor.fetchall():
                     try:
-                        results_data = json.loads(row['results_json'])
+                        # Handle results - could be string or dict
+                        results_data = row['results']
+                        if isinstance(results_data, str):
+                            results_data = json.loads(results_data)
+                    
                         anomalies = results_data.get('anomalies', [])
                         for anomaly in anomalies[:5]:  # Get up to 5 per detection
                             anomaly['detected_at'] = row['detected_at']
                             results.append(anomaly)
-                    except:
+                    except Exception as e:
+                        print(f"Warning: Could not parse results for row: {e}")
                         continue
-                
+            
                 return results[:10]
         except Exception as e:
             print(f"Error getting user anomalies: {e}")
