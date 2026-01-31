@@ -59,6 +59,10 @@ python -m intrusion_detection.cli --help
 
 ### Example Commands
 ```bash
+# Login and enter user name and OTP code
+vigilante login
+vigilante --version
+
 # Administrator user management & system monitoring
 vigilante admin user-create --username analyst1 --email analyst@example.com --role Analyst
 vigilante admin user-modify --username user1 --role Administrator
@@ -69,3 +73,5 @@ vigilante admin system-report --period 7d --output report.pdf
 # Analyst Detection & Analysis
 vigilante train --input dataset.csv --model-name "Test Model"
 vigilante detect --input traffic.csv --model-id 1
+# List trained models
+vigilante --list-models
