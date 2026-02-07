@@ -84,6 +84,9 @@ class RNSA_KNN_Model:
         self.detectors: List[Detector] = []
         self.knn = KNeighborsClassifier(n_neighbors=k)
         self.scaler = MinMaxScaler()
+        self.feature_names = None  # Add feature_names attribute
+        self.metrics = {}  # Add metrics attribute
+        self.threshold = 0.5  # Add threshold attribute
 
     def _euclidean_distance(self, a: np.ndarray, b: np.ndarray) -> float:
         """Calculate Euclidean distance between two vectors"""
@@ -357,10 +360,6 @@ class RNSA_KNN_Model:
             'feature_names': self.feature_names,
             'metrics': self.metrics,
             'threshold': self.threshold,
-            'is_fitted': self.is_fitted,
-            'datasets_trained_on': self.datasets_trained_on,
-            'all_training_data': self.all_training_data.tolist() if hasattr(self, 'all_training_data') else None,
-            'all_training_labels': self.all_training_labels.tolist() if hasattr(self, 'all_training_labels') else None
         }
         joblib.dump(model_data, path)
         print(f"Model saved to: {path}")
@@ -387,13 +386,6 @@ class RNSA_KNN_Model:
         model.feature_names = model_data['feature_names']
         model.metrics = model_data['metrics']
         model.threshold = model_data['threshold']
-        model.is_fitted = model_data['is_fitted']
-        model.datasets_trained_on = model_data['datasets_trained_on']
-        
-        if model_data['all_training_data']:
-            model.all_training_data = np.array(model_data['all_training_data'])
-        if model_data['all_training_labels']:
-            model.all_training_labels = np.array(model_data['all_training_labels'])
         
         return model
 
@@ -575,9 +567,12 @@ def train_single_model_on_both_datasets(db, auth, user_id=1):
         
         print(f"UNSW-NB15: {len(X_unsw_train)} training samples, {X_unsw_train.shape[1]} features")
         
+        # Store feature names for UNSW
+        model.feature_names = unsw_features
+        
         # Train model on UNSW-NB15
         print("\nTraining on UNSW-NB15...")
-        model.fit(X_unsw_train, y_unsw_train, feature_names=unsw_features, dataset_name="UNSW-NB15")
+        model.fit(X_unsw_train, y_unsw_train)  # Removed feature_names parameter
         
         # Evaluate on UNSW test set
         print("\nEvaluating on UNSW-NB15 test set...")
@@ -601,7 +596,7 @@ def train_single_model_on_both_datasets(db, auth, user_id=1):
         
         # Train model on CIC-IDS-2018 (using the same feature space/scaler)
         print("\nTraining on CIC-IDS-2018...")
-        model.fit(X_cic_train, y_cic_train, dataset_name="CIC-IDS-2018")
+        model.fit(X_cic_train, y_cic_train)  # Removed dataset_name parameter
         
         # Evaluate on CIC test set
         print("\nEvaluating on CIC-IDS-2018 test set...")
@@ -619,7 +614,7 @@ def train_single_model_on_both_datasets(db, auth, user_id=1):
             'created_at': pd.Timestamp.now().isoformat(),
             'dataset': 'UNSW-NB15 + CIC-IDS-2018 (Sequential Training)',
             'dataset_source': 'Sequential training on both datasets',
-            'datasets_trained_on': model.datasets_trained_on,
+            'datasets_trained_on': ['UNSW-NB15', 'CIC-IDS-2018'],
             'training_samples': len(X_unsw_train) + len(X_cic_train),
             'test_samples': len(X_unsw_test) + len(X_cic_test),
             'features_count': X_unsw_train.shape[1],  # Based on first dataset
@@ -648,7 +643,7 @@ def train_single_model_on_both_datasets(db, auth, user_id=1):
             },
             'combined_metrics': {
                 'detectors_count': len(model.detectors),
-                'datasets_trained': len(model.datasets_trained_on),
+                'datasets_trained': 2,
                 'unsw_training_samples': len(X_unsw_train),
                 'cic_training_samples': len(X_cic_train),
                 'total_training_samples': len(X_unsw_train) + len(X_cic_train)
@@ -667,9 +662,10 @@ def train_single_model_on_both_datasets(db, auth, user_id=1):
         # Save model metrics
         model.metrics = metadata['combined_metrics']
         
-        # Save to database with metadata
-        print("\n5. Saving model to database...")
+        # After saving model to file, save to database
+        print("\n4. Saving model to database...")
         try:
+            # Save to database with proper metrics
             model_id = db.save_model(
                 user_id=user_id,
                 model_name=model_name,
@@ -680,10 +676,13 @@ def train_single_model_on_both_datasets(db, auth, user_id=1):
                     'precision': (unsw_metrics['precision'] + cic_metrics['precision']) / 2,
                     'recall': (unsw_metrics['recall'] + cic_metrics['recall']) / 2,
                     'f1_score': (unsw_metrics['f1_score'] + cic_metrics['f1_score']) / 2,
+                    'detection_rate': (unsw_metrics['detection_rate'] + cic_metrics['detection_rate']) / 2,
+                    'false_alarm_rate': (unsw_metrics['false_alarm_rate'] + cic_metrics['false_alarm_rate']) / 2,
+                    'auc': (unsw_metrics['auc'] + cic_metrics['auc']) / 2,
                     'detectors_count': len(model.detectors),
-                    'datasets_trained': len(model.datasets_trained_on)
+                    'training_samples': len(X_unsw_train) + len(X_cic_train)
                 },
-                features=unsw_features,  # Use UNSW features
+                features=model.feature_names,  # Use the actual feature names from model
                 parameters={
                     'r_s': 0.01,
                     'max_detectors': 2000,
@@ -694,33 +693,33 @@ def train_single_model_on_both_datasets(db, auth, user_id=1):
                     'normalization': 'MinMaxScaler',
                     'distance_metric': 'euclidean',
                     'training_method': 'sequential',
-                    'datasets': model.datasets_trained_on,
+                    'datasets': ['UNSW-NB15', 'CIC-IDS-2018'],
                     'unsw_training_samples': len(X_unsw_train),
-                    'cic_training_samples': len(X_cic_train)
+                    'cic_training_samples': len(X_cic_train),
+                    'feature_space': 'UNSW-NB15 format (CIC aligned)'
                 }
             )
-            
+    
             print(f"✅ Single model trained sequentially on both datasets saved to database with ID: {model_id}")
-            
-            # Verify
+    
+            # Verify the save by retrieving from database
             db_model = db.get_model(model_id, user_id)
             if db_model:
                 print(f"\n📋 Database Model Details:")
                 print(f"   ID: {db_model['id']}")
                 print(f"   Name: {db_model['name']}")
+                print(f"   Accuracy: {db_model.get('accuracy', 'N/A')}")
                 print(f"   Created: {db_model['created_at']}")
                 print(f"   Path: {db_model['model_path']}")
                 print(f"   Detectors: {len(model.detectors)}")
-                print(f"   Datasets Trained On: {model.datasets_trained_on}")
-                
+        
             return model_id, metadata
-            
+    
         except Exception as e:
             print(f"❌ Error saving to database: {e}")
             import traceback
             traceback.print_exc()
             return None, metadata
-        
     except Exception as e:
         print(f"❌ Error training combined model: {e}")
         import traceback
@@ -744,8 +743,14 @@ def main():
         # Use admin user ID (default is 1 for admin1)
         user_id = 1
         
-        # Train single model sequentially on both datasets
         model_id, metadata = train_single_model_on_both_datasets(db, auth, user_id)
+
+        # Make sure you check if model_id was returned
+        if model_id:
+            print(f"\n✅ Model successfully saved to database with ID: {model_id}")
+            print(f"   You can use this model with: vigilante detect --model-id {model_id}")
+        else:
+            print("\n⚠️ Model was trained but not saved to database")
         
         # Display summary
         if metadata:
@@ -795,7 +800,10 @@ def main():
         print(f"\nModel file saved in: saved_models/")
         print(f"\nYou can now use this model with the vigilante CLI:")
         print(f"  vigilante detect --input your_data.csv --model-id {model_id}")
-        print(f"\nNote: This model expects data with {metadata['features_count']} features (UNSW-NB15 format)")
+        
+        # Only print feature count if metadata exists
+        if metadata:
+            print(f"\nNote: This model expects data with {metadata['features_count']} features (UNSW-NB15 format)")
         
         # Save metadata to JSON file for reference
         if metadata:
