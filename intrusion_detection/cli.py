@@ -863,34 +863,34 @@ Examples:
         """Handle model training"""
         if not self.check_permission('train_models'):
             return
-    
+
         if not os.path.exists(args.input):
             console.print(f"[red]Input file not found: {args.input}[/red]")
             return
-    
+
         # Process features
         features = None
         if args.features:
             features = [f.strip() for f in args.features.split(',')]
-    
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             transient=True,
         ) as progress:
-            task = progress.add_task("[cyan]Training model...", total=100)
-        
+            task = progress.add_task("[cyan]Training RNSA+KNN model...", total=100)
+    
             try:
-                # Train model using existing trainer - FIXED: Remove unsupported parameters
+                # Train model using RNSA+KNN - Updated parameters
                 result = self.trainer.train_model(
                     data_path=args.input,
                     model_name=args.model_name or f"model_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                    epochs=50,
-                    learning_rate=1e-3
-                    # Removed: features=features, threshold=args.threshold
+                    r_s=0.01,  # Self radius
+                    max_detectors=1000,  # Maximum detectors
+                    k=1  # KNN neighbors
                 )
-            
-                # Save model to database
+        
+                # Save model to database - Updated parameters for RNSA+KNN
                 model_id = self.db.save_model(
                     user_id=self.auth.current_user['id'],
                     model_name=result['model_name'],
@@ -899,27 +899,29 @@ Examples:
                     metrics=result['metrics'],
                     features=features,
                     parameters={
-                        'epochs': 50,
-                        'learning_rate': 1e-3,
-                        'threshold': args.threshold
+                        'model_type': 'rnsa_knn',
+                        'r_s': 0.01,
+                        'max_detectors': 1000,
+                        'k': 1
                     }
                 )
-            
+        
                 progress.update(task, completed=100)
-            
+        
             except Exception as e:
                 console.print(f"[red]Training failed: {e}[/red]")
                 if self.args.verbose:
                     console.print(traceback.format_exc())
                 return
+
         # Display results
-        console.print(f"[green]✓ Model trained successfully[/green]")
+        console.print(f"[green]✓ RNSA+KNN Model trained successfully[/green]")
         console.print(f"Model ID: [cyan]{model_id}[/cyan]")
         console.print(f"Model saved to: [cyan]{result['model_path']}[/cyan]")
-    
+
         # Show metrics
         self.display_training_metrics(result['metrics'])
-    
+
         # Log training event
         self.db.log_audit_event(
             user_id=self.auth.current_user['id'],
@@ -929,28 +931,38 @@ Examples:
             status="success",
             details={"model_id": model_id, "model_name": result['model_name']}
         )
-    
+
+
+    # Show RNSA+KNN specific metrics
     def display_training_metrics(self, metrics):
-        """Display training metrics"""
-        table = Table(title="Training Metrics", box=ROUNDED)
+        """Display training metrics for RNSA+KNN"""
+        table = Table(title="RNSA+KNN Training Metrics", box=ROUNDED)
         table.add_column("Metric", style="cyan")
         table.add_column("Value", style="green")
-        
-        if 'accuracy' in metrics:
-            table.add_row("Accuracy", f"{metrics['accuracy']:.4f}")
+    
+        if 'train_accuracy' in metrics:
+            table.add_row("Train Accuracy", f"{metrics['train_accuracy']:.4f}")
+        if 'test_accuracy' in metrics:
+            table.add_row("Test Accuracy", f"{metrics['test_accuracy']:.4f}")
+        if 'detection_rate' in metrics:
+            table.add_row("Detection Rate", f"{metrics['detection_rate']:.4f}")
+        if 'false_alarm_rate' in metrics:
+            table.add_row("False Alarm Rate", f"{metrics['false_alarm_rate']:.4f}")
+        if 'auc' in metrics:
+            table.add_row("AUC", f"{metrics['auc']:.4f}")
+        if 'optimal_dr' in metrics:
+            table.add_row("Optimal Detection Rate", f"{metrics['optimal_dr']:.4f}")
+        if 'optimal_far' in metrics:
+            table.add_row("Optimal False Alarm Rate", f"{metrics['optimal_far']:.4f}")
+        if 'detectors' in metrics:
+            table.add_row("Detectors Generated", str(metrics['detectors']))
         if 'precision' in metrics:
             table.add_row("Precision", f"{metrics['precision']:.4f}")
         if 'recall' in metrics:
             table.add_row("Recall", f"{metrics['recall']:.4f}")
         if 'f1_score' in metrics:
             table.add_row("F1 Score", f"{metrics['f1_score']:.4f}")
-        if 'final_loss' in metrics:
-            table.add_row("Final Loss", f"{metrics['final_loss']:.6f}")
-        if 'training_samples' in metrics:
-            table.add_row("Training Samples", str(metrics['training_samples']))
-        if 'features_count' in metrics:
-            table.add_row("Features Count", str(metrics['features_count']))
-        
+    
         console.print(table)
     
     # Summary Command

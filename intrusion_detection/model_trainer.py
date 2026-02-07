@@ -1,7 +1,6 @@
 # intrusion_detection/model_trainer.py
 import os
 import joblib
-import torch
 import pandas as pd
 import numpy as np
 from typing import Tuple, Dict, Any, Optional
@@ -11,7 +10,7 @@ import json
 from .model import IntrusionDetectionModel
 
 class ModelTrainer:
-    """Train and manage intrusion detection models"""
+    """Train and manage intrusion detection models using RNSA+KNN"""
     
     def __init__(self, model_dir: str = "models"):
         self.model_dir = model_dir
@@ -42,12 +41,16 @@ class ModelTrainer:
         return df, y
     
     def train_model(self, data_path: str, model_name: str, 
-                   epochs: int = 50, learning_rate: float = 1e-3) -> Dict[str, Any]:
-        """Train a complete intrusion detection model"""
-        print(f"Starting model training: {model_name}")
+                   r_s: float = 0.01, max_detectors: int = 1000, 
+                   k: int = 1) -> Dict[str, Any]:
+        """Train a complete intrusion detection model using RNSA+KNN"""
+        print(f"Starting RNSA+KNN model training: {model_name}")
         
         # Load data
         df, y_train = self.load_data(data_path, has_labels=True)
+        
+        if y_train is None:
+            raise ValueError("Training data must have labels")
         
         # Initialize model
         model = IntrusionDetectionModel()
@@ -56,14 +59,11 @@ class ModelTrainer:
         X_train = model.preprocess_data(df, fit_scaler=True)
         
         # Train model
-        losses = model.fit(X_train, epochs=epochs, learning_rate=learning_rate)
+        model.fit(X_train, y_train, r_s=r_s, max_detectors=max_detectors, k=k)
         
-        # Evaluate if labels are available
-        if y_train is not None:
-            metrics = model.evaluate(X_train, y_train)
-            print(f"Training metrics: {metrics}")
-        else:
-            metrics = model.metrics
+        # Evaluate
+        metrics = model.evaluate(X_train, y_train)
+        print(f"Training metrics: {metrics}")
         
         # Create unique model name with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -72,14 +72,28 @@ class ModelTrainer:
         # Save model
         model_path = model.save(unique_name)
         
-        # Prepare result
+        # Prepare result with all required metrics
         result = {
             'model_path': model_path,
             'model_name': unique_name,
-            'metrics': metrics,
+            'metrics': {
+                **metrics,
+                'test_accuracy': metrics.get('accuracy', 0),
+                'detection_rate': metrics.get('detection_rate', 0),
+                'false_alarm_rate': metrics.get('false_alarm_rate', 0),
+                'auc': metrics.get('roc_auc', 0),
+                'detectors': len(model.model.detectors),
+                'optimal_dr': metrics.get('detection_rate', 0),
+                'optimal_far': metrics.get('false_alarm_rate', 0)
+            },
             'training_samples': len(X_train),
             'features_count': X_train.shape[1],
-            'loss_history': [float(l) for l in losses] if losses else []
+            'parameters': {
+                'r_s': r_s,
+                'max_detectors': max_detectors,
+                'k': k,
+                'model_type': 'rnsa_knn'
+            }
         }
         
         # Save training log
@@ -88,10 +102,14 @@ class ModelTrainer:
             json.dump(result, f, indent=2)
         
         print(f"✅ Model training completed: {model_path}")
+        print(f"   Detectors generated: {len(model.model.detectors)}")
+        print(f"   Test accuracy: {metrics.get('accuracy', 0):.4f}")
+        print(f"   Detection rate: {metrics.get('detection_rate', 0):.4f}")
+        
         return result
     
     def detect_anomalies(self, model_path: str, data_path: str) -> Dict[str, Any]:
-        """Detect anomalies in new data"""
+        """Detect anomalies in new data using RNSA+KNN"""
         print(f"Loading model from {model_path}")
         
         # Load model
@@ -102,7 +120,7 @@ class ModelTrainer:
         X = model.preprocess_data(df, fit_scaler=False)
         
         # Make predictions
-        predictions, reconstruction_errors = model.predict(X)
+        predictions, confidence_scores = model.predict(X)
         
         # Prepare results
         results = {
@@ -110,9 +128,10 @@ class ModelTrainer:
             'anomalies_detected': int(np.sum(predictions)),
             'anomaly_rate': float(np.mean(predictions)),
             'anomaly_indices': np.where(predictions == 1)[0].tolist(),
-            'reconstruction_errors': reconstruction_errors.tolist(),
+            'confidence_scores': confidence_scores.tolist(),
             'threshold': float(model.threshold),
-            'mean_reconstruction_error': float(np.mean(reconstruction_errors))
+            'mean_confidence': float(np.mean(confidence_scores)),
+            'detectors_used': len(model.model.detectors) if hasattr(model.model, 'detectors') else 0
         }
         
         # Save detection results
@@ -145,6 +164,43 @@ class ModelTrainer:
         # Evaluate
         metrics = model.evaluate(X_test, y_true)
         
+        # Calculate additional ROC metrics if available
+        from sklearn.metrics import roc_curve, auc
+        
+        if hasattr(model.model, 'predict_proba'):
+            proba = model.model.predict_proba(X_test)
+            y_scores = proba[:, 1]
+            
+            # Calculate ROC curve
+            fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+            roc_auc = auc(fpr, tpr)
+            
+            # Find optimal threshold (Youden's J statistic)
+            youden_j = tpr - fpr
+            optimal_idx = np.argmax(youden_j)
+            optimal_threshold = thresholds[optimal_idx]
+            
+            # Calculate metrics at optimal threshold
+            y_pred_optimal = (y_scores >= optimal_threshold).astype(int)
+            
+            from sklearn.metrics import confusion_matrix
+            cm = confusion_matrix(y_true, y_pred_optimal)
+            TN, FP, FN, TP = cm.ravel()
+            
+            detection_rate_optimal = TP / (TP + FN) if (TP + FN) > 0 else 0
+            false_alarm_rate_optimal = FP / (FP + TN) if (FP + TN) > 0 else 0
+            
+            # Add ROC metrics
+            metrics.update({
+                'test_accuracy': metrics.get('accuracy', 0),
+                'auc': roc_auc,
+                'optimal_threshold': float(optimal_threshold),
+                'optimal_dr': float(detection_rate_optimal),
+                'optimal_far': float(false_alarm_rate_optimal),
+                'fpr': fpr.tolist(),
+                'tpr': tpr.tolist()
+            })
+        
         # Save evaluation results
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         eval_path = os.path.join("evaluations", f"evaluation_{timestamp}.json")
@@ -154,9 +210,9 @@ class ModelTrainer:
             json.dump(metrics, f, indent=2)
         
         print(f"✅ Model evaluation completed")
-        print(f"   Accuracy: {metrics['accuracy']:.4f}")
-        print(f"   Precision: {metrics['precision']:.4f}")
-        print(f"   Recall: {metrics['recall']:.4f}")
-        print(f"   F1-Score: {metrics['f1_score']:.4f}")
+        print(f"   Test Accuracy: {metrics.get('accuracy', 0):.4f}")
+        print(f"   Detection Rate: {metrics.get('detection_rate', 0):.4f}")
+        print(f"   False Alarm Rate: {metrics.get('false_alarm_rate', 0):.4f}")
+        print(f"   AUC: {metrics.get('auc', 0):.4f}")
         
         return metrics

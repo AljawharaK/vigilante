@@ -93,7 +93,7 @@ class DatabaseManager:
                         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                         name VARCHAR(100) NOT NULL,
                         model_path VARCHAR(500) NOT NULL,
-                        model_type VARCHAR(50) DEFAULT 'dca_dae',
+                        model_type VARCHAR(50) DEFAULT 'proposed_algorithm',
                         dataset_name VARCHAR(100),
                         accuracy DECIMAL(5,4),
                         precision DECIMAL(5,4),
