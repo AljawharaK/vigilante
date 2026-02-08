@@ -406,31 +406,99 @@ class IntrusionDetectionModel:
         return signal_features, all_features
     
     def preprocess_data(self, df: pd.DataFrame, fit_scaler: bool = True) -> np.ndarray:
-        """Preprocess data with feature engineering"""
-        # Define features
-        signal_features, all_features = self.define_features()
+        """Robust preprocessing that handles different dataset formats"""
+        try:
+            # Define common features across different IDS datasets
+            common_features = self._get_common_features(df)
         
-        # Select available features
-        available_features = [f for f in all_features if f in df.columns]
-        self.feature_names = available_features
+            if not common_features:
+                raise ValueError("No compatible features found between model and input data")
         
-        # Extract features
-        X = df[available_features].copy()
+            self.feature_names = common_features
+            print(f"Using {len(common_features)} features for detection")
         
-        # Handle missing values
-        X = X.fillna(0)
-        X = X.replace([np.inf, -np.inf], 0)
+            # Extract and clean features
+            X = df[common_features].copy()
         
-        # Scale features
-        if fit_scaler:
-            self.scaler = MinMaxScaler()
-            X_scaled = self.scaler.fit_transform(X)
+            # Handle missing values
+            X = X.fillna(0)
+            X = X.replace([np.inf, -np.inf], 0)
+        
+            # Ensure numeric types
+            X = X.apply(pd.to_numeric, errors='coerce').fillna(0)
+        
+            # Scale features
+            if fit_scaler:
+                self.scaler = MinMaxScaler()
+                X_scaled = self.scaler.fit_transform(X)
+            else:
+                if self.scaler is None:
+                    raise ValueError("Scaler not fitted. Call fit() first.")
+                X_scaled = self.scaler.transform(X)
+        
+            return X_scaled
+        
+        except Exception as e:
+            print(f"Preprocessing error: {e}")
+            raise
+
+    def _get_common_features(self, df: pd.DataFrame) -> list:
+        """Get common features between model and input data"""
+        # If model has defined feature names, use those
+        if hasattr(self, 'feature_names') and self.feature_names:
+            model_features = self.feature_names
+        elif hasattr(self, 'model') and hasattr(self.model, 'feature_names') and self.model.feature_names:
+            model_features = self.model.feature_names
         else:
-            if self.scaler is None:
-                raise ValueError("Scaler not fitted. Call fit() first.")
-            X_scaled = self.scaler.transform(X)
+            # Fallback to standard features
+            model_features = self.define_features()[1]  # Get all_features from define_features()
+    
+        # Get available features in input data
+        available_features = list(df.columns)
+    
+        # Find intersection
+        common_features = [f for f in model_features if f in available_features]
+    
+        # If no common features, try to map similar features
+        if not common_features:
+            common_features = self._map_similar_features(model_features, available_features)
+    
+        return common_features
+
+    def _map_similar_features(self, model_features: list, available_features: list) -> list:
+        """Map similar feature names between different datasets"""
+        feature_mappings = {
+            # UNSW-NB15 to CIC mappings
+            'sbytes': ['TotLen Fwd Pkts', 'Fwd Pkt Len Max', 'Flow Byts/s'],
+            'dbytes': ['TotLen Bwd Pkts', 'Bwd Pkt Len Max'],
+            'spkts': ['Tot Fwd Pkts', 'Fwd Pkts/s'],
+            'dpkts': ['Tot Bwd Pkts', 'Bwd Pkts/s'],
+            'dur': ['Flow Duration', 'Flow IAT Mean'],
+            'sload': ['Fwd Pkt Len Mean', 'Flow Byts/s'],
+            'dload': ['Bwd Pkt Len Mean', 'Flow Byts/s'],
+            'sinpkt': ['Fwd IAT Mean', 'Flow IAT Mean'],
+            'dinpkt': ['Bwd IAT Mean', 'Flow IAT Mean'],
+            'rate': ['Flow Pkts/s', 'Flow Byts/s'],
         
-        return X_scaled
+            # Common network features
+            'protocol': ['Protocol', 'proto'],
+            'src_port': ['Src Port', 'sport'],
+            'dst_port': ['Dst Port', 'dport'],
+            'src_ip': ['Src IP', 'srcip'],
+            'dst_ip': ['Dst IP', 'dstip']
+        }
+    
+        common_features = []
+        for model_feature in model_features:
+            if model_feature in available_features:
+                common_features.append(model_feature)
+            elif model_feature in feature_mappings:
+                for mapped_feature in feature_mappings[model_feature]:
+                    if mapped_feature in available_features:
+                        common_features.append(mapped_feature)
+                        break
+    
+        return common_features
     
     def fit(self, X_train: np.ndarray, y_train: np.ndarray, 
            r_s: float = 0.01, max_detectors: int = 1000, k: int = 1):

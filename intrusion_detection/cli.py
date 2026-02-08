@@ -613,6 +613,7 @@ Examples:
     # Detection Commands
     def handle_detect(self, args):
         """Handle anomaly detection"""
+        
         if not self.check_permission('run_detection'):
             return
 
@@ -689,8 +690,29 @@ Examples:
             try:
                 # Load and preprocess data
                 df = pd.read_csv(args.input)
-                X = model.preprocess_data(df, fit_scaler=False)
-        
+                console.print(f"[cyan]Loaded {len(df)} records from {args.input}[/cyan]")
+    
+                # Validate and prepare data
+                df = self.validate_and_prepare_data(df, model)
+    
+                # Check if data has any rows
+                if len(df) == 0:
+                    console.print("[red]Error: No valid data rows found after preprocessing[/red]")
+                    return
+    
+                # Preprocess using model's method
+                try:
+                    X = model.preprocess_data(df, fit_scaler=False)
+                except ValueError as e:
+                    console.print(f"[yellow]Feature mismatch: {e}[/yellow]")
+                    console.print("[cyan]Attempting alternative preprocessing...[/cyan]")
+                    X = self.alternative_preprocessing(df, model)
+    
+                # Check if we have data to process
+                if X.shape[0] == 0 or X.shape[1] == 0:
+                    console.print("[red]Error: No features available for detection[/red]")
+                    return
+    
                 # Detect anomalies
                 predictions, reconstruction_errors = model.predict(X)
         
@@ -759,6 +781,131 @@ Examples:
         # Tell user how to get full explanations later
         console.print(f"\n[yellow]For full explanations, use:[/yellow]")
         console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
+
+    def alternative_preprocessing(self, df: pd.DataFrame, model) -> np.ndarray:
+        """Alternative preprocessing when standard preprocessing fails"""
+        console.print("[yellow]Using alternative preprocessing...[/yellow]")
+    
+        # Select only numeric columns
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+        if len(numeric_cols) == 0:
+            # If no numeric columns, try to convert everything to numeric
+            df_numeric = df.apply(pd.to_numeric, errors='coerce').fillna(0)
+            numeric_cols = df_numeric.columns
+        else:
+            df_numeric = df[numeric_cols].copy()
+    
+        # Fill NaN values
+        df_numeric = df_numeric.fillna(0)
+        df_numeric = df_numeric.replace([np.inf, -np.inf], 0)
+    
+        # Use the model's scaler if available
+        if hasattr(model, 'scaler') and model.scaler:
+            X_scaled = model.scaler.transform(df_numeric)
+        elif hasattr(model, 'model') and hasattr(model.model, 'scaler') and model.model.scaler:
+            X_scaled = model.model.scaler.transform(df_numeric)
+        else:
+            # Create new scaler
+            from sklearn.preprocessing import MinMaxScaler
+            scaler = MinMaxScaler()
+            X_scaled = scaler.fit_transform(df_numeric)
+    
+        console.print(f"[green]✓ Alternative preprocessing complete: {X_scaled.shape}[/green]")
+        return X_scaled
+
+    def validate_and_prepare_data(self, df: pd.DataFrame, model) -> pd.DataFrame:
+        """Validate and prepare input data for detection"""
+        console.print("[cyan]Validating input data...[/cyan]")
+    
+        # Make a copy to avoid modifying original
+        df_processed = df.copy()
+    
+        # Add flow_id if not present
+        if 'flow_id' not in df_processed.columns:
+            df_processed = df_processed.reset_index().rename(columns={'index': 'flow_id'})
+    
+        # Check for label column and remove it if present
+        label_cols = ['label', 'Label', ' Label', 'attack_cat', 'Label.1']
+        for col in label_cols:
+            if col in df_processed.columns:
+                df_processed = df_processed.drop(columns=[col])
+                console.print(f"[yellow]Removed label column: {col}[/yellow]")
+    
+        # Check for timestamp columns and remove them
+        time_cols = ['timestamp', 'Timestamp', 'timestamp', 'StartTime', 'EndTime', ' Timestamp']
+        for col in time_cols:
+            if col in df_processed.columns:
+                df_processed = df_processed.drop(columns=[col])
+    
+        # Handle IP address columns
+        ip_cols = ['srcip', 'dstip', 'src_ip', 'dst_ip', 'srcip', 'dstip', 
+                'Source IP', 'Destination IP', ' Source IP', ' Destination IP']
+    
+        for col in ip_cols:
+            if col in df_processed.columns:
+                try:
+                    # Convert IP addresses to numeric representation
+                    if df_processed[col].dtype == 'object':
+                        df_processed[col] = pd.factorize(df_processed[col])[0]
+                        console.print(f"[cyan]Converted {col} to numeric[/cyan]")
+                except:
+                    # If conversion fails, drop the column
+                    df_processed = df_processed.drop(columns=[col])
+                    console.print(f"[yellow]Dropped problematic column: {col}[/yellow]")
+    
+        # Handle protocol and port columns
+        proto_port_cols = ['proto', 'protocol', 'Protocol', 'sport', 'dport', 
+                        'src_port', 'dst_port', ' Source Port', ' Destination Port']
+    
+        for col in proto_port_cols:
+            if col in df_processed.columns:
+                try:
+                    if df_processed[col].dtype == 'object':
+                        # For protocol names (tcp, udp, etc.)
+                        if df_processed[col].nunique() < 20:
+                            df_processed[col] = pd.factorize(df_processed[col])[0]
+                        else:
+                            # For port numbers, ensure they're numeric
+                            df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').fillna(0)
+                except:
+                    df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').fillna(0)
+    
+        # Check which model features are available in the data
+        if hasattr(model, 'feature_names') and model.feature_names:
+            model_features = model.feature_names
+            available_features = [f for f in model_features if f in df_processed.columns]
+        
+            console.print(f"[cyan]Model expects {len(model_features)} features[/cyan]")
+            console.print(f"[cyan]Found {len(available_features)} matching features in input data[/cyan]")
+        
+            if len(available_features) < len(model_features) * 0.3:  # Less than 30% match
+                console.print("[yellow]Warning: Low feature match between model and input data[/yellow]")
+                console.print("[cyan]Will use all available numeric features[/cyan]")
+    
+        # Ensure all columns are numeric
+        for col in df_processed.columns:
+            if df_processed[col].dtype == 'object':
+                # Try to convert to numeric
+                try:
+                    df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce')
+                except:
+                    # If conversion fails, use factorize for categorical data
+                    if df_processed[col].nunique() < 100:
+                        df_processed[col] = pd.factorize(df_processed[col])[0]
+                    else:
+                        # Too many unique values, drop the column
+                        df_processed = df_processed.drop(columns=[col])
+    
+        # Fill any NaN values
+        df_processed = df_processed.fillna(0)
+    
+        # Replace infinite values
+        df_processed = df_processed.replace([np.inf, -np.inf], 0)
+    
+        console.print(f"[green]✓ Data prepared: {len(df_processed)} rows, {len(df_processed.columns)} columns[/green]")
+    
+        return df_processed
 
     # Add this new method to format execution time
     def format_execution_time(self, seconds):
