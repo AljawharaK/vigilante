@@ -657,8 +657,7 @@ def train_single_model_on_both_datasets(db, auth, user_id=1):
         
         model_filename = f"{model_name}.joblib"
         model_path = os.path.join(model_dir, model_filename)
-        model.save(model_path)
-        
+
         # Save model metrics
         model.metrics = metadata['combined_metrics']
         

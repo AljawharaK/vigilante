@@ -617,8 +617,8 @@ Examples:
             return
 
         if not os.path.exists(args.input):
-            console.print(f"[red]Input file not found: {args.input}[/red]")
-            return
+           console.print(f"[red]Input file not found: {args.input}[/red]")
+           return
 
         # Load model
         model = None
@@ -628,12 +628,31 @@ Examples:
             if not model_data:
                 console.print(f"[red]Model ID {args.model_id} not found[/red]")
                 return
-    
+
             model_path = model_data['model_path']
+        
+            # Check if path exists
             if not os.path.exists(model_path):
                 console.print(f"[red]Model file not found: {model_path}[/red]")
-                return
-    
+            
+                # Try alternative paths
+                possible_paths = [
+                    model_path,
+                    os.path.join("saved_models", os.path.basename(model_path)),
+                    os.path.basename(model_path)
+                ]
+            
+                found = False
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        model_path = path
+                        found = True
+                        break
+            
+                if not found:
+                    console.print("[red]Could not locate model file[/red]")
+                    return
+
             try:
                 model = IntrusionDetectionModel.load(model_path)
             except Exception as e:
@@ -645,7 +664,7 @@ Examples:
             if not os.path.exists(args.model_path):
                 console.print(f"[red]Model file not found: {args.model_path}[/red]")
                 return
-    
+
             try:
                 model = IntrusionDetectionModel.load(args.model_path)
             except Exception as e:
@@ -1343,8 +1362,7 @@ Examples:
         console.print("Model: Deterministic DCA + Denoising Autoencoder")
         console.print("Database: PostgreSQL (Neon)")
         console.print("Roles: Administrator, Analyst")
-        console.print("Author: Aljawhara Al-Qasem")
-        console.print("License: MIT")
+        console.print("Author: Vigilante Team")
 
 
 def main():

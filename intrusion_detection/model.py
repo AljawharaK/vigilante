@@ -302,7 +302,6 @@ class RNSA_KNN_Model:
         
         return model
 
-
 # ========================
 # Complete Model Class
 # ========================
@@ -451,43 +450,55 @@ class IntrusionDetectionModel:
         return metrics
     
     def save(self, model_name: str):
-        """Save complete model to disk"""
+        """Save complete model to disk - as single file"""
+        # Ensure .joblib extension
+        if not model_name.endswith('.joblib'):
+            model_name = f"{model_name}.joblib"
+        
         model_path = os.path.join(self.model_dir, model_name)
-        os.makedirs(model_path, exist_ok=True)
         
-        # Save main model
-        model_file = os.path.join(model_path, "rnsa_knn_model.joblib")
-        self.model.save(model_file)
-        
-        # Save metadata
-        metadata = {
+        # Save all model data in one file
+        model_data = {
+            'model': self.model,
             'feature_names': self.feature_names,
             'metrics': self.metrics,
             'threshold': float(self.threshold),
-            'model_type': 'rnsa_knn'
+            'model_type': 'rnsa_knn',
+            'scaler': self.scaler if hasattr(self.model, 'scaler') else None
         }
         
-        metadata_path = os.path.join(model_path, "metadata.joblib")
-        joblib.dump(metadata, metadata_path)
+        joblib.dump(model_data, model_path)
         
         print(f"Model saved to: {model_path}")
         return model_path
     
     @classmethod
     def load(cls, model_path: str):
-        """Load complete model from disk"""
+        """Load complete model from disk - from single file"""
+        # Check if path exists
+        if not os.path.exists(model_path):
+            # Try adding .joblib extension
+            if not model_path.endswith('.joblib'):
+                model_path = f"{model_path}.joblib"
+            if not os.path.exists(model_path):
+                raise FileNotFoundError(f"Model file not found: {model_path}")
+        
+        # Load the model data
+        model_data = joblib.load(model_path)
+        
+        # Create model instance
         model = cls(model_dir=os.path.dirname(model_path))
         
-        # Load metadata
-        metadata_path = os.path.join(model_path, "metadata.joblib")
-        metadata = joblib.load(metadata_path)
+        # Restore components
+        model.model = model_data['model']
+        model.feature_names = model_data['feature_names']
+        model.metrics = model_data['metrics']
+        model.threshold = model_data['threshold']
         
-        model.feature_names = metadata['feature_names']
-        model.metrics = metadata['metrics']
-        model.threshold = metadata['threshold']
-        
-        # Load main model
-        model_file = os.path.join(model_path, "rnsa_knn_model.joblib")
-        model.model = RNSA_KNN_Model.load(model_file)
+        # If scaler is stored separately, restore it
+        if 'scaler' in model_data and model_data['scaler'] is not None:
+            model.scaler = model_data['scaler']
+        elif hasattr(model.model, 'scaler'):
+            model.scaler = model.model.scaler
         
         return model
