@@ -65,6 +65,9 @@ class RNSA_KNN_Model:
         self.detectors: List[Detector] = []
         self.knn = KNeighborsClassifier(n_neighbors=k)
         self.scaler = MinMaxScaler()
+        self.feature_names = None
+        self.metrics = {}
+        self.threshold = 0.5
 
     def _euclidean_distance(self, a: np.ndarray, b: np.ndarray) -> float:
         """Calculate Euclidean distance between two vectors"""
@@ -257,6 +260,76 @@ class RNSA_KNN_Model:
         proba_array[:, 1] = prob_scores      # Probability of class 1 (abnormal)
 
         return proba_array
+    
+    def evaluate(self, X_test: np.ndarray, y_test: np.ndarray) -> Dict[str, Any]:
+        """Evaluate model and return comprehensive metrics"""
+        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+        from sklearn.metrics import confusion_matrix, roc_curve, auc
+        
+        # Make predictions
+        y_pred = self.predict(X_test)
+        y_scores = self.predict_proba(X_test)[:, 1]
+        
+        # Calculate basic metrics
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred, zero_division=0)
+        recall = recall_score(y_test, y_pred, zero_division=0)
+        f1 = f1_score(y_test, y_pred, zero_division=0)
+        
+        # Calculate confusion matrix
+        cm = confusion_matrix(y_test, y_pred)
+        if cm.shape == (2, 2):
+            TN, FP, FN, TP = cm.ravel()
+            detection_rate = TP / (TP + FN) if (TP + FN) > 0 else 0
+            false_alarm_rate = FP / (FP + TN) if (FP + TN) > 0 else 0
+        else:
+            TN, FP, FN, TP = 0, 0, 0, 0
+            detection_rate = 0
+            false_alarm_rate = 0
+        
+        # Calculate ROC metrics
+        fpr, tpr, thresholds = roc_curve(y_test, y_scores)
+        roc_auc = auc(fpr, tpr)
+        
+        # Find optimal threshold (Youden's J statistic)
+        youden_j = tpr - fpr
+        optimal_idx = np.argmax(youden_j)
+        optimal_threshold = thresholds[optimal_idx]
+        
+        # Calculate metrics at optimal threshold
+        y_pred_optimal = (y_scores >= optimal_threshold).astype(int)
+        cm_optimal = confusion_matrix(y_test, y_pred_optimal)
+        if cm_optimal.shape == (2, 2):
+            TN_opt, FP_opt, FN_opt, TP_opt = cm_optimal.ravel()
+            optimal_dr = TP_opt / (TP_opt + FN_opt) if (TP_opt + FN_opt) > 0 else 0
+            optimal_far = FP_opt / (FP_opt + TN_opt) if (FP_opt + TN_opt) > 0 else 0
+        else:
+            optimal_dr = 0
+            optimal_far = 0
+        
+        # Get number of anomalies detected
+        anomalies_detected = int(np.sum(y_pred))
+        
+        return {
+            'accuracy': float(accuracy),
+            'precision': float(precision),
+            'recall': float(recall),
+            'f1_score': float(f1),
+            'detection_rate': float(detection_rate),
+            'false_alarm_rate': float(false_alarm_rate),
+            'auc': float(roc_auc),
+            'optimal_threshold': float(optimal_threshold),
+            'optimal_dr': float(optimal_dr),
+            'optimal_far': float(optimal_far),
+            'true_positives': int(TP),
+            'false_positives': int(FP),
+            'true_negatives': int(TN),
+            'false_negatives': int(FN),
+            'anomalies_detected': anomalies_detected,
+            'anomaly_rate': float(anomalies_detected / len(y_test)) if len(y_test) > 0 else 0,
+            'threshold': float(self.threshold),
+            'detectors_count': len(self.detectors)
+        }
 
     def save(self, path: str):
         """Save model to file"""
@@ -270,15 +343,15 @@ class RNSA_KNN_Model:
             'knn': self.knn,
             'feature_names': self.feature_names,
             'metrics': self.metrics,
-            'threshold': self.threshold
+            'threshold': self.threshold,
         }
         joblib.dump(model_data, path)
-    
+        print(f"Model saved to: {path}")
+        return path
+
     @classmethod
     def load(cls, path: str):
         """Load model from file"""
-        from sklearn.neighbors import KNeighborsClassifier
-        
         model_data = joblib.load(path)
         model = cls(
             r_s=model_data['r_s'],
@@ -287,13 +360,11 @@ class RNSA_KNN_Model:
             estimated_coverage=model_data['estimated_coverage']
         )
         
-        # Restore detectors
         model.detectors = [
             Detector(np.array(center), radius) 
             for center, radius in model_data['detectors']
         ]
         
-        # Restore other components
         model.scaler = model_data['scaler']
         model.knn = model_data['knn']
         model.feature_names = model_data['feature_names']

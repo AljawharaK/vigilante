@@ -24,7 +24,7 @@ import numpy as np
 from .database import DatabaseManager
 from .auth import AuthManager
 from .model_trainer import ModelTrainer
-from .model import IntrusionDetectionModel
+from .model import IntrusionDetectionModel, RNSA_KNN_Model, Detector
 from .utils import generate_pdf_report, format_table, get_system_info, json_serializable
 
 console = Console()
