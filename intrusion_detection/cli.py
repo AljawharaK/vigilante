@@ -24,7 +24,7 @@ import numpy as np
 from .database import DatabaseManager
 from .auth import AuthManager
 from .model_trainer import ModelTrainer
-from .model import IntrusionDetectionModel, RNSA_KNN_Model, Detector
+from .model import IntrusionDetectionModel
 from .utils import generate_pdf_report, format_table, get_system_info, json_serializable
 
 console = Console()
@@ -612,14 +612,14 @@ Examples:
     
     # Detection Commands
     def handle_detect(self, args):
-        """Handle anomaly detection"""
-        
+        """Handle anomaly detection with feature alignment"""
+    
         if not self.check_permission('run_detection'):
             return
 
         if not os.path.exists(args.input):
-           console.print(f"[red]Input file not found: {args.input}[/red]")
-           return
+            console.print(f"[red]Input file not found: {args.input}[/red]")
+            return
 
         # Load model
         model = None
@@ -638,9 +638,10 @@ Examples:
             
                 # Try alternative paths
                 possible_paths = [
-                    model_path,
+                model_path,
                     os.path.join("saved_models", os.path.basename(model_path)),
-                    os.path.basename(model_path)
+                    os.path.basename(model_path),
+                    os.path.join("models", os.path.basename(model_path))
                 ]
             
                 found = False
@@ -676,59 +677,61 @@ Examples:
             console.print("[red]Please specify either --model-id or --model-path[/red]")
             return
 
-        # Perform detection with timing
-        import time  # Add this import
-        start_time = time.time()
+        # Show model info
+        console.print(f"[cyan]Model loaded: {os.path.basename(model_path)}[/cyan]")
+        feature_info = model.get_feature_summary()
+        console.print(f"[cyan]Model expects {feature_info['features_count']} core features[/cyan]")
     
+        # Perform detection with timing
+        import time
+        start_time = time.time()
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             transient=True,
         ) as progress:
             task = progress.add_task("[cyan]Analyzing traffic...", total=None)
-    
+
             try:
-                # Load and preprocess data
+                # Load data
                 df = pd.read_csv(args.input)
                 console.print(f"[cyan]Loaded {len(df)} records from {args.input}[/cyan]")
-    
-                # Validate and prepare data
-                df = self.validate_and_prepare_data(df, model)
-    
-                # Check if data has any rows
-                if len(df) == 0:
-                    console.print("[red]Error: No valid data rows found after preprocessing[/red]")
-                    return
-    
-                # Preprocess using model's method
-                try:
-                    X = model.preprocess_data(df, fit_scaler=False)
-                except ValueError as e:
-                    console.print(f"[yellow]Feature mismatch: {e}[/yellow]")
-                    console.print("[cyan]Attempting alternative preprocessing...[/cyan]")
-                    X = self.alternative_preprocessing(df, model)
-    
-                # Check if we have data to process
-                if X.shape[0] == 0 or X.shape[1] == 0:
-                    console.print("[red]Error: No features available for detection[/red]")
-                    return
-    
+            
+                # Show feature analysis
+                from .model import find_matching_features
+                available_features, feature_mapping = model._find_features_in_data(df)
+            
+                if len(available_features) < 5:  # Less than half of features
+                    console.print(f"[yellow]Warning: Only {len(available_features)} of {len(model.CORE_FEATURES)} features found[/yellow]")
+                    console.print("[yellow]Missing features will be filled with zeros[/yellow]")
+
+                # Preprocess data (this will automatically align features)
+                X = model.preprocess_data(df, fit_scaler=False)
+            
                 # Detect anomalies
-                predictions, reconstruction_errors = model.predict(X)
-        
+                predictions, confidence_scores = model.predict(X)
+            
                 # Calculate execution time
                 execution_time = time.time() - start_time
             
-                # Prepare results with JSON serializable types
-                results = self.prepare_detection_results(df, predictions, reconstruction_errors, model)
+                # Prepare results
+                results = self.prepare_detection_results(df, predictions, confidence_scores, model)
             
-                # Add execution time to results
+                # Add execution time
                 results['execution_time'] = self.format_execution_time(execution_time)
                 results['execution_time_seconds'] = float(execution_time)
+            
+                # Add feature alignment info
+                results['feature_alignment'] = {
+                    'core_features': model.CORE_FEATURES,
+                    'features_found': len(available_features),
+                    'feature_mapping': feature_mapping
+                }
 
-                # Convert results to JSON serializable format for database
+                # Convert to JSON serializable
                 serializable_results = self.make_json_serializable(results)
-        
+            
                 # Save to database
                 detection_id = self.db.save_detection(
                     user_id=self.auth.current_user['id'],
@@ -736,12 +739,12 @@ Examples:
                     input_file=args.input,
                     results=serializable_results
                 )
-        
+            
                 progress.update(task, completed=100)
-        
+
             except Exception as e:
                 console.print(f"[red]Detection failed: {e}[/red]")
-                if self.args.verbose:
+                if hasattr(self.args, 'verbose') and self.args.verbose:
                     console.print(traceback.format_exc())
                 return
 
@@ -752,18 +755,26 @@ Examples:
         # Show summary table
         self.display_detection_summary(results)
 
+        # Show feature alignment info
+        if 'feature_alignment' in results:
+            alignment = results['feature_alignment']
+            console.print(f"\n[cyan]Feature Alignment:[/cyan]")
+            console.print(f"  Core features: {len(alignment['core_features'])}")
+            console.print(f"  Features found: {alignment['features_found']}")
+            if alignment.get('feature_mapping'):
+                console.print(f"  Mapped {len(alignment['feature_mapping'])} features")
+
         # Show anomalies if any
         if results['anomalies_detected'] > 0:
             console.print("\n[bold]Detected Anomalies:[/bold]")
             for anomaly in results['anomalies'][:10]:  # Show first 10
-                console.print(f"  Flow ID: {anomaly.get('flow_id', 'N/A')} - "
-                            f"Confidence: {anomaly.get('confidence_score', 0):.2f} - "
+                console.print(f"  Flow {anomaly.get('index', 'N/A')} - "
+                            f"Confidence: {anomaly.get('confidence', 0):.2f} - "
                             f"Severity: {anomaly.get('severity', 'Medium')}")
 
         # Save results if requested
         if args.output:
             try:
-                # Ensure results are JSON serializable
                 serializable_results = self.make_json_serializable(results)
                 with open(args.output, 'w') as f:
                     json.dump(serializable_results, f, indent=2)
@@ -771,14 +782,7 @@ Examples:
             except Exception as e:
                 console.print(f"[red]Failed to save results to file: {e}[/red]")
 
-        # Generate explanations if requested
-        if args.explain and results['anomalies_detected'] > 0:
-        # Instead of calling handle_explain directly, show the anomalies from current results
-            console.print("\n[bold cyan]Anomaly Explanations:[/bold cyan]")
-        for i, anomaly in enumerate(results['anomalies'][:5]):  # Show first 5
-            self.explain_anomaly(anomaly, i+1)
-    
-        # Tell user how to get full explanations later
+        # Tell user how to get explanations
         console.print(f"\n[yellow]For full explanations, use:[/yellow]")
         console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
 
@@ -965,68 +969,61 @@ Examples:
         
         console.print(table)
 
-    def prepare_detection_results(self, df, predictions, reconstruction_errors, model, execution_time=None):
+    def prepare_detection_results(self, df, predictions, confidence_scores, model, execution_time=None):
         """Prepare detection results in structured format with JSON serializable types"""
         anomalies = []
         anomaly_indices = np.where(predictions == 1)[0]
 
-        # Normalize reconstruction errors for confidence calculation
-        if len(reconstruction_errors) > 0:
-            max_error = np.max(reconstruction_errors) if np.max(reconstruction_errors) > 0 else 1.0
-            normalized_errors = reconstruction_errors / max_error
-        else:
-            normalized_errors = reconstruction_errors
-
         for idx in anomaly_indices:
-            row = df.iloc[idx]
-    
-            # Calculate confidence score: 1 - normalized reconstruction error
-            # Clamp between 0 and 1
-            if idx < len(normalized_errors):
-                confidence = max(0.0, min(1.0, 1.0 - normalized_errors[idx]))
-            else:
-                confidence = 0.5  # Default if index out of bounds
-    
-            # Convert numpy types to Python native types
+            confidence = float(confidence_scores[idx]) if idx < len(confidence_scores) else 0.5
+        
             anomaly = {
-                'flow_id': int(idx),  # Convert numpy.int64 to int
-                'src_ip': str(row.get('srcip', 'N/A')),
-                'dst_ip': str(row.get('dstip', 'N/A')),
-                'protocol': str(row.get('proto', 'N/A')),
-                'confidence_score': float(confidence),  # Use proper confidence calculation
+                'index': int(idx),
+                'confidence': float(confidence),
                 'severity': self.calculate_severity(confidence),
-                'reconstruction_error': float(reconstruction_errors[idx]),  # Convert to float
-                'features': self.get_important_features(row, model)
             }
+        
+            # Add some feature values for context (limit to first few to avoid huge results)
+            if idx < len(df):
+                row = df.iloc[idx]
+                top_features = {}
+                feature_names = model.feature_names if model.feature_names else []
+            
+                for i, feat in enumerate(feature_names[:5]):  # First 5 features
+                    if i < len(row):
+                        val = row.iloc[i] if hasattr(row, 'iloc') else row[i]
+                        if isinstance(val, (int, float)):
+                            top_features[feat] = float(val)
+                        else:
+                            top_features[feat] = str(val)
+                anomaly['top_features'] = top_features
+        
             anomalies.append(anomaly)
 
-        # Calculate metrics with JSON serializable types
-        total_flows = int(len(predictions))  # Convert to int
-        anomalies_detected = int(len(anomalies))  # Convert to int
-    
-        # Get metrics from model if available
-        metrics = model.metrics
+        # Calculate metrics
+        total_flows = int(len(predictions))
+        anomalies_detected = int(len(anomalies))
 
         result = {
             'total_flows': total_flows,
             'anomalies_detected': anomalies_detected,
             'anomaly_rate': float(anomalies_detected / total_flows) if total_flows > 0 else 0.0,
-            'anomalies': anomalies,
+            'anomalies': anomalies[:100],  # Limit to first 100 for performance
             'threshold': float(model.threshold),
-            'mean_reconstruction_error': float(np.mean(reconstruction_errors)),
-            'metrics': metrics
+            'mean_confidence': float(np.mean(confidence_scores)) if len(confidence_scores) > 0 else 0,
+            'metrics': model.metrics if hasattr(model, 'metrics') else {}
         }
-    
+
         # Add execution time if provided
         if execution_time is not None:
             result['execution_time'] = self.format_execution_time(execution_time)
             result['execution_time_seconds'] = float(execution_time)
-    
+
         return result
     
     # Training Command
     def handle_train(self, args):
-        """Handle model training"""
+        """Handle model training with feature alignment"""
         if not self.check_permission('train_models'):
             return
 
@@ -1034,7 +1031,7 @@ Examples:
             console.print(f"[red]Input file not found: {args.input}[/red]")
             return
 
-        # Process features
+        # Process features (optional, model will use core features)
         features = None
         if args.features:
             features = [f.strip() for f in args.features.split(',')]
@@ -1045,48 +1042,72 @@ Examples:
             transient=True,
         ) as progress:
             task = progress.add_task("[cyan]Training RNSA+KNN model...", total=100)
-    
+
             try:
-                # Train model using RNSA+KNN - Updated parameters
+                # Analyze dataset first
+                console.print("[cyan]Analyzing dataset features...[/cyan]")
+                df_preview = pd.read_csv(args.input, nrows=1000)
+                from .model import IntrusionDetectionModel
+                temp_model = IntrusionDetectionModel()
+                available_features, feature_mapping = temp_model._find_features_in_data(df_preview)
+            
+                console.print(f"\n[cyan]Feature Analysis:[/cyan]")
+                console.print(f"  Core features required: {len(temp_model.CORE_FEATURES)}")
+                console.print(f"  Features found: {len(available_features)}")
+                if feature_mapping:
+                    console.print(f"  Feature mapping:")
+                    for k, v in list(feature_mapping.items())[:5]:
+                        console.print(f"    {k} → {v}")
+            
+                # Train model
                 result = self.trainer.train_model(
                     data_path=args.input,
                     model_name=args.model_name or f"model_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                    r_s=0.01,  # Self radius
-                    max_detectors=1000,  # Maximum detectors
-                    k=1  # KNN neighbors
+                    r_s=0.01,
+                    max_detectors=1000,
+                    k=1,
+                    dataset_name=os.path.basename(args.input)
                 )
-        
-                # Save model to database - Updated parameters for RNSA+KNN
+            
+                # Save model to database
                 model_id = self.db.save_model(
                     user_id=self.auth.current_user['id'],
                     model_name=result['model_name'],
                     model_path=result['model_path'],
                     dataset_name=os.path.basename(args.input),
                     metrics=result['metrics'],
-                    features=features,
+                    features=result.get('feature_analysis', {}).get('available_features', features),
                     parameters={
                         'model_type': 'rnsa_knn',
                         'r_s': 0.01,
                         'max_detectors': 1000,
-                        'k': 1
+                        'k': 1,
+                        'core_features': temp_model.CORE_FEATURES
                     }
                 )
-        
+            
                 progress.update(task, completed=100)
-        
+
             except Exception as e:
                 console.print(f"[red]Training failed: {e}[/red]")
-                if self.args.verbose:
+                if hasattr(self.args, 'verbose') and self.args.verbose:
                     console.print(traceback.format_exc())
                 return
 
-        # Display results
         console.print(f"[green]✓ RNSA+KNN Model trained successfully[/green]")
         console.print(f"Model ID: [cyan]{model_id}[/cyan]")
         console.print(f"Model saved to: [cyan]{result['model_path']}[/cyan]")
 
         # Show metrics
         self.display_training_metrics(result['metrics'])
+
+        # Show feature summary
+        if 'feature_analysis' in result:
+            fa = result['feature_analysis']
+            console.print(f"\n[cyan]Feature Summary:[/cyan]")
+            console.print(f"  Features used: {fa.get('coverage', 0):.1f}% coverage")
+            console.print(f"  Features found: {len(fa.get('available_features', []))}")
+            console.print(f"  Missing features: {len(fa.get('missing_features', []))}")
 
         # Log training event
         self.db.log_audit_event(

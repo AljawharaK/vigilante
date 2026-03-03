@@ -343,8 +343,8 @@ class DatabaseManager:
             print(f"Error updating failed attempts: {e}")
     
     def save_model(self, user_id: int, model_name: str, model_path: str, 
-                   dataset_name: str = None, metrics: Dict[str, Any] = None,
-                   features: List[str] = None, parameters: Dict[str, Any] = None) -> int:
+               dataset_name: str = None, metrics: Dict[str, Any] = None,
+               features: List[str] = None, parameters: Dict[str, Any] = None) -> int:
         """Save model metadata to database"""
         try:
             with self.conn.cursor() as cursor:
@@ -358,7 +358,7 @@ class DatabaseManager:
                     RETURNING id
                 """, (
                     user_id, model_name, model_path, dataset_name,
-                    metrics.get('accuracy') if metrics else None,
+                    metrics.get('test_accuracy') if metrics else None,
                     metrics.get('precision') if metrics else None,
                     metrics.get('recall') if metrics else None,
                     metrics.get('f1_score') if metrics else None,
