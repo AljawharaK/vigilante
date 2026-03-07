@@ -1621,20 +1621,45 @@ Examples:
         """Show system status"""
         if not self.check_auth():
             return
-        
+    
+        # Get system info
+        try:
+            system_info = get_system_info()
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not get full system info: {e}[/yellow]")
+            system_info = {"status": "partial"}
+    
         # Get database stats
         db_stats = self.db.get_database_stats()
-        
+    
         # Display status
-        console.print(Panel.fit(
-            f"[bold]Vigilante Intrusion Detection System[/bold]\n"
-            f"Version: 1.0.0\n"
-            f"User: {self.auth.current_user['username']}\n"
-            f"Role: {self.auth.current_role}\n"
-            f"Session: Active\n"
-            f"Database: Connected\n"
-            f"Models: {db_stats.get('model_count', 0)}\n"
+        status_lines = [
+            f"[bold]Vigilante Intrusion Detection System[/bold]",
+            f"Version: 1.0.0",
+            f"User: {self.auth.current_user['username']}",
+            f"Role: {self.auth.current_role}",
+            f"Session: Active",
+            f"Database: Connected",
+            f"Models: {db_stats.get('model_count', 0)}",
             f"Detections: {db_stats.get('detection_count', 0)}",
+        ]
+    
+        # Add system info if available
+        if system_info and system_info != {"status": "partial"}:
+            status_lines.extend([
+                f"",
+                f"[cyan]System:[/cyan] {system_info.get('system', 'Unknown')} {system_info.get('release', '')}",
+                f"Python: {system_info.get('python_version', 'Unknown')}",
+                f"CPU: {system_info.get('cpu_count', '?')} cores ({system_info.get('cpu_percent', 0)}% used)",
+                f"Memory: {system_info.get('available_memory', '?')} available / {system_info.get('total_memory', '?')} total",
+            ])
+        
+            # Add ML framework info
+            if not system_info.get('torch_available', True):
+                status_lines.append(f"ML Framework: scikit-learn based (PyTorch not required)")
+    
+        console.print(Panel.fit(
+            "\n".join(status_lines),
             title="System Status",
             border_style="green"
         ))
