@@ -543,25 +543,45 @@ Examples:
             TextColumn("[progress.description]{task.description}"),
             transient=True,
         ) as progress:
-            task = progress.add_task("Collecting data...", total=4)
+            task = progress.add_task("Collecting data...", total=5)
         
             end_date = datetime.now()
             start_date = end_date - timedelta(days=period_days)
         
             progress.update(task, advance=1, description="Getting detection summary...")
-            detection_summary = self.db.get_detection_summary(None, period_days)
+            try:
+                detection_summary = self.db.get_detection_summary(None, period_days)
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not get detection summary: {e}[/yellow]")
+                detection_summary = []
         
             progress.update(task, advance=1, description="Getting user activity...")
-            user_activity = self.db.get_user_activity(period_days)
+            try:
+                user_activity = self.db.get_user_activity(period_days)
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not get user activity: {e}[/yellow]")
+                user_activity = {}
         
             progress.update(task, advance=1, description="Getting recent anomalies...")
-            recent_anomalies = self.db.get_recent_anomalies(period_days, limit=20)
+            try:
+                recent_anomalies = self.db.get_recent_anomalies(period_days, limit=20)
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not get recent anomalies: {e}[/yellow]")
+                recent_anomalies = []
         
             progress.update(task, advance=1, description="Getting all models...")
-            all_models = self.db.get_all_models()  # Add this method to database.py
-        
+            try:
+                all_models = self.db.get_all_models()
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not get models: {e}[/yellow]")
+                all_models = []
+
             progress.update(task, advance=1, description="Getting all detections...")
-            all_detections = self.db.get_all_detections(period_days)  # Add this method
+            try:
+                all_detections = self.db.get_all_detections(period_days)
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not get detections: {e}[/yellow]")
+                all_detections = []
         
             progress.update(task, advance=1, description="Compiling report...")
     
@@ -603,6 +623,8 @@ Examples:
                 )
             console.print(det_table)
             console.print(f"[dim]Showing {min(20, len(all_detections))} of {len(all_detections)} detections[/dim]")
+        else:
+            console.print("[yellow]No detection data found for the specified period[/yellow]")
     
         # Display all models
         if all_models:
@@ -626,9 +648,11 @@ Examples:
                     model['created_at'].strftime('%Y-%m-%d')
                 )
             console.print(model_table)
-    
+        else:
+            console.print("[yellow]No models found in the system[/yellow]")
+
         # Display user activity
-        if user_activity:
+        if user_activity and any(user_activity.values()):
             activity_table = Table(title="User Activity Summary", box=ROUNDED)
             activity_table.add_column("Metric", style="cyan")
             activity_table.add_column("Count", style="green", justify="right")
@@ -638,7 +662,9 @@ Examples:
             activity_table.add_row("Detection Jobs Run", str(user_activity.get('detection_jobs_run', 0)))
         
             console.print(activity_table)
-    
+        else:
+            console.print("[yellow]No user activity data found for the specified period[/yellow]")
+
         # Display recent anomalies
         if recent_anomalies:
             anomaly_table = Table(title="Recent Anomalies", box=ROUNDED)
@@ -655,7 +681,9 @@ Examples:
                     anomaly.get('severity', 'Medium')
                 )
             console.print(anomaly_table)
-    
+        else:
+            console.print("[yellow]No anomalies detected in the specified period[/yellow]")
+
         # Prepare report data for PDF
         report_data = {
             "report_period": {
@@ -1038,31 +1066,40 @@ Examples:
         table = Table(title="Detection Summary", box=ROUNDED)
         table.add_column("Metric", style="cyan")
         table.add_column("Value", style="green", justify="right")
-        
+    
         table.add_row("Total Flows Analyzed", f"{results['total_flows']:,}")
         table.add_row("Anomalies Detected", str(results['anomalies_detected']))
-        table.add_row("Anomaly Rate", f"{results['anomaly_rate']:.2%}")
+        table.add_row("Detection Rate", f"{results.get('detection_rate', results['anomaly_rate']):.2%}")
+        table.add_row("Mean Reconstruction Error", f"{results.get('mean_reconstruction_error', 0):.6f}")
+        table.add_row("Mean Confidence", f"{results.get('mean_confidence', 0):.6f}")
         table.add_row("Detection Threshold", f"{results['threshold']:.6f}")
-        table.add_row("Mean Reconstruction Error", f"{results['mean_reconstruction_error']:.6f}")
+    
         # Add execution time if available
         if 'execution_time' in results:
             table.add_row("Execution Time", results['execution_time'])
         else:
             table.add_row("Execution Time", "N/A")
-        
+    
         console.print(table)
 
     def prepare_detection_results(self, df, predictions, confidence_scores, model, execution_time=None):
         """Prepare detection results in structured format with JSON serializable types"""
         anomalies = []
         anomaly_indices = np.where(predictions == 1)[0]
+    
+        # Calculate mean reconstruction error (using inverse of confidence as proxy)
+        # For RNSA+KNN, lower confidence = higher "reconstruction error" (more anomalous)
+        reconstruction_errors = 1.0 - confidence_scores
+        mean_reconstruction_error = float(np.mean(reconstruction_errors))
 
         for idx in anomaly_indices:
             confidence = float(confidence_scores[idx]) if idx < len(confidence_scores) else 0.5
+            reconstruction_error = float(reconstruction_errors[idx]) if idx < len(reconstruction_errors) else 0.5
         
             anomaly = {
                 'index': int(idx),
-                'confidence': float(confidence),
+                'confidence': confidence,
+                'reconstruction_error': reconstruction_error,
                 'severity': self.calculate_severity(confidence),
             }
         
@@ -1086,11 +1123,16 @@ Examples:
         # Calculate metrics
         total_flows = int(len(predictions))
         anomalies_detected = int(len(anomalies))
+    
+        # Calculate detection rate (True Positive Rate) - Note: We don't have ground truth labels here
+        # For detection results without labels, we can only report the raw detection rate
+        detection_rate = float(anomalies_detected / total_flows) if total_flows > 0 else 0.0
 
         result = {
             'total_flows': total_flows,
             'anomalies_detected': anomalies_detected,
-            'anomaly_rate': float(anomalies_detected / total_flows) if total_flows > 0 else 0.0,
+            'detection_rate': detection_rate,
+            'mean_reconstruction_error': mean_reconstruction_error,
             'anomalies': anomalies[:100],  # Limit to first 100 for performance
             'threshold': float(model.threshold),
             'mean_confidence': float(np.mean(confidence_scores)) if len(confidence_scores) > 0 else 0,
@@ -1152,8 +1194,12 @@ Examples:
                     dataset_name=os.path.basename(args.input)
                 )
             
-                # Save model to database
-                model_id = self.db.save_model(
+                # Create a fresh database connection for saving the model
+                # This ensures we don't use a stale connection from long training
+                fresh_db = DatabaseManager()
+            
+                # Save model to database using fresh connection
+                model_id = fresh_db.save_model(
                     user_id=self.auth.current_user['id'],
                     model_name=result['model_name'],
                     model_path=result['model_path'],
@@ -1168,6 +1214,9 @@ Examples:
                         'core_features': temp_model.CORE_FEATURES
                     }
                 )
+            
+                # Close the fresh connection
+                fresh_db.close()
             
                 progress.update(task, completed=100)
 
@@ -1201,7 +1250,6 @@ Examples:
             status="success",
             details={"model_id": model_id, "model_name": result['model_name']}
         )
-
 
     # Show RNSA+KNN specific metrics
     def display_training_metrics(self, metrics):
@@ -1573,9 +1621,6 @@ Examples:
         """Show system status"""
         if not self.check_auth():
             return
-        
-        # Get system info
-        system_info = get_system_info()
         
         # Get database stats
         db_stats = self.db.get_database_stats()

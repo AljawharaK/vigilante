@@ -159,29 +159,6 @@ def format_table(data: List[Dict], title: str = "") -> RichTable:
     
     return table
 
-def get_system_info() -> Dict[str, Any]:
-    """Get system information"""
-    import platform
-    import psutil
-    import torch
-    
-    info = {
-        "system": platform.system(),
-        "release": platform.release(),
-        "python_version": platform.python_version(),
-        "cpu_count": psutil.cpu_count(),
-        "total_memory": f"{psutil.virtual_memory().total / (1024**3):.2f} GB",
-        "available_memory": f"{psutil.virtual_memory().available / (1024**3):.2f} GB",
-        "torch_version": torch.__version__,
-        "cuda_available": torch.cuda.is_available(),
-    }
-    
-    if torch.cuda.is_available():
-        info["gpu_name"] = torch.cuda.get_device_name(0)
-        info["gpu_memory"] = f"{torch.cuda.get_device_properties(0).total_memory / (1024**3):.2f} GB"
-    
-    return info
-
 def save_detection_to_csv(results: Dict[str, Any], output_path: str):
     """Save detection results to CSV"""
     # Extract anomalies

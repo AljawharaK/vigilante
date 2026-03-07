@@ -379,6 +379,8 @@ class DatabaseManager:
             print(f"❌ Error getting all models: {e}")
             return []
 
+    # Replace the get_all_detections method:
+
     def get_all_detections(self, period_days: int = 30):
         """Get all detections in the system (admin only)"""
         try:
@@ -388,7 +390,7 @@ class DatabaseManager:
                     FROM detection_results d
                     JOIN users u ON d.user_id = u.id
                     LEFT JOIN models m ON d.model_id = m.id
-                    WHERE d.created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
+                    WHERE d.created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
                     ORDER BY d.created_at DESC
                 """, (period_days,))
                 detections = cursor.fetchall()
