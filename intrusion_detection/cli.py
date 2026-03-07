@@ -694,7 +694,7 @@ Examples:
             "detection_summary": {
                 "total_flows_analyzed": total_flows,
                 "total_anomalies_detected": total_anomalies,
-                "anomaly_rate": total_anomalies / total_flows if total_flows > 0 else 0,
+                "detection_rate": total_anomalies / total_flows if total_flows > 0 else 0,
                 "avg_false_positive_rate": self.calculate_avg_fpr(detection_summary),
             },
             "user_activity": user_activity,
@@ -1069,7 +1069,7 @@ Examples:
     
         table.add_row("Total Flows Analyzed", f"{results['total_flows']:,}")
         table.add_row("Anomalies Detected", str(results['anomalies_detected']))
-        table.add_row("Detection Rate", f"{results.get('detection_rate', results['anomaly_rate']):.2%}")
+        table.add_row("Detection Rate", f"{results.get('detection_rate', 0):.2%}")
         table.add_row("Mean Reconstruction Error", f"{results.get('mean_reconstruction_error', 0):.6f}")
         table.add_row("Mean Confidence", f"{results.get('mean_confidence', 0):.6f}")
         table.add_row("Detection Threshold", f"{results['threshold']:.6f}")
