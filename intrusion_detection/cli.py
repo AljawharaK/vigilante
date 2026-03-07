@@ -34,6 +34,8 @@ class VigilanteCLI:
     
     def __init__(self):
         self.db = DatabaseManager()
+        # Add longer timeout for detection operations
+        self.db.set_long_timeout()
         self.auth = AuthManager(self.db)
         self.trainer = ModelTrainer()
         self.current_model = None
@@ -459,10 +461,9 @@ Examples:
         """View audit logs (Administrator only)"""
         if not self.check_admin():
             return
-        
-        # Parse period
+    
         period_days = int(args.period.rstrip('d'))
-        
+    
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -470,40 +471,57 @@ Examples:
         ) as progress:
             progress.add_task(description="Retrieving audit logs...", total=None)
             logs = self.db.get_audit_logs(period_days)
-        
-        # Display logs
+    
         if not logs:
             console.print("[yellow]No audit logs found for the specified period[/yellow]")
             return
-        
-        # Create table
+    
+        # Display summary stats
+        console.print(f"[green]Found {len(logs)} audit log entries[/green]\n")
+    
+        # Create detailed table
         table = Table(title=f"Audit Logs - Last {args.period}", box=ROUNDED)
+        table.add_column("ID", style="dim", width=6)
         table.add_column("Timestamp", style="cyan", width=20)
         table.add_column("User", style="green", width=15)
         table.add_column("Action", style="yellow", width=20)
         table.add_column("Resource", style="blue", width=30)
         table.add_column("Status", style="magenta", width=10)
-        
-        for log in logs[:50]:  # Show first 50
+    
+        for log in logs[:100]:  # Show first 100
             timestamp = log['created_at'].strftime('%Y-%m-%d %H:%M:%S')
             username = log['username'] or 'System'
-            
-            # Truncate long resource names
             resource = log['resource'] or '-'
+        
+            # Truncate long resource names
             if len(resource) > 25:
                 resource = resource[:22] + '...'
-            
+        
             table.add_row(
+                str(log['id']),
                 timestamp,
                 username,
                 log['action'],
                 resource,
                 log['status']
             )
-        
+    
         console.print(table)
-        console.print(f"[dim]Showing {min(50, len(logs))} of {len(logs)} logs[/dim]")
-        
+        console.print(f"[dim]Showing {min(100, len(logs))} of {len(logs)} logs[/dim]")
+    
+        # Show action summary
+        from collections import Counter
+        actions = Counter([log['action'] for log in logs])
+    
+        summary_table = Table(title="Action Summary", box=ROUNDED)
+        summary_table.add_column("Action", style="cyan")
+        summary_table.add_column("Count", style="green", justify="right")
+    
+        for action, count in actions.most_common(10):
+            summary_table.add_row(action, str(count))
+    
+        console.print(summary_table)
+    
         # Save to CSV if requested
         if args.output:
             try:
@@ -512,49 +530,133 @@ Examples:
                 console.print(f"[green]✓ Full log saved to: {args.output}[/green]")
             except Exception as e:
                 console.print(f"[red]Failed to save CSV: {e}[/red]")
-    
+
     def handle_admin_system_report(self, args):
-        """Generate system report (Administrator only)"""
         if not self.check_admin():
             return
-        
-        # Parse period
+    
         period_days = int(args.period.rstrip('d'))
-        
         console.print(f"[cyan]Generating system report for the last {args.period}...[/cyan]")
-        
+    
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             transient=True,
         ) as progress:
             task = progress.add_task("Collecting data...", total=4)
-            
-            # Get system statistics
+        
             end_date = datetime.now()
             start_date = end_date - timedelta(days=period_days)
-            
-            progress.update(task, advance=1, description="Getting detection summary...")
-            
-            # Get detection summary
-            detection_summary = self.db.get_detection_summary(None, period_days)
-            
-            progress.update(task, advance=1, description="Getting user activity...")
-            
-            # Get user activity
-            user_activity = self.db.get_user_activity(period_days)
-            
-            progress.update(task, advance=1, description="Getting recent anomalies...")
-            
-            # Get recent anomalies
-            recent_anomalies = self.db.get_recent_anomalies(period_days, limit=20)
-            
-            progress.update(task, advance=1, description="Compiling report...")
         
-        # Prepare report data
+            progress.update(task, advance=1, description="Getting detection summary...")
+            detection_summary = self.db.get_detection_summary(None, period_days)
+        
+            progress.update(task, advance=1, description="Getting user activity...")
+            user_activity = self.db.get_user_activity(period_days)
+        
+            progress.update(task, advance=1, description="Getting recent anomalies...")
+            recent_anomalies = self.db.get_recent_anomalies(period_days, limit=20)
+        
+            progress.update(task, advance=1, description="Getting all models...")
+            all_models = self.db.get_all_models()  # Add this method to database.py
+        
+            progress.update(task, advance=1, description="Getting all detections...")
+            all_detections = self.db.get_all_detections(period_days)  # Add this method
+        
+            progress.update(task, advance=1, description="Compiling report...")
+    
+        # Calculate totals
         total_flows = sum(d.get('total_flows', 0) for d in detection_summary)
         total_anomalies = sum(d.get('total_anomalies', 0) for d in detection_summary)
+    
+        # Display comprehensive summary
+        console.print(Panel.fit(
+            f"[bold cyan]System Report Summary[/bold cyan]\n"
+            f"────────────────────────────\n"
+            f"Period: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}\n"
+            f"Total Flows Analyzed: [green]{total_flows:,}[/green]\n"
+            f"Total Anomalies: [yellow]{total_anomalies}[/yellow]\n"
+            f"Anomaly Rate: [magenta]{(total_anomalies/total_flows if total_flows>0 else 0):.2%}[/magenta]\n"
+            f"Avg False Positive Rate: [cyan]{self.calculate_avg_fpr(detection_summary):.2f}%[/cyan]\n",
+            title="Report Summary",
+            border_style="cyan"
+        ))
+    
+        # Display all detections
+        if all_detections:
+            det_table = Table(title=f"All Detections (Last {args.period})", box=ROUNDED)
+            det_table.add_column("ID", style="cyan")
+            det_table.add_column("User", style="green")
+            det_table.add_column("Date", style="blue")
+            det_table.add_column("Total Flows", justify="right")
+            det_table.add_column("Anomalies", justify="right")
+            det_table.add_column("Model ID", justify="right")
         
+            for det in all_detections[:20]:  # Show first 20
+                det_table.add_row(
+                    str(det['id']),
+                    det.get('username', 'N/A'),
+                    det['created_at'].strftime('%Y-%m-%d %H:%M'),
+                    f"{det['total_flows']:,}",
+                    str(det['anomalies_detected']),
+                    str(det.get('model_id', 'N/A'))
+                )
+            console.print(det_table)
+            console.print(f"[dim]Showing {min(20, len(all_detections))} of {len(all_detections)} detections[/dim]")
+    
+        # Display all models
+        if all_models:
+            model_table = Table(title="All Models in System", box=ROUNDED)
+            model_table.add_column("ID", style="cyan")
+            model_table.add_column("Name", style="green")
+            model_table.add_column("User", style="yellow")
+            model_table.add_column("Type", style="blue")
+            model_table.add_column("Accuracy", justify="right")
+            model_table.add_column("Samples", justify="right")
+            model_table.add_column("Created", style="magenta")
+        
+            for model in all_models[:20]:
+                model_table.add_row(
+                    str(model['id']),
+                    model['name'][:30] + "..." if len(model['name']) > 30 else model['name'],
+                    model.get('username', 'N/A'),
+                    model.get('model_type', 'rnsa_knn'),
+                    f"{model.get('accuracy', 0):.2%}" if model.get('accuracy') else "N/A",
+                    f"{model.get('training_samples', 0):,}",
+                    model['created_at'].strftime('%Y-%m-%d')
+                )
+            console.print(model_table)
+    
+        # Display user activity
+        if user_activity:
+            activity_table = Table(title="User Activity Summary", box=ROUNDED)
+            activity_table.add_column("Metric", style="cyan")
+            activity_table.add_column("Count", style="green", justify="right")
+        
+            activity_table.add_row("Total Logins", str(user_activity.get('total_logins', 0)))
+            activity_table.add_row("Models Trained", str(user_activity.get('models_trained', 0)))
+            activity_table.add_row("Detection Jobs Run", str(user_activity.get('detection_jobs_run', 0)))
+        
+            console.print(activity_table)
+    
+        # Display recent anomalies
+        if recent_anomalies:
+            anomaly_table = Table(title="Recent Anomalies", box=ROUNDED)
+            anomaly_table.add_column("Detected At", style="cyan")
+            anomaly_table.add_column("Flow ID", style="yellow")
+            anomaly_table.add_column("Confidence", justify="right")
+            anomaly_table.add_column("Severity")
+        
+            for anomaly in recent_anomalies[:10]:
+                anomaly_table.add_row(
+                    anomaly.get('detected_at', 'N/A').strftime('%Y-%m-%d %H:%M') if hasattr(anomaly.get('detected_at'), 'strftime') else str(anomaly.get('detected_at', 'N/A')),
+                    str(anomaly.get('index', 'N/A')),
+                    f"{anomaly.get('confidence', 0):.2f}",
+                    anomaly.get('severity', 'Medium')
+                )
+            console.print(anomaly_table)
+    
+        # Prepare report data for PDF
         report_data = {
             "report_period": {
                 "start": start_date.strftime('%Y-%m-%d'),
@@ -568,34 +670,11 @@ Examples:
                 "avg_false_positive_rate": self.calculate_avg_fpr(detection_summary),
             },
             "user_activity": user_activity,
-            "recent_anomalies": recent_anomalies[:10]  # Top 10
+            "recent_anomalies": recent_anomalies[:10],
+            "all_models": all_models,
+            "all_detections": all_detections
         }
-        
-        # Display summary in a nice panel
-        console.print(Panel.fit(
-            f"[bold cyan]System Report Summary[/bold cyan]\n"
-            f"────────────────────────────\n"
-            f"Period: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}\n"
-            f"Total Flows Analyzed: [green]{total_flows:,}[/green]\n"
-            f"Total Anomalies: [yellow]{total_anomalies}[/yellow]\n"
-            f"Anomaly Rate: [magenta]{report_data['detection_summary']['anomaly_rate']:.2%}[/magenta]\n"
-            f"Avg False Positive Rate: {report_data['detection_summary']['avg_false_positive_rate']:.2f}%\n",
-            title="Report Summary",
-            border_style="cyan"
-        ))
-        
-        # User activity table
-        if user_activity:
-            table = Table(title="User Activity Summary", box=ROUNDED)
-            table.add_column("Metric", style="cyan")
-            table.add_column("Count", style="green", justify="right")
-            
-            table.add_row("Total Logins", str(user_activity.get('total_logins', 0)))
-            table.add_row("Models Trained", str(user_activity.get('models_trained', 0)))
-            table.add_row("Detection Jobs Run", str(user_activity.get('detection_jobs_run', 0)))
-            
-            console.print(table)
-        
+    
         # Generate PDF if requested
         if args.output:
             try:
@@ -609,18 +688,18 @@ Examples:
                 with open(json_output, 'w') as f:
                     json.dump(report_data, f, indent=2, default=str)
                 console.print(f"[yellow]JSON report saved to: {json_output}[/yellow]")
-    
+
     # Detection Commands
     def handle_detect(self, args):
         """Handle anomaly detection with feature alignment"""
-    
+        
         if not self.check_permission('run_detection'):
             return
 
         if not os.path.exists(args.input):
             console.print(f"[red]Input file not found: {args.input}[/red]")
             return
-
+        
         # Load model
         model = None
         if args.model_id:
@@ -654,6 +733,8 @@ Examples:
                 if not found:
                     console.print("[red]Could not locate model file[/red]")
                     return
+                
+            self.db.set_long_timeout()
 
             try:
                 model = IntrusionDetectionModel.load(model_path)
@@ -743,6 +824,7 @@ Examples:
                 progress.update(task, completed=100)
 
             except Exception as e:
+                self.db.set_default_timeout()
                 console.print(f"[red]Detection failed: {e}[/red]")
                 if hasattr(self.args, 'verbose') and self.args.verbose:
                     console.print(traceback.format_exc())
@@ -785,6 +867,7 @@ Examples:
         # Tell user how to get explanations
         console.print(f"\n[yellow]For full explanations, use:[/yellow]")
         console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
+        self.db.set_default_timeout()
 
     def alternative_preprocessing(self, df: pd.DataFrame, model) -> np.ndarray:
         """Alternative preprocessing when standard preprocessing fails"""
@@ -1431,36 +1514,60 @@ Examples:
         """List available models"""
         if not self.check_auth():
             return
-        
+    
         models = self.db.get_user_models(self.auth.current_user['id'])
-        
+    
         if not models:
             console.print("[yellow]No models found[/yellow]")
             return
-        
+    
+        # Get admin view if user is admin
+        if self.auth.is_admin():
+            all_models = self.db.get_all_models()
+            console.print(f"[cyan]Showing {len(models)} of {len(all_models)} total models in system[/cyan]\n")
+    
         table = Table(title="Available Models", box=ROUNDED)
-        table.add_column("ID", style="cyan")
-        table.add_column("Name", style="green")
-        table.add_column("Type", style="yellow")
-        table.add_column("Accuracy", justify="right")
-        table.add_column("Created", style="blue")
-        table.add_column("Samples", justify="right")
-        
+        table.add_column("ID", style="cyan", width=6)
+        table.add_column("Name", style="green", width=30)
+        table.add_column("Type", style="yellow", width=15)
+        table.add_column("Accuracy", justify="right", width=10)
+        table.add_column("Precision", justify="right", width=10)
+        table.add_column("Recall", justify="right", width=10)
+        table.add_column("F1", justify="right", width=8)
+        table.add_column("Samples", justify="right", width=10)
+        table.add_column("Created", style="blue", width=12)
+    
         for model in models:
             accuracy = f"{model.get('accuracy', 0):.2%}" if model.get('accuracy') else "N/A"
+            precision = f"{model.get('precision', 0):.2%}" if model.get('precision') else "N/A"
+            recall = f"{model.get('recall', 0):.2%}" if model.get('recall') else "N/A"
+            f1 = f"{model.get('f1_score', 0):.2%}" if model.get('f1_score') else "N/A"
             created = model['created_at'].strftime('%Y-%m-%d')
-            samples = str(model.get('training_samples', 'N/A'))
-            
+            samples = f"{model.get('training_samples', 0):,}" if model.get('training_samples') else "N/A"
+        
             table.add_row(
                 str(model['id']),
-                model['name'],
-                model.get('model_type', 'dca_dae'),
+                model['name'][:28] + ".." if len(model['name']) > 28 else model['name'],
+                model.get('model_type', 'rnsa_knn'),
                 accuracy,
-                created,
-                samples
+                precision,
+                recall,
+                f1,
+                samples,
+                created
             )
-        
+    
         console.print(table)
+    
+        # Show detailed view for the first model if requested
+        if len(models) == 1:
+            model = models[0]
+            console.print(f"\n[cyan]Model Details (ID: {model['id']}):[/cyan]")
+            console.print(f"  Path: {model['model_path']}")
+            if model.get('features_count'):
+                console.print(f"  Features: {model['features_count']}")
+            if model.get('training_samples'):
+                console.print(f"  Training Samples: {model['training_samples']:,}")
     
     def handle_status(self, args):
         """Show system status"""

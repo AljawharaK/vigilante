@@ -1,6 +1,6 @@
 # Intrusion Detection CLI Tool
 
-A command-line tool for intrusion detection using Deterministic DCA + Denoising Autoencoder.
+A command-line tool for intrusion detection using RNSA + KNN.
 
 ## Features
 - User authentication and management
@@ -61,17 +61,30 @@ python -m intrusion_detection.cli --help
 ```bash
 # Login and enter user name and OTP code
 vigilante login
+vigilante logout
 vigilante --version
+vigilante reset-pass
+vigilante status
+vigilante explain (without --detection-id for file input)
+vigilante -v or vigilante --verbose
+vigilante -h
+vigilante --help
 
 # Administrator user management & system monitoring
-vigilante admin user-create --username analyst1 --email analyst@example.com --role Analyst
+# 1. Create analyst users
+vigilante admin user-create --username analyst1 --email analyst@company.com --role Analyst
 vigilante admin user-modify --username user1 --role Administrator
 vigilante admin user-deactivate --username olduser
-vigilante admin audit-logs --period 30d --output logs.csv
-vigilante admin system-report --period 7d --output report.pdf
+# 2. Monitor system activity
+vigilante admin audit-logs --period 7d
+vigilante admin system-report --period 30d --output monthly_report.pdf
 
 # Analyst Detection & Analysis
-vigilante train --input dataset.csv --model-name "Test Model"
-vigilante detect --input traffic.csv --model-id 1
-# List trained models
-vigilante --list-models
+# 1. Train a model on your dataset
+vigilante train --input training_data.csv --model-name "Network Traffic Model"
+# 2. List available models to get the ID
+vigilante list-models
+# 3. Run detection on new traffic
+vigilante detect --input new_traffic.csv --model-id 1 --explain --output results.json
+# 4. Check summary of detections
+vigilante summary --period 7d

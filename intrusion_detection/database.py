@@ -342,6 +342,61 @@ class DatabaseManager:
             self.conn.rollback()
             print(f"Error updating failed attempts: {e}")
     
+    def set_long_timeout(self):
+        """Set longer timeout for long-running operations like detection"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("SET statement_timeout = '120min'")
+                cursor.execute("SET idle_in_transaction_session_timeout = '120min'")
+            self.conn.commit()
+        except Exception as e:
+            print(f"⚠️ Could not set long timeout: {e}")
+
+    def set_default_timeout(self):
+        """Reset to default timeout"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("SET statement_timeout = '30s'")
+                cursor.execute("SET idle_in_transaction_session_timeout = '2min'")
+            self.conn.commit()
+        except Exception as e:
+            print(f"⚠️ Could not reset timeout: {e}")
+
+    def get_all_models(self):
+        """Get all models in the system (admin only)"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT m.*, u.username 
+                    FROM models m
+                    JOIN users u ON m.user_id = u.id
+                    WHERE m.is_active = TRUE
+                    ORDER BY m.created_at DESC
+                """)
+                models = cursor.fetchall()
+                return [dict(model) for model in models]
+        except Exception as e:
+            print(f"❌ Error getting all models: {e}")
+            return []
+
+    def get_all_detections(self, period_days: int = 30):
+        """Get all detections in the system (admin only)"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT d.*, u.username, m.name as model_name
+                    FROM detection_results d
+                    JOIN users u ON d.user_id = u.id
+                    LEFT JOIN models m ON d.model_id = m.id
+                    WHERE d.created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
+                    ORDER BY d.created_at DESC
+                """, (period_days,))
+                detections = cursor.fetchall()
+                return [dict(detection) for detection in detections]
+        except Exception as e:
+            print(f"❌ Error getting all detections: {e}")
+            return []
+        
     def save_model(self, user_id: int, model_name: str, model_path: str, 
                dataset_name: str = None, metrics: Dict[str, Any] = None,
                features: List[str] = None, parameters: Dict[str, Any] = None) -> int:
@@ -382,7 +437,7 @@ class DatabaseManager:
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
-                    SELECT id, name, description, model_path, model_type,
+                    SELECT id, name, model_path, model_type,
                            accuracy, precision, recall, f1_score,
                            training_samples, features_count,
                            created_at, updated_at
@@ -580,9 +635,8 @@ class DatabaseManager:
                     UPDATE sessions 
                     SET is_valid = FALSE 
                     WHERE user_id = %s AND is_valid = TRUE
-                    RETURNING COUNT(*)
                 """, (user_id,))
-                count = cursor.fetchone()[0]
+                count = cursor.rowcount  # Get count from rowcount instead of RETURNING
                 self.conn.commit()
                 print(f"✅ Invalidated {count} sessions for user {user_id}")
                 return count
@@ -613,14 +667,14 @@ class DatabaseManager:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 query = """
                     SELECT * FROM audit_logs 
-                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
+                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
                 """
                 params = [period_days]
-                
+            
                 if user_id:
                     query += " AND user_id = %s"
                     params.append(user_id)
-                
+            
                 query += " ORDER BY created_at DESC"
                 cursor.execute(query, tuple(params))
                 return cursor.fetchall()
@@ -639,14 +693,14 @@ class DatabaseManager:
                         SUM(total_flows) as total_flows,
                         SUM(anomalies_detected) as total_anomalies
                     FROM detection_results
-                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
+                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
                 """
                 params = [period_days]
-                
+            
                 if user_id:
                     query += " AND user_id = %s"
                     params.append(user_id)
-                
+            
                 query += " GROUP BY DATE(created_at) ORDER BY date DESC"
                 cursor.execute(query, tuple(params))
                 return cursor.fetchall()
@@ -786,7 +840,7 @@ class DatabaseManager:
                         COUNT(DISTINCT CASE WHEN action = 'model_train' THEN id END) as models_trained,
                         COUNT(DISTINCT CASE WHEN action = 'detect' THEN id END) as detection_jobs_run
                     FROM audit_logs
-                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
+                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
                 """, (period_days,))
                 result = cursor.fetchone()
                 return dict(result) if result else {}
@@ -803,7 +857,7 @@ class DatabaseManager:
                         dr.created_at as detected_at,
                         dr.results
                     FROM detection_results dr
-                    WHERE dr.created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
+                    WHERE dr.created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
                     AND dr.anomalies_detected > 0
                     ORDER BY dr.created_at DESC
                     LIMIT %s
@@ -840,7 +894,7 @@ class DatabaseManager:
                         dr.results
                     FROM detection_results dr
                     WHERE dr.user_id = %s
-                    AND dr.created_at >= CURRENT_TIMESTAMP - INTERVAL %s days
+                    AND dr.created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
                     AND dr.anomalies_detected > 0
                     ORDER BY dr.created_at DESC
                     LIMIT 10
