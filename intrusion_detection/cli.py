@@ -761,8 +761,6 @@ Examples:
                 if not found:
                     console.print("[red]Could not locate model file[/red]")
                     return
-                
-            self.db.set_long_timeout()
 
             try:
                 model = IntrusionDetectionModel.load(model_path)
@@ -794,42 +792,84 @@ Examples:
         # Perform detection with timing
         import time
         start_time = time.time()
+        
+        self.db.set_long_timeout()
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            transient=True,
-        ) as progress:
-            task = progress.add_task("[cyan]Analyzing traffic...", total=None)
+        try:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                transient=True,
+            ) as progress:
+                task = progress.add_task("[cyan]Analyzing traffic...", total=None)
 
-            try:
                 # Load data
                 df = pd.read_csv(args.input)
                 console.print(f"[cyan]Loaded {len(df)} records from {args.input}[/cyan]")
             
+                # Check if data has labels
+                has_labels = False
+                y_true = None
+                label_col = None
+            
+                # Look for label columns (case-insensitive)
+                possible_label_cols = ['label', 'Label', 'attack_cat', 'class', 'Label.1', ' Label', 'attack', 'Attack']
+                for col in possible_label_cols:
+                    if col in df.columns:
+                        has_labels = True
+                        label_col = col
+                        y_true = df[col].values
+                    
+                        # Convert to binary if needed
+                        if y_true.dtype == 'object':
+                            y_true = np.array([1 if str(v).lower() in ['attack', 'malicious', 'anomaly', '1', 'true', 'yes'] 
+                                          else 0 for v in y_true])
+                        console.print(f"[green]✓ Found label column: '{col}' with {len(np.unique(y_true))} unique values[/green]")
+                    
+                        # Remove label column from features for preprocessing
+                        df_features = df.drop(columns=[col])
+                        break
+            
+                if not has_labels:
+                    console.print("[yellow]No label column found. Will perform unsupervised detection only.[/yellow]")
+                    df_features = df.copy()
+            
                 # Show feature analysis
                 from .model import find_matching_features
-                available_features, feature_mapping = model._find_features_in_data(df)
-            
+                available_features, feature_mapping = model._find_features_in_data(df_features)
+        
                 if len(available_features) < 5:  # Less than half of features
                     console.print(f"[yellow]Warning: Only {len(available_features)} of {len(model.CORE_FEATURES)} features found[/yellow]")
                     console.print("[yellow]Missing features will be filled with zeros[/yellow]")
 
                 # Preprocess data (this will automatically align features)
-                X = model.preprocess_data(df, fit_scaler=False)
-            
+                X = model.preprocess_data(df_features, fit_scaler=False)
+        
                 # Detect anomalies
                 predictions, confidence_scores = model.predict(X)
-            
+        
                 # Calculate execution time
                 execution_time = time.time() - start_time
-            
-                # Prepare results
-                results = self.prepare_detection_results(df, predictions, confidence_scores, model)
-            
-                # Add execution time
-                results['execution_time'] = self.format_execution_time(execution_time)
-                results['execution_time_seconds'] = float(execution_time)
+        
+                # Prepare results with metrics
+                if has_labels and y_true is not None:
+                    # Calculate all metrics using ground truth labels
+                    results = self.prepare_detection_results_with_labels(
+                        df_features, predictions, confidence_scores, y_true, model, execution_time
+                    )
+                
+                    # Calculate ROC metrics and plot if requested
+                    if args.explain:
+                        roc_metrics = self.calculate_roc_metrics(y_true, confidence_scores, "RNSA+KNN Model")
+                        results['roc_metrics'] = roc_metrics
+                    
+                        # Plot ROC curve
+                        self.plot_roc_curve(y_true, confidence_scores, "Test Dataset")
+                else:
+                    # Unlabeled detection - basic results only
+                    results = self.prepare_detection_results(
+                        df_features, predictions, confidence_scores, model, execution_time
+                    )
             
                 # Add feature alignment info
                 results['feature_alignment'] = {
@@ -840,7 +880,7 @@ Examples:
 
                 # Convert to JSON serializable
                 serializable_results = self.make_json_serializable(results)
-            
+        
                 # Save to database
                 detection_id = self.db.save_detection(
                     user_id=self.auth.current_user['id'],
@@ -848,15 +888,19 @@ Examples:
                     input_file=args.input,
                     results=serializable_results
                 )
-            
+        
                 progress.update(task, completed=100)
-
-            except Exception as e:
+            
+                # Reset timeout after detection
                 self.db.set_default_timeout()
-                console.print(f"[red]Detection failed: {e}[/red]")
-                if hasattr(self.args, 'verbose') and self.args.verbose:
-                    console.print(traceback.format_exc())
-                return
+
+        except Exception as e:
+            # Reset timeout even on error
+            self.db.set_default_timeout()
+            console.print(f"[red]Detection failed: {e}[/red]")
+            if hasattr(self.args, 'verbose') and self.args.verbose:
+                console.print(traceback.format_exc())
+            return
 
         # Display results
         console.print(f"[green]✓ Detection analysis completed[/green]")
@@ -895,7 +939,286 @@ Examples:
         # Tell user how to get explanations
         console.print(f"\n[yellow]For full explanations, use:[/yellow]")
         console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
-        self.db.set_default_timeout()
+
+    # Add this new method for labeled data with full metrics:
+
+    def prepare_detection_results_with_labels(self, df, predictions, confidence_scores, y_true, model, execution_time=None):
+        """Prepare detection results with full metrics using ground truth labels"""
+        from sklearn.metrics import (accuracy_score, precision_score, recall_score, 
+                                    f1_score, roc_curve, auc, confusion_matrix)
+    
+        anomalies = []
+        anomaly_indices = np.where(predictions == 1)[0]
+    
+        # Calculate reconstruction errors (proxy)
+        reconstruction_errors = 1.0 - confidence_scores
+        mean_reconstruction_error = float(np.mean(reconstruction_errors))
+
+        for idx in anomaly_indices:
+            confidence = float(confidence_scores[idx]) if idx < len(confidence_scores) else 0.5
+            reconstruction_error = float(reconstruction_errors[idx]) if idx < len(reconstruction_errors) else 0.5
+        
+            anomaly = {
+                'index': int(idx),
+                'confidence': confidence,
+                'reconstruction_error': reconstruction_error,
+                'severity': self.calculate_severity(confidence),
+            }
+        
+            # Add some feature values for context
+            if idx < len(df):
+                row = df.iloc[idx] if hasattr(df, 'iloc') else df[idx]
+                top_features = {}
+                feature_names = model.feature_names if model.feature_names else []
+            
+                for i, feat in enumerate(feature_names[:5]):
+                    if i < len(row):
+                        val = row.iloc[i] if hasattr(row, 'iloc') else row[i]
+                        if isinstance(val, (int, float)):
+                            top_features[feat] = float(val)
+                        else:
+                            top_features[feat] = str(val)
+                anomaly['top_features'] = top_features
+        
+            anomalies.append(anomaly)
+
+        # Calculate confusion matrix
+        cm = confusion_matrix(y_true, predictions)
+    
+        if cm.shape == (2, 2):
+            TN, FP, FN, TP = cm.ravel()
+        
+            # Calculate all metrics
+            accuracy = accuracy_score(y_true, predictions)
+            precision = precision_score(y_true, predictions, zero_division=0)
+            recall = recall_score(y_true, predictions, zero_division=0)
+            f1 = f1_score(y_true, predictions, zero_division=0)
+        
+            # Detection rate = TP / (TP + FN) = recall
+            detection_rate = recall
+        
+            # False positive rate = FP / (FP + TN)
+            false_positive_rate = FP / (FP + TN) if (FP + TN) > 0 else 0
+        
+            # Calculate ROC AUC
+            try:
+                fpr, tpr, thresholds = roc_curve(y_true, confidence_scores)
+                roc_auc = auc(fpr, tpr)
+            
+                # Find optimal threshold (Youden's J statistic)
+                youden_j = tpr - fpr
+                optimal_idx = np.argmax(youden_j)
+                optimal_threshold = thresholds[optimal_idx]
+            
+                # Metrics at optimal threshold
+                y_pred_optimal = (confidence_scores >= optimal_threshold).astype(int)
+                cm_opt = confusion_matrix(y_true, y_pred_optimal)
+                if cm_opt.shape == (2, 2):
+                    TN_opt, FP_opt, FN_opt, TP_opt = cm_opt.ravel()
+                    optimal_dr = TP_opt / (TP_opt + FN_opt) if (TP_opt + FN_opt) > 0 else 0
+                    optimal_far = FP_opt / (FP_opt + TN_opt) if (FP_opt + TN_opt) > 0 else 0
+                else:
+                    optimal_dr, optimal_far = 0, 0
+                
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not calculate ROC AUC: {e}[/yellow]")
+                roc_auc = 0
+                fpr, tpr, thresholds = [], [], []
+                optimal_threshold, optimal_dr, optimal_far = 0, 0, 0
+        else:
+            # Handle case where confusion matrix isn't 2x2
+            accuracy = precision = recall = f1 = detection_rate = false_positive_rate = 0
+            roc_auc = optimal_threshold = optimal_dr = optimal_far = 0
+            TP = FP = TN = FN = 0
+            fpr, tpr, thresholds = [], [], []
+
+        total_flows = int(len(predictions))
+        anomalies_detected = int(len(anomalies))
+
+        result = {
+            'total_flows': total_flows,
+            'anomalies_detected': anomalies_detected,
+            'detection_rate': float(detection_rate),
+            'false_positive_rate': float(false_positive_rate),
+            'mean_reconstruction_error': mean_reconstruction_error,
+            'anomalies': anomalies[:100],
+            'threshold': float(model.threshold),
+            'mean_confidence': float(np.mean(confidence_scores)) if len(confidence_scores) > 0 else 0,
+        
+            # Classification metrics
+            'accuracy': float(accuracy),
+            'precision': float(precision),
+            'recall': float(recall),
+            'f1_score': float(f1),
+        
+            # Confusion matrix values
+            'true_positives': int(TP),
+            'false_positives': int(FP),
+            'true_negatives': int(TN),
+            'false_negatives': int(FN),
+        
+            # ROC metrics
+            'roc_auc': float(roc_auc),
+            'optimal_threshold': float(optimal_threshold),
+            'optimal_detection_rate': float(optimal_dr),
+            'optimal_false_alarm_rate': float(optimal_far),
+        
+            # Model metrics
+            'metrics': model.metrics if hasattr(model, 'metrics') else {}
+        }
+
+        if execution_time is not None:
+            result['execution_time'] = self.format_execution_time(execution_time)
+            result['execution_time_seconds'] = float(execution_time)
+
+        return result
+
+    # Add ROC curve calculation method:
+
+    def calculate_roc_metrics(self, y_true, y_scores, algorithm_name):
+        """
+        Calculate detailed ROC metrics for an algorithm
+        """
+        from sklearn.metrics import roc_curve, auc, confusion_matrix
+        import numpy as np
+    
+        # Calculate ROC curve
+        fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+
+        # Calculate AUC
+        roc_auc = auc(fpr, tpr)
+
+        # Find optimal threshold (Youden's J statistic)
+        youden_j = tpr - fpr
+        optimal_idx = np.argmax(youden_j)
+        optimal_threshold = thresholds[optimal_idx]
+
+        # Calculate metrics at optimal threshold
+        y_pred_optimal = (y_scores >= optimal_threshold).astype(int)
+        cm = confusion_matrix(y_true, y_pred_optimal)
+    
+        if cm.shape == (2, 2):
+            TN, FP, FN, TP = cm.ravel()
+            detection_rate_optimal = TP / (TP + FN) if (TP + FN) > 0 else 0
+            false_alarm_rate_optimal = FP / (FP + TN) if (FP + TN) > 0 else 0
+            precision_optimal = TP / (TP + FP) if (TP + FP) > 0 else 0
+        else:
+            detection_rate_optimal = false_alarm_rate_optimal = precision_optimal = 0
+
+        console.print(f"\n{'-'*60}")
+        console.print(f"[bold cyan]ROC Analysis for {algorithm_name}[/bold cyan]")
+        console.print(f"{'-'*60}")
+        console.print(f"AUC: [green]{roc_auc:.4f}[/green]")
+        console.print(f"Optimal Threshold: [yellow]{optimal_threshold:.4f}[/yellow]")
+        console.print(f"Detection Rate at Optimal Threshold: {detection_rate_optimal:.4f}")
+        console.print(f"False Alarm Rate at Optimal Threshold: {false_alarm_rate_optimal:.4f}")
+        console.print(f"Precision at Optimal Threshold: {precision_optimal:.4f}")
+
+        return {
+            'fpr': fpr.tolist(),
+            'tpr': tpr.tolist(),
+            'thresholds': thresholds.tolist(),
+            'auc': float(roc_auc),
+            'optimal_threshold': float(optimal_threshold),
+            'optimal_dr': float(detection_rate_optimal),
+            'optimal_far': float(false_alarm_rate_optimal),
+            'optimal_precision': float(precision_optimal)
+        }
+
+    # Add ROC curve plotting method:
+
+    def plot_roc_curve(self, y_true, y_scores, dataset_name, save_path=None):
+        """
+        Plot ROC curves for the algorithm
+        """
+        try:
+            import matplotlib.pyplot as plt
+            from sklearn.metrics import roc_curve, auc
+        
+            plt.figure(figsize=(10, 8))
+
+            # Calculate ROC curve
+            fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+
+            # Calculate AUC
+            roc_auc = auc(fpr, tpr)
+
+            # Plot ROC curve
+            plt.plot(fpr, tpr, color='blue', lw=2,
+                     label=f'Single Model (AUC = {roc_auc:.4f})')
+
+            # Plot diagonal line (random classifier)
+            plt.plot([0, 1], [0, 1], color='gray', lw=1, linestyle='--', 
+                     label='Random (AUC = 0.5)')
+
+            # Customize plot
+            plt.xlim([0.0, 1.0])
+            plt.ylim([0.0, 1.05])
+            plt.xlabel('False Positive Rate (False Alarm Rate)', fontsize=12)
+            plt.ylabel('True Positive Rate (Detection Rate)', fontsize=12)
+            plt.title(f'ROC Curve for Single Model on {dataset_name}', fontsize=14, fontweight='bold')
+            plt.legend(loc="lower right", fontsize=11)
+            plt.grid(True, alpha=0.3)
+
+            # Add AUC values in text box
+            plt.text(0.6, 0.15, f'AUC: {roc_auc:.4f}',
+                     bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5'),
+                     fontsize=10)
+
+            plt.tight_layout()
+        
+            if save_path:
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+                console.print(f"[green]✓ ROC curve saved to: {save_path}[/green]")
+        
+            plt.show()
+        
+        except ImportError:
+            console.print("[yellow]Matplotlib not available for plotting ROC curve[/yellow]")
+        except Exception as e:
+            console.print(f"[yellow]Could not plot ROC curve: {e}[/yellow]")
+
+    # Update display_detection_summary to show all metrics:
+
+    def display_detection_summary(self, results):
+        """Display detection summary table with all available metrics"""
+        table = Table(title="Detection Summary", box=ROUNDED)
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green", justify="right")
+    
+        table.add_row("Total Flows Analyzed", f"{results['total_flows']:,}")
+        table.add_row("Anomalies Detected", str(results['anomalies_detected']))
+    
+        # Show classification metrics if available
+        if 'accuracy' in results and results['accuracy'] > 0:
+            table.add_row("Accuracy", f"{results['accuracy']:.2%}")
+            table.add_row("Precision (TP/(TP+FP))", f"{results['precision']:.2%}")
+            table.add_row("Recall (Detection Rate)", f"{results['recall']:.2%}")
+            table.add_row("F1 Score", f"{results['f1_score']:.2%}")
+            table.add_row("ROC AUC", f"{results.get('roc_auc', 0):.4f}")
+    
+        # Show confusion matrix if available
+        if 'true_positives' in results:
+            table.add_row("True Positives", str(results['true_positives']))
+            table.add_row("False Positives", str(results['false_positives']))
+            table.add_row("True Negatives", str(results['true_negatives']))
+            table.add_row("False Negatives", str(results['false_negatives']))
+    
+        table.add_row("Mean Reconstruction Error", f"{results.get('mean_reconstruction_error', 0):.6f}")
+        table.add_row("Mean Confidence", f"{results.get('mean_confidence', 0):.6f}")
+        table.add_row("Detection Threshold", f"{results['threshold']:.6f}")
+    
+        if 'execution_time' in results:
+            table.add_row("Execution Time", results['execution_time'])
+    
+        console.print(table)
+    
+        # Show optimal threshold info if available
+        if 'optimal_threshold' in results and results['optimal_threshold'] > 0:
+            console.print(f"\n[cyan]Optimal Threshold Analysis:[/cyan]")
+            console.print(f"  Optimal Threshold: {results['optimal_threshold']:.4f}")
+            console.print(f"  Detection Rate at Optimal: {results.get('optimal_detection_rate', 0):.2%}")
+            console.print(f"  False Alarm Rate at Optimal: {results.get('optimal_false_alarm_rate', 0):.2%}")
 
     def alternative_preprocessing(self, df: pd.DataFrame, model) -> np.ndarray:
         """Alternative preprocessing when standard preprocessing fails"""
@@ -1060,91 +1383,6 @@ Examples:
             return obj.to_dict()
         else:
             return obj
-    
-    def display_detection_summary(self, results):
-        """Display detection summary table"""
-        table = Table(title="Detection Summary", box=ROUNDED)
-        table.add_column("Metric", style="cyan")
-        table.add_column("Value", style="green", justify="right")
-    
-        table.add_row("Total Flows Analyzed", f"{results['total_flows']:,}")
-        table.add_row("Anomalies Detected", str(results['anomalies_detected']))
-        table.add_row("Detection Rate", f"{results.get('detection_rate', 0):.2%}")
-        table.add_row("Mean Reconstruction Error", f"{results.get('mean_reconstruction_error', 0):.6f}")
-        table.add_row("Mean Confidence", f"{results.get('mean_confidence', 0):.6f}")
-        table.add_row("Detection Threshold", f"{results['threshold']:.6f}")
-    
-        # Add execution time if available
-        if 'execution_time' in results:
-            table.add_row("Execution Time", results['execution_time'])
-        else:
-            table.add_row("Execution Time", "N/A")
-    
-        console.print(table)
-
-    def prepare_detection_results(self, df, predictions, confidence_scores, model, execution_time=None):
-        """Prepare detection results in structured format with JSON serializable types"""
-        anomalies = []
-        anomaly_indices = np.where(predictions == 1)[0]
-    
-        # Calculate mean reconstruction error (using inverse of confidence as proxy)
-        # For RNSA+KNN, lower confidence = higher "reconstruction error" (more anomalous)
-        reconstruction_errors = 1.0 - confidence_scores
-        mean_reconstruction_error = float(np.mean(reconstruction_errors))
-
-        for idx in anomaly_indices:
-            confidence = float(confidence_scores[idx]) if idx < len(confidence_scores) else 0.5
-            reconstruction_error = float(reconstruction_errors[idx]) if idx < len(reconstruction_errors) else 0.5
-        
-            anomaly = {
-                'index': int(idx),
-                'confidence': confidence,
-                'reconstruction_error': reconstruction_error,
-                'severity': self.calculate_severity(confidence),
-            }
-        
-            # Add some feature values for context (limit to first few to avoid huge results)
-            if idx < len(df):
-                row = df.iloc[idx]
-                top_features = {}
-                feature_names = model.feature_names if model.feature_names else []
-            
-                for i, feat in enumerate(feature_names[:5]):  # First 5 features
-                    if i < len(row):
-                        val = row.iloc[i] if hasattr(row, 'iloc') else row[i]
-                        if isinstance(val, (int, float)):
-                            top_features[feat] = float(val)
-                        else:
-                            top_features[feat] = str(val)
-                anomaly['top_features'] = top_features
-        
-            anomalies.append(anomaly)
-
-        # Calculate metrics
-        total_flows = int(len(predictions))
-        anomalies_detected = int(len(anomalies))
-    
-        # Calculate detection rate (True Positive Rate) - Note: We don't have ground truth labels here
-        # For detection results without labels, we can only report the raw detection rate
-        detection_rate = float(anomalies_detected / total_flows) if total_flows > 0 else 0.0
-
-        result = {
-            'total_flows': total_flows,
-            'anomalies_detected': anomalies_detected,
-            'detection_rate': detection_rate,
-            'mean_reconstruction_error': mean_reconstruction_error,
-            'anomalies': anomalies[:100],  # Limit to first 100 for performance
-            'threshold': float(model.threshold),
-            'mean_confidence': float(np.mean(confidence_scores)) if len(confidence_scores) > 0 else 0,
-            'metrics': model.metrics if hasattr(model, 'metrics') else {}
-        }
-
-        # Add execution time if provided
-        if execution_time is not None:
-            result['execution_time'] = self.format_execution_time(execution_time)
-            result['execution_time_seconds'] = float(execution_time)
-
-        return result
     
     # Training Command
     def handle_train(self, args):

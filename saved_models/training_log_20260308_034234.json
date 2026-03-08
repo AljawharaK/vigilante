@@ -1,0 +1,57 @@
+{
+  "model_path": "saved_models\\UNSWNB15 Model_20260308_034234.joblib",
+  "model_name": "UNSWNB15 Model_20260308_034234",
+  "metrics": {
+    "train_accuracy": 0.9858417930877152,
+    "test_accuracy": 0.9310502152898571,
+    "detection_rate": 0.9447819347270519,
+    "false_alarm_rate": 0.09821428571428571,
+    "auc": 0.9226521287324263,
+    "precision": 0.9534903386748975,
+    "recall": 0.9447819347270519,
+    "f1_score": 0.9491161616161616,
+    "detectors": 1000,
+    "optimal_dr": 0.9447819347270519,
+    "optimal_far": 0.09821428571428571
+  },
+  "training_samples": 140272,
+  "validation_samples": 35069,
+  "features_count": 10,
+  "feature_analysis": {
+    "total_columns": 44,
+    "available_features": [
+      "dur",
+      "spkts",
+      "dpkts",
+      "sbytes",
+      "dbytes",
+      "rate",
+      "smean",
+      "dmean",
+      "swin",
+      "dwin"
+    ],
+    "missing_features": [],
+    "feature_mapping": {
+      "dur": "dur",
+      "spkts": "spkts",
+      "dpkts": "dpkts",
+      "sbytes": "sbytes",
+      "dbytes": "dbytes",
+      "rate": "rate",
+      "smean": "smean",
+      "dmean": "dmean",
+      "swin": "swin",
+      "dwin": "dwin"
+    },
+    "coverage": 100.0
+  },
+  "parameters": {
+    "r_s": 0.01,
+    "max_detectors": 1000,
+    "k": 1,
+    "model_type": "rnsa_knn"
+  },
+  "dataset_name": "UNSW_NB15_testing-set.csv",
+  "timestamp": "20260308_034234"
+}
