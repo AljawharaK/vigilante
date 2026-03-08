@@ -813,7 +813,7 @@ Examples:
                 label_col = None
 
                 # Look for label columns (case-insensitive)
-                possible_label_cols = ['label', 'Label', 'attack_cat', 'class', 'malicious', 'DDoS', 'Label.1', ' Label', 'attack', 'Attack']
+                possible_label_cols = ['label', 'Label', 'attack_cat', 'class', 'malicious', 'DDoS', 'Label.1', ' LABEL', 'attack', 'Attack']
                 for col in possible_label_cols:
                     if col in df.columns:
                         has_labels = True
@@ -826,7 +826,7 @@ Examples:
                         # Convert string labels to binary (0 for normal/benign, 1 for attack/malicious)
                         if y_true.dtype == 'object':
                             # Define what counts as normal/benign (case-insensitive)
-                            normal_terms = ['benign', 'normal', '0', 'false', 'no', 'legitimate']
+                            normal_terms = ['benign', 'Benign', 'BENIGN', 'normal', 'Normal', '0', 'false', 'no', 'legitimate']
             
                             y_true_binary = []
                             for val in y_true:
