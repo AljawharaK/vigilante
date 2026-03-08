@@ -1684,9 +1684,12 @@ Examples:
         """Handle detection explanation"""
         if not self.check_permission('generate_explanations'):
             return
-    
+
         detection_data = None
-    
+        self.original_data = None
+        self.original_features = None
+        self.feature_stats = None
+
         if args.detection_id:
             # Load from database
             detection = self.db.get_detection(args.detection_id, self.auth.current_user['id'])
@@ -1696,6 +1699,82 @@ Examples:
         
             detection_data = detection['results']
         
+            # Load original data to get IP addresses and feature values
+            original_file = detection.get('input_file')
+            if original_file and os.path.exists(original_file):
+                try:
+                    original_df = pd.read_csv(original_file)
+                    self.original_data = original_df  # Full data for IPs
+                
+                    # Define all possible feature names for the 10 core features
+                    feature_variations = {
+                        'dur': ['dur', 'Flow Duration', 'flow_duration', 'Duration', 'Dur', 'duration'],
+                        'spkts': ['spkts', 'Tot Fwd Pkts', 'Total Fwd Packets', 'fwd_pkts', 'Fwd Packets', 'Fwd Pkts'],
+                        'dpkts': ['dpkts', 'Tot Bwd Pkts', 'Total Bwd Packets', 'bwd_pkts', 'Bwd Packets', 'Bwd Pkts'],
+                        'sbytes': ['sbytes', 'TotLen Fwd Pkts', 'Total Length of Fwd Packets', 'fwd_bytes', 'Fwd Bytes'],
+                        'dbytes': ['dbytes', 'TotLen Bwd Pkts', 'Total Length of Bwd Packets', 'bwd_bytes', 'Bwd Bytes'],
+                        'rate': ['rate', 'Flow Byts/s', 'Flow Bytes/s', 'flow_bytes_per_sec', 'Bytes/s'],
+                        'smean': ['smean', 'Fwd Pkt Len Mean', 'Fwd Packet Length Mean', 'fwd_pkt_len_mean'],
+                        'dmean': ['dmean', 'Bwd Pkt Len Mean', 'Bwd Packet Length Mean', 'bwd_pkt_len_mean'],
+                        'swin': ['swin', 'Init Fwd Win Byts', 'Init Fwd Window Bytes', 'fwd_win'],
+                        'dwin': ['dwin', 'Init Bwd Win Byts', 'Init Bwd Window Bytes', 'bwd_win']
+                    }
+                
+                    self.feature_mapping = {}
+                    self.original_features = pd.DataFrame()
+                
+                    # For each core feature, try to find a match in the data
+                    for core_feature, variations in feature_variations.items():
+                        found = False
+                        for var in variations:
+                            # Check exact match
+                            if var in original_df.columns:
+                                self.feature_mapping[core_feature] = var
+                                self.original_features[core_feature] = pd.to_numeric(original_df[var], errors='coerce')
+                                found = True
+                                console.print(f"[dim]  ✓ Mapped '{core_feature}' → '{var}'[/dim]")
+                                break
+                            # Check case-insensitive match
+                            elif var.lower() in [col.lower() for col in original_df.columns]:
+                                actual_col = next(col for col in original_df.columns if col.lower() == var.lower())
+                                self.feature_mapping[core_feature] = actual_col
+                                self.original_features[core_feature] = pd.to_numeric(original_df[actual_col], errors='coerce')
+                                found = True
+                                console.print(f"[dim]  ✓ Mapped '{core_feature}' → '{actual_col}'[/dim]")
+                                break
+                    
+                        if not found:
+                            # Feature not found, fill with zeros
+                            self.original_features[core_feature] = 0
+                            console.print(f"[dim]  ✗ '{core_feature}' not found, using zeros[/dim]")
+                
+                    # Fill NaN values
+                    self.original_features = self.original_features.fillna(0)
+                
+                    # Calculate statistics for each feature
+                    self.feature_stats = {}
+                    for feature in self.original_features.columns:
+                        values = self.original_features[feature].values
+                        self.feature_stats[feature] = {
+                            'mean': float(np.mean(values)),
+                            'std': float(np.std(values)) if float(np.std(values)) > 0 else 1.0,
+                            'min': float(np.min(values)),
+                            'max': float(np.max(values))
+                        }
+                
+                    console.print(f"[green]✓ Loaded original data with {len(self.original_features.columns)} core features[/green]")
+                    if self.feature_mapping:
+                        console.print(f"[green]✓ Found IP columns in data[/green]")
+                
+                except Exception as e:
+                    console.print(f"[yellow]Warning: Could not load original data: {e}[/yellow]")
+                    self.original_data = None
+                    self.original_features = None
+            else:
+                console.print(f"[yellow]Original data file not found: {original_file}[/yellow]")
+                self.original_data = None
+                self.original_features = None
+        
         elif args.input:
             # Load from file
             if not os.path.exists(args.input):
@@ -1704,49 +1783,189 @@ Examples:
         
             with open(args.input, 'r') as f:
                 detection_data = json.load(f)
-    
+            self.original_data = None
+            self.original_features = None
+
         else:
             console.print("[red]Please specify either --detection-id or --input[/red]")
             return
-    
+
         # Generate explanations
         console.print("[cyan]Generating explanations for detected anomalies...[/cyan]\n")
-    
+
         if not detection_data or not detection_data.get('anomalies'):
             console.print("[yellow]No anomalies to explain[/yellow]")
             return
-    
-        for i, anomaly in enumerate(detection_data['anomalies'][:5]):  # Explain first 5
+
+        # Sort anomalies by confidence score (highest first)
+        anomalies = sorted(detection_data['anomalies'], 
+                          key=lambda x: x.get('confidence', 0), 
+                          reverse=True)
+
+        for i, anomaly in enumerate(anomalies[:10]):  # Explain first 10
             self.explain_anomaly(anomaly, i+1)
     
     def explain_anomaly(self, anomaly, index):
-        """Explain a single anomaly"""
+        """Explain a single anomaly with contributing features from core features"""
+    
+        # Get confidence score
+        confidence = anomaly.get('confidence', anomaly.get('confidence_score', 0))
+        if confidence == 0 and 'reconstruction_error' in anomaly:
+            # Convert reconstruction error to confidence (inverse)
+            confidence = 1.0 - anomaly.get('reconstruction_error', 0)
+    
+        severity = anomaly.get('severity', self.calculate_severity(confidence))
+    
         panel_content = [
             f"[bold]Anomaly #{index}[/bold]",
-            f"Flow ID: {anomaly.get('flow_id', 'N/A')}",
-            f"Source IP: {anomaly.get('src_ip', 'N/A')}",
-            f"Destination IP: {anomaly.get('dst_ip', 'N/A')}",
-            f"Confidence Score: {anomaly.get('confidence_score', 0):.2f}",
-            f"Severity: {anomaly.get('severity', 'Medium')}",
-            f"Reconstruction Error: {anomaly.get('reconstruction_error', 0):.6f}"
         ]
+    
+        # Try to get IP information from original data if available
+        src_ip = None
+        dst_ip = None
+        flow_id = None
+    
+        if hasattr(self, 'original_data') and self.original_data is not None:
+            idx = anomaly.get('index')
+            if idx is not None and idx < len(self.original_data):
+                row = self.original_data.iloc[idx]
+            
+                # Check for source IP columns (common variations)
+                src_ip_cols = ['srcip', 'src_ip', 'source_ip', 'Source IP', 'Src IP', 'src-ip', 
+                              'SourceIP', 'SrcIP', 'source address', 'Source Address']
+                for col in src_ip_cols:
+                    if col in row.index or col.lower() in [c.lower() for c in row.index]:
+                        # Find the actual column name
+                        actual_col = next((c for c in row.index if c.lower() == col.lower()), None)
+                        if actual_col:
+                            src_ip = str(row[actual_col])
+                            break
+            
+                # Check for destination IP columns
+                dst_ip_cols = ['dstip', 'dst_ip', 'destination_ip', 'Destination IP', 'Dst IP', 'dst-ip',
+                              'DestIP', 'DstIP', 'destination address', 'Destination Address']
+                for col in dst_ip_cols:
+                    if col in row.index or col.lower() in [c.lower() for c in row.index]:
+                        actual_col = next((c for c in row.index if c.lower() == col.lower()), None)
+                        if actual_col:
+                            dst_ip = str(row[actual_col])
+                            break
+    
+        # Add IP information only if found
+        if src_ip:
+            panel_content.append(f"Source IP: {src_ip}")
+        if dst_ip:
+            panel_content.append(f"Destination IP: {dst_ip}")
+    
+        # Add confidence and severity
+        panel_content.extend([
+            f"Confidence Score: {confidence:.2f}",
+            f"Severity: {severity}",
+            f"Reconstruction Error: {anomaly.get('reconstruction_error', 0):.6f}"
+        ])
+    
+        # Get feature values for this anomaly
+        feature_values = {}
+        idx = anomaly.get('index')
+    
+        if hasattr(self, 'original_features') and self.original_features is not None and idx is not None:
+            if idx < len(self.original_features):
+                row = self.original_features.iloc[idx]
+                feature_variations = {
+                    'dur': ['dur', 'Flow Duration', 'flow_duration', 'Duration', 'Dur', 'duration'],
+                    'spkts': ['spkts', 'Tot Fwd Pkts', 'Total Fwd Packets', 'fwd_pkts', 'Fwd Packets', 'Fwd Pkts'],
+                    'dpkts': ['dpkts', 'Tot Bwd Pkts', 'Total Bwd Packets', 'bwd_pkts', 'Bwd Packets', 'Bwd Pkts'],
+                    'sbytes': ['sbytes', 'TotLen Fwd Pkts', 'Total Length of Fwd Packets', 'fwd_bytes', 'Fwd Bytes'],
+                    'dbytes': ['dbytes', 'TotLen Bwd Pkts', 'Total Length of Bwd Packets', 'bwd_bytes', 'Bwd Bytes'],
+                    'rate': ['rate', 'Flow Byts/s', 'Flow Bytes/s', 'flow_bytes_per_sec', 'Bytes/s'],
+                    'smean': ['smean', 'Fwd Pkt Len Mean', 'Fwd Packet Length Mean', 'fwd_pkt_len_mean'],
+                    'dmean': ['dmean', 'Bwd Pkt Len Mean', 'Bwd Packet Length Mean', 'bwd_pkt_len_mean'],
+                    'swin': ['swin', 'Init Fwd Win Byts', 'Init Fwd Window Bytes', 'fwd_win'],
+                    'dwin': ['dwin', 'Init Bwd Win Byts', 'Init Bwd Window Bytes', 'bwd_win']
+                }
+            
+                # For each core feature, try to find a match in the row
+                for core_feature, variations in feature_variations.items():
+                    for var in variations:
+                        if var in row.index:
+                            feature_values[core_feature] = row[var]
+                            break
+    
+        # Calculate z-scores to find which features are most anomalous
+        z_scores = {}
+        if feature_values and hasattr(self, 'feature_stats'):
+            for feature, value in feature_values.items():
+                if feature in self.feature_stats:
+                    mean = self.feature_stats[feature]['mean']
+                    std = self.feature_stats[feature]['std']
+                    if std > 0:
+                        z_score = abs((value - mean) / std)
+                        z_scores[feature] = z_score
+    
+        # Show contributing features
+        if z_scores:
+            # Sort features by how anomalous they are (highest z-score first)
+            sorted_features = sorted(z_scores.items(), key=lambda x: x[1], reverse=True)
         
-        # Add feature importance if available
-        if 'features' in anomaly:
-            panel_content.append("\n[bold]Top Contributing Features:[/bold]")
-            features = anomaly['features']
-            for feature, importance in sorted(features.items(), key=lambda x: x[1], reverse=True)[:3]:
-                panel_content.append(f"  • {feature}: {importance:.2f}")
-        
-        # Add possible explanation
-        explanation = self.generate_explanation(anomaly)
+            panel_content.append("\n[bold]Contributing Features (most anomalous first):[/bold]")
+            for feature, z_score in sorted_features[:5]:  # Show top 5
+                value = feature_values[feature]
+                mean = self.feature_stats[feature]['mean']
+            
+                # Determine deviation direction
+                if value > mean:
+                    direction = "↑ higher"
+                else:
+                    direction = "↓ lower"
+            
+                # Better description of feature names
+                feature_names = {
+                    'dur': 'Duration',
+                    'spkts': 'Src Packets',
+                    'dpkts': 'Dst Packets',
+                    'sbytes': 'Src Bytes',
+                    'dbytes': 'Dst Bytes',
+                    'rate': 'Flow Rate',
+                    'smean': 'Avg Src Pkt Size',
+                    'dmean': 'Avg Dst Pkt Size',
+                    'swin': 'Src Window',
+                    'dwin': 'Dst Window'
+                }
+            
+                display_name = feature_names.get(feature, feature)
+            
+                # Format based on z-score magnitude
+                if z_score > 3:
+                    marker = "🔴"  # Critical
+                elif z_score > 2:
+                    marker = "🟠"  # High
+                elif z_score > 1:
+                    marker = "🟡"  # Medium
+                else:
+                    marker = "🔵"  # Low
+            
+                panel_content.append(f"  {marker} {display_name}: {value:.2f} ({direction}, {z_score:.1f}σ)")
+    
+        # Add feature importance if available from model
+        elif 'top_features' in anomaly and anomaly['top_features']:
+            panel_content.append("\n[bold]Model's Top Contributing Features:[/bold]")
+            features = anomaly['top_features']
+            sorted_features = sorted(features.items(), 
+                                   key=lambda x: abs(x[1] if isinstance(x[1], (int, float)) else 0), 
+                                   reverse=True)[:5]
+            for feature, value in sorted_features:
+                panel_content.append(f"  • {feature}: {value:.4f}")
+    
+        # Generate AI decision explanation
+        explanation = self.generate_ai_explanation(anomaly, confidence, severity, feature_values, z_scores if z_scores else {})
         if explanation:
-            panel_content.append(f"\n[bold]Explanation:[/bold]\n{explanation}")
-        
+            panel_content.append(f"\n[bold]AI Decision Explanation:[/bold]")
+            panel_content.append(explanation)
+    
         console.print(Panel(
             "\n".join(panel_content),
             title=f"Anomaly Explanation",
-            border_style="yellow" if anomaly.get('severity') == 'High' else "cyan"
+            border_style="yellow" if severity in ['High', 'Critical'] else "cyan"
         ))
     
     def generate_explanation(self, anomaly):
