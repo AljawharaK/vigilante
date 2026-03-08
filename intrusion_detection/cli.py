@@ -811,6 +811,7 @@ Examples:
                 has_labels = False
                 y_true = None
                 label_col = None
+                label_column_name = None  # Store the actual column name
 
                 # Look for label columns (case-insensitive)
                 possible_label_cols = ['label', 'Label', 'attack_cat', 'class', 'malicious', 'DDoS', 'Label.1', ' LABEL', 'attack', 'Attack']
@@ -818,11 +819,12 @@ Examples:
                     if col in df.columns:
                         has_labels = True
                         label_col = col
+                        label_column_name = col  # Store for later use
                         y_true = df[col].values
-        
+
                         console.print(f"[green]✓ Found label column: '{col}'[/green]")
                         console.print(f"  Original labels: {np.unique(y_true)}")
-        
+
                         # Convert string labels to binary (0 for normal/benign, 1 for attack/malicious)
                         if y_true.dtype == 'object':
                             # Define what counts as normal/benign (case-insensitive)
@@ -840,16 +842,19 @@ Examples:
                             console.print(f"  Converted to binary: 0=normal, 1=attack")
                             console.print(f"  Class distribution: Normal={np.sum(y_true==0)}, Attack={np.sum(y_true==1)}")
         
-                        # Remove label column from features for preprocessing
-                        df_features = df.drop(columns=[col])
+                        # Don't drop the label column yet - we need it for preprocessing alignment
+                        # We'll use a copy for features but keep original for labels
                         break
 
                 if not has_labels:
                     console.print("[yellow]No label column found. Will perform unsupervised detection only.[/yellow]")
                     df_features = df.copy()
+                    y_true = None
+                else:
+                    # Create features dataframe WITHOUT the label column for preprocessing
+                    df_features = df.drop(columns=[label_column_name])
             
                 # Show feature analysis
-                from .model import find_matching_features
                 available_features, feature_mapping = model._find_features_in_data(df_features)
         
                 if len(available_features) < 5:  # Less than half of features
@@ -865,18 +870,27 @@ Examples:
                 # Calculate execution time
                 execution_time = time.time() - start_time
         
-                # Prepare results with metrics
+                # Prepare results with metrics - NOW USING THE CORRECT Y_TRUE
                 if has_labels and y_true is not None:
+                    # Pass the original y_true that we preserved
+                    # But ensure it's the same length as X (should be, unless we dropped rows)
+                    if len(y_true) != len(X):
+                        console.print(f"[yellow]Warning: Label length ({len(y_true)}) doesn't match features ({len(X)}). Truncating...[/yellow]")
+                        min_len = min(len(y_true), len(X))
+                        y_true = y_true[:min_len]
+                        predictions = predictions[:min_len]
+                        confidence_scores = confidence_scores[:min_len]
+    
                     # Calculate all metrics using ground truth labels
                     results = self.prepare_detection_results_with_labels(
                         df_features, predictions, confidence_scores, y_true, model, execution_time
                     )
-                
+    
                     # Calculate ROC metrics and plot if requested
                     if args.explain:
                         roc_metrics = self.calculate_roc_metrics(y_true, confidence_scores, "RNSA+KNN Model")
                         results['roc_metrics'] = roc_metrics
-                    
+        
                         # Plot ROC curve
                         self.plot_roc_curve(y_true, confidence_scores, "Test Dataset")
                 else:
@@ -956,6 +970,18 @@ Examples:
 
     def prepare_detection_results(self, df, predictions, confidence_scores, model, execution_time=None):
         """Prepare detection results in structured format with JSON serializable types"""
+        # Ensure y_true is numpy array and properly formatted
+        if isinstance(y_true, list):
+            y_true = np.array(y_true)
+    
+        # Ensure predictions and y_true have the same length
+        min_len = min(len(predictions), len(y_true))
+        if len(predictions) != len(y_true):
+            console.print(f"[yellow]Warning: Truncating to match lengths: predictions={len(predictions)}, y_true={len(y_true)}[/yellow]")
+            predictions = predictions[:min_len]
+            confidence_scores = confidence_scores[:min_len]
+            y_true = y_true[:min_len]
+        
         anomalies = []
         anomaly_indices = np.where(predictions == 1)[0]
     
@@ -1968,26 +1994,164 @@ Examples:
             border_style="yellow" if severity in ['High', 'Critical'] else "cyan"
         ))
     
-    def generate_explanation(self, anomaly):
-        """Generate human-readable explanation for anomaly"""
-        confidence = anomaly.get('confidence_score', 0)
-        severity = anomaly.get('severity', 'Medium')
-        
-        explanations = []
-        
-        if confidence > 0.9:
-            explanations.append("Very high confidence score indicates strong deviation from normal patterns.")
-        
-        if severity == 'High':
-            explanations.append("High severity suggests potential security threat requiring immediate attention.")
-        
-        if anomaly.get('features'):
-            top_features = list(anomaly['features'].keys())[:2]
-            if top_features:
-                explanations.append(f"Primary indicators: {', '.join(top_features)}.")
-        
-        return " ".join(explanations) if explanations else "Pattern deviation detected from trained model."
+    def generate_ai_explanation(self, anomaly, confidence, severity, feature_values=None, z_scores=None):
+        """Generate detailed AI explanation for the detection like other security apps"""
     
+        explanation_parts = []
+    
+        # 1. What was detected (like other SIEM tools)
+        if severity == "Critical":
+            explanation_parts.append("⚠️ CRITICAL ALERT: The model detected a highly anomalous traffic pattern that strongly deviates from normal behavior. This requires immediate investigation.")
+        elif severity == "High":
+            explanation_parts.append("🔴 HIGH SEVERITY: Significant deviation detected in network traffic pattern. Investigate promptly.")
+        elif severity == "Medium":
+            explanation_parts.append("🟠 MEDIUM SEVERITY: Moderate deviation detected. Review the contributing factors below.")
+        elif severity == "Low":
+            explanation_parts.append("🟡 LOW SEVERITY: Minor deviation detected. Monitor for any changes.")
+        else:
+            explanation_parts.append("🔵 MINIMAL: Slight deviation within acceptable range.")
+    
+        # 2. Confidence level (like other ML-based detectors)
+        if confidence >= 0.9:
+            explanation_parts.append(f"✅ High confidence ({confidence:.1%}) - The model is very certain this is anomalous.")
+        elif confidence >= 0.7:
+            explanation_parts.append(f"📊 Moderate confidence ({confidence:.1%}) - Multiple indicators suggest anomalous behavior.")
+        elif confidence >= 0.5:
+            explanation_parts.append(f"📉 Low confidence ({confidence:.1%}) - Some deviation detected but pattern is mostly normal.")
+        else:
+            explanation_parts.append(f"ℹ️ Minimal confidence ({confidence:.1%}) - Mostly normal with slight variations.")
+    
+        # 3. Feature analysis - what made this anomalous (like feature importance in ML)
+        if feature_values and z_scores:
+            # Find top 3 most anomalous features
+            top_features = sorted(z_scores.items(), key=lambda x: x[1], reverse=True)[:3]
+        
+            if top_features:
+                explanation_parts.append("\n🔍 Primary Indicators (features deviating most from normal):")
+            
+                for feature, z_score in top_features:
+                    value = feature_values.get(feature, 0)
+                
+                    # Map technical feature names to human-readable descriptions
+                    feature_descriptions = {
+                        'dur': 'Flow Duration',
+                        'spkts': 'Source Packets',
+                        'dpkts': 'Destination Packets',
+                        'sbytes': 'Source Bytes',
+                        'dbytes': 'Destination Bytes',
+                        'rate': 'Flow Rate',
+                        'smean': 'Average Source Packet Size',
+                        'dmean': 'Average Destination Packet Size',
+                        'swin': 'Source TCP Window Size',
+                        'dwin': 'Destination TCP Window Size'
+                    }
+                
+                    readable_name = feature_descriptions.get(feature, feature)
+                
+                    # Determine severity of deviation
+                    if z_score > 3:
+                        deviation = "EXTREME"
+                        severity_symbol = "🔴"
+                    elif z_score > 2:
+                        deviation = "HIGH"
+                        severity_symbol = "🟠"
+                    elif z_score > 1:
+                        deviation = "MODERATE"
+                        severity_symbol = "🟡"
+                    else:
+                        deviation = "LOW"
+                        severity_symbol = "🔵"
+                
+                    # Add context about the value based on feature type
+                    if feature in ['dur', 'rate']:
+                        if value > 1000:
+                            context = f"(unusually high: {value:.2f})"
+                        elif value < 0.1:
+                            context = f"(unusually low: {value:.2f})"
+                        else:
+                            context = f"(value: {value:.2f})"
+                    elif feature in ['sbytes', 'dbytes']:
+                        if value > 10000:
+                            context = f"(large data transfer: {value:.2f} bytes)"
+                        elif value > 1000:
+                            context = f"(medium transfer: {value:.2f} bytes)"
+                        else:
+                            context = f"(value: {value:.2f} bytes)"
+                    else:
+                        context = f"(value: {value:.2f})"
+                
+                    explanation_parts.append(f"  {severity_symbol} {readable_name}: {deviation} deviation {context}")
+    
+        # 4. Attack type inference based on feature patterns
+        if feature_values:
+            attack_hints = []
+        
+            # Check for DoS/DDoS patterns (high rate, many packets)
+            if feature_values.get('rate', 0) > 10000:
+                attack_hints.append("Extremely high flow rate (>10K) - Possible DoS/DDoS attack")
+            elif feature_values.get('rate', 0) > 1000:
+                attack_hints.append("High flow rate - May indicate network scanning or DoS")
+        
+            if feature_values.get('spkts', 0) > 1000:
+                attack_hints.append("High source packet count - Possible flooding")
+        
+            # Check for data exfiltration (large outbound data)
+            if feature_values.get('sbytes', 0) > 100000:
+                attack_hints.append("Very large outbound data transfer - Possible data exfiltration")
+            elif feature_values.get('sbytes', 0) > 10000:
+                attack_hints.append("Large outbound data - Investigate for data theft")
+        
+            # Check for unusual packet sizes
+            smean = feature_values.get('smean', 0)
+            dmean = feature_values.get('dmean', 0)
+            if smean > 1400 and dmean < 100:
+                attack_hints.append("Large source packets but small destination packets - Possible command & control traffic")
+            elif smean < 100 and dmean > 1400:
+                attack_hints.append("Small source packets but large destination packets - Possible data download")
+        
+            # Check for port scanning indicators (zero window sizes)
+            if feature_values.get('dwin', 0) == 0 and feature_values.get('swin', 0) == 0:
+                attack_hints.append("Zero TCP window sizes - May indicate port scanning activity")
+        
+            # Check for unusual duration
+            if feature_values.get('dur', 0) > 300:
+                attack_hints.append("Very long flow duration (>5 min) - Possible persistent connection")
+        
+            if attack_hints:
+                explanation_parts.append("\n💡 Possible Attack Indicators:")
+                for hint in attack_hints[:3]:  # Limit to 3 hints
+                    explanation_parts.append(f"  • {hint}")
+    
+        # 5. Context about the anomaly
+        if 'reconstruction_error' in anomaly:
+            rec_error = anomaly.get('reconstruction_error', 0)
+            if rec_error > 0.9:
+                explanation_parts.append(f"\n📊 Model Analysis: Very high reconstruction error ({rec_error:.2f}) - Pattern completely different from normal")
+            elif rec_error > 0.7:
+                explanation_parts.append(f"\n📊 Model Analysis: High reconstruction error ({rec_error:.2f}) - Significant deviation from normal patterns")
+            elif rec_error > 0.5:
+                explanation_parts.append(f"\n📊 Model Analysis: Moderate reconstruction error ({rec_error:.2f}) - Partial deviation from normal")
+    
+        # 6. Recommended action (like other security tools)
+        explanation_parts.append("\n📋 Recommended Action:")
+        if severity in ['Critical', 'High']:
+            explanation_parts.append("  • 🚨 IMMEDIATE ACTION REQUIRED")
+            explanation_parts.append("  • Isolate affected host from network")
+            explanation_parts.append("  • Capture full packet capture for forensics")
+            explanation_parts.append("  • Review firewall and IDS logs for related events")
+            explanation_parts.append("  • Escalate to security operations team")
+        elif severity == 'Medium':
+            explanation_parts.append("  • Monitor the connection for 10-15 minutes")
+            explanation_parts.append("  • Check if pattern repeats with same source/destination")
+            explanation_parts.append("  • Review recent alerts for related activity")
+            explanation_parts.append("  • Update firewall rules if pattern persists")
+        else:
+            explanation_parts.append("  • Log for baseline reference")
+            explanation_parts.append("  • No immediate action required")
+            explanation_parts.append("  • Monitor for pattern frequency")
+    
+        return "\n".join(explanation_parts)
+
     # Utility Methods
     def calculate_avg_fpr(self, detection_summary):
         """Calculate average false positive rate"""
