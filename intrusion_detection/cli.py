@@ -811,25 +811,39 @@ Examples:
                 has_labels = False
                 y_true = None
                 label_col = None
-            
+
                 # Look for label columns (case-insensitive)
-                possible_label_cols = ['label', 'Label', 'attack_cat', 'class', 'Label.1', ' Label', 'attack', 'Attack']
+                possible_label_cols = ['label', 'Label', 'attack_cat', 'class', 'malicious', 'DDoS', 'Label.1', ' Label', 'attack', 'Attack']
                 for col in possible_label_cols:
                     if col in df.columns:
                         has_labels = True
                         label_col = col
                         y_true = df[col].values
-                    
-                        # Convert to binary if needed
+        
+                        console.print(f"[green]✓ Found label column: '{col}'[/green]")
+                        console.print(f"  Original labels: {np.unique(y_true)}")
+        
+                        # Convert string labels to binary (0 for normal/benign, 1 for attack/malicious)
                         if y_true.dtype == 'object':
-                            y_true = np.array([1 if str(v).lower() in ['attack', 'malicious', 'anomaly', '1', 'true', 'yes'] 
-                                          else 0 for v in y_true])
-                        console.print(f"[green]✓ Found label column: '{col}' with {len(np.unique(y_true))} unique values[/green]")
-                    
+                            # Define what counts as normal/benign (case-insensitive)
+                            normal_terms = ['benign', 'normal', '0', 'false', 'no', 'legitimate']
+            
+                            y_true_binary = []
+                            for val in y_true:
+                                val_str = str(val).lower().strip()
+                                if any(term in val_str for term in normal_terms):
+                                    y_true_binary.append(0)  # Normal
+                                else:
+                                    y_true_binary.append(1)  # Attack/Malicious
+            
+                            y_true = np.array(y_true_binary)
+                            console.print(f"  Converted to binary: 0=normal, 1=attack")
+                            console.print(f"  Class distribution: Normal={np.sum(y_true==0)}, Attack={np.sum(y_true==1)}")
+        
                         # Remove label column from features for preprocessing
                         df_features = df.drop(columns=[col])
                         break
-            
+
                 if not has_labels:
                     console.print("[yellow]No label column found. Will perform unsupervised detection only.[/yellow]")
                     df_features = df.copy()
@@ -939,8 +953,6 @@ Examples:
         # Tell user how to get explanations
         console.print(f"\n[yellow]For full explanations, use:[/yellow]")
         console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
-
-    # Add this new method for labeled data with full metrics:
 
     def prepare_detection_results_with_labels(self, df, predictions, confidence_scores, y_true, model, execution_time=None):
         """Prepare detection results with full metrics using ground truth labels"""
@@ -1073,8 +1085,6 @@ Examples:
 
         return result
 
-    # Add ROC curve calculation method:
-
     def calculate_roc_metrics(self, y_true, y_scores, algorithm_name):
         """
         Calculate detailed ROC metrics for an algorithm
@@ -1124,8 +1134,6 @@ Examples:
             'optimal_far': float(false_alarm_rate_optimal),
             'optimal_precision': float(precision_optimal)
         }
-
-    # Add ROC curve plotting method:
 
     def plot_roc_curve(self, y_true, y_scores, dataset_name, save_path=None):
         """
