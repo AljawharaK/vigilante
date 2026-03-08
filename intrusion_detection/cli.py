@@ -954,6 +954,71 @@ Examples:
         console.print(f"\n[yellow]For full explanations, use:[/yellow]")
         console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
 
+    def prepare_detection_results(self, df, predictions, confidence_scores, model, execution_time=None):
+        """Prepare detection results in structured format with JSON serializable types"""
+        anomalies = []
+        anomaly_indices = np.where(predictions == 1)[0]
+    
+        # Calculate mean reconstruction error (using inverse of confidence as proxy)
+        # For RNSA+KNN, lower confidence = higher "reconstruction error" (more anomalous)
+        reconstruction_errors = 1.0 - confidence_scores
+        mean_reconstruction_error = float(np.mean(reconstruction_errors))
+
+        for idx in anomaly_indices:
+            confidence = float(confidence_scores[idx]) if idx < len(confidence_scores) else 0.5
+            reconstruction_error = float(reconstruction_errors[idx]) if idx < len(reconstruction_errors) else 0.5
+        
+            anomaly = {
+                'index': int(idx),
+                'confidence': confidence,
+                'reconstruction_error': reconstruction_error,
+                'severity': self.calculate_severity(confidence),
+            }
+        
+            # Add some feature values for context (limit to first few to avoid huge results)
+            if idx < len(df):
+                row = df.iloc[idx]
+                top_features = {}
+                feature_names = model.feature_names if model.feature_names else []
+            
+                for i, feat in enumerate(feature_names[:5]):  # First 5 features
+                    if i < len(row):
+                        val = row.iloc[i] if hasattr(row, 'iloc') else row[i]
+                        if isinstance(val, (int, float)):
+                            top_features[feat] = float(val)
+                        else:
+                            top_features[feat] = str(val)
+                anomaly['top_features'] = top_features
+        
+            anomalies.append(anomaly)
+
+        # Calculate metrics
+        total_flows = int(len(predictions))
+        anomalies_detected = int(len(anomalies))
+    
+        # Calculate detection rate (True Positive Rate) - Note: We don't have ground truth labels here
+        # For detection results without labels, we can only report the raw detection rate
+        # The formula e = TP / (TP + FP) requires actual labels to calculate
+        detection_rate = float(anomalies_detected / total_flows) if total_flows > 0 else 0.0
+
+        result = {
+            'total_flows': total_flows,
+            'anomalies_detected': anomalies_detected,
+            'detection_rate': detection_rate,  # Add explicit detection_rate field
+            'mean_reconstruction_error': mean_reconstruction_error,
+            'anomalies': anomalies[:100],  # Limit to first 100 for performance
+            'threshold': float(model.threshold),
+            'mean_confidence': float(np.mean(confidence_scores)) if len(confidence_scores) > 0 else 0,
+            'metrics': model.metrics if hasattr(model, 'metrics') else {}
+        }
+
+        # Add execution time if provided
+        if execution_time is not None:
+            result['execution_time'] = self.format_execution_time(execution_time)
+            result['execution_time_seconds'] = float(execution_time)
+
+        return result
+
     def prepare_detection_results_with_labels(self, df, predictions, confidence_scores, y_true, model, execution_time=None):
         """Prepare detection results with full metrics using ground truth labels"""
         from sklearn.metrics import (accuracy_score, precision_score, recall_score, 
