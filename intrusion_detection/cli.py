@@ -34,8 +34,6 @@ class VigilanteCLI:
     
     def __init__(self):
         self.db = DatabaseManager()
-        # Add longer timeout for detection operations
-        self.db.set_long_timeout()
         self.auth = AuthManager(self.db)
         self.trainer = ModelTrainer()
         self.current_model = None
@@ -936,13 +934,25 @@ Examples:
                 # Convert to JSON serializable
                 serializable_results = self.make_json_serializable(results)
     
-                # Save to database
-                detection_id = self.db.save_detection(
-                    user_id=self.auth.current_user['id'],
-                    model_id=args.model_id if args.model_id else None,
-                    input_file=args.input,
-                    results=serializable_results
-                )
+                # Save to database - use a fresh connection for saving
+                try:
+                    # Create a new database manager instance for saving results
+                    # This ensures we have a fresh connection
+                    save_db = DatabaseManager()
+    
+                    detection_id = save_db.save_detection(
+                        user_id=self.auth.current_user['id'],
+                        model_id=args.model_id if args.model_id else None,
+                        input_file=args.input,
+                        results=serializable_results
+                    )
+    
+                    # Close the temporary connection
+                    save_db.close()
+    
+                except Exception as e:
+                    console.print(f"[yellow]Warning: Could not save detection to database: {e}[/yellow]")
+                    detection_id = None
     
                 progress.update(task, completed=100)
         
@@ -991,7 +1001,7 @@ Examples:
         console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
         
         self.db.set_default_timeout()
-        
+
     def prepare_detection_results(self, df, predictions, confidence_scores, model, execution_time=None):
         """Prepare detection results in structured format with JSON serializable types"""
         anomalies = []

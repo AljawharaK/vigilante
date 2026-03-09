@@ -342,6 +342,12 @@ class DatabaseManager:
             self.conn.rollback()
             print(f"Error updating failed attempts: {e}")
     
+    def get_fresh_connection(self):
+        """Get a fresh database connection if current one is closed"""
+        if self.conn is None or self.conn.closed:
+            self.connect()
+        return self.conn
+
     def set_long_timeout(self):
         """Set longer timeout for long-running operations like detection"""
         try:
