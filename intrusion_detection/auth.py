@@ -94,7 +94,7 @@ class AuthManager:
             """
             
             r = resend.Emails.send({
-                "from": "Vigilante Security <onboarding@resend.dev>",
+                "from": "Vigilante Security <noreply@updates.vigilanteapps.com>",
                 "to": email,
                 "subject": "Vigilante Security - OTP Verification Code",
                 "html": html_content
