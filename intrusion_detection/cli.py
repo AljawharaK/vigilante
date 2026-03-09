@@ -720,14 +720,14 @@ Examples:
     # Detection Commands
     def handle_detect(self, args):
         """Handle anomaly detection with feature alignment"""
-        
+    
         if not self.check_permission('run_detection'):
             return
 
         if not os.path.exists(args.input):
             console.print(f"[red]Input file not found: {args.input}[/red]")
             return
-        
+    
         # Load model
         model = None
         if args.model_id:
@@ -738,11 +738,11 @@ Examples:
                 return
 
             model_path = model_data['model_path']
-        
+    
             # Check if path exists
             if not os.path.exists(model_path):
                 console.print(f"[red]Model file not found: {model_path}[/red]")
-            
+        
                 # Try alternative paths
                 possible_paths = [
                 model_path,
@@ -750,14 +750,14 @@ Examples:
                     os.path.basename(model_path),
                     os.path.join("models", os.path.basename(model_path))
                 ]
-            
+        
                 found = False
                 for path in possible_paths:
                     if os.path.exists(path):
                         model_path = path
                         found = True
                         break
-            
+        
                 if not found:
                     console.print("[red]Could not locate model file[/red]")
                     return
@@ -788,11 +788,11 @@ Examples:
         console.print(f"[cyan]Model loaded: {os.path.basename(model_path)}[/cyan]")
         feature_info = model.get_feature_summary()
         console.print(f"[cyan]Model expects {feature_info['features_count']} core features[/cyan]")
-    
+
         # Perform detection with timing
         import time
         start_time = time.time()
-        
+    
         self.db.set_long_timeout()
 
         try:
@@ -806,7 +806,7 @@ Examples:
                 # Load data
                 df = pd.read_csv(args.input)
                 console.print(f"[cyan]Loaded {len(df)} records from {args.input}[/cyan]")
-            
+        
                 # Check if data has labels
                 has_labels = False
                 y_true = None
@@ -829,7 +829,7 @@ Examples:
                         if y_true.dtype == 'object':
                             # Define what counts as normal/benign (case-insensitive)
                             normal_terms = ['benign', 'Benign', 'BENIGN', 'normal', 'Normal', '0', 'false', 'no', 'legitimate']
-            
+        
                             y_true_binary = []
                             for val in y_true:
                                 val_str = str(val).lower().strip()
@@ -837,11 +837,11 @@ Examples:
                                     y_true_binary.append(0)  # Normal
                                 else:
                                     y_true_binary.append(1)  # Attack/Malicious
-            
+        
                             y_true = np.array(y_true_binary)
                             console.print(f"  Converted to binary: 0=normal, 1=attack")
                             console.print(f"  Class distribution: Normal={np.sum(y_true==0)}, Attack={np.sum(y_true==1)}")
-        
+    
                         # Don't drop the label column yet - we need it for preprocessing alignment
                         # We'll use a copy for features but keep original for labels
                         break
@@ -853,23 +853,23 @@ Examples:
                 else:
                     # Create features dataframe WITHOUT the label column for preprocessing
                     df_features = df.drop(columns=[label_column_name])
-            
+        
                 # Show feature analysis
                 available_features, feature_mapping = model._find_features_in_data(df_features)
-        
+    
                 if len(available_features) < 5:  # Less than half of features
                     console.print(f"[yellow]Warning: Only {len(available_features)} of {len(model.CORE_FEATURES)} features found[/yellow]")
                     console.print("[yellow]Missing features will be filled with zeros[/yellow]")
 
                 # Preprocess data (this will automatically align features)
                 X = model.preprocess_data(df_features, fit_scaler=False)
-        
+    
                 # Detect anomalies
                 predictions, confidence_scores = model.predict(X)
-        
+    
                 # Calculate execution time
                 execution_time = time.time() - start_time
-        
+    
                 # Prepare results with metrics - NOW USING THE CORRECT Y_TRUE
                 if has_labels and y_true is not None:
                     # Pass the original y_true that we preserved
@@ -880,25 +880,17 @@ Examples:
                         y_true = y_true[:min_len]
                         predictions = predictions[:min_len]
                         confidence_scores = confidence_scores[:min_len]
-    
+
                     # Calculate all metrics using ground truth labels
                     results = self.prepare_detection_results_with_labels(
                         df_features, predictions, confidence_scores, y_true, model, execution_time
                     )
-    
-                    # Calculate ROC metrics and plot if requested
-                    if args.explain:
-                        roc_metrics = self.calculate_roc_metrics(y_true, confidence_scores, "RNSA+KNN Model")
-                        results['roc_metrics'] = roc_metrics
-        
-                        # Plot ROC curve
-                        self.plot_roc_curve(y_true, confidence_scores, "Test Dataset")
                 else:
                     # Unlabeled detection - basic results only
                     results = self.prepare_detection_results(
                         df_features, predictions, confidence_scores, model, execution_time
                     )
-            
+        
                 # Add feature alignment info
                 results['feature_alignment'] = {
                     'core_features': model.CORE_FEATURES,
@@ -908,7 +900,7 @@ Examples:
 
                 # Convert to JSON serializable
                 serializable_results = self.make_json_serializable(results)
-        
+    
                 # Save to database
                 detection_id = self.db.save_detection(
                     user_id=self.auth.current_user['id'],
@@ -916,9 +908,9 @@ Examples:
                     input_file=args.input,
                     results=serializable_results
                 )
-        
+    
                 progress.update(task, completed=100)
-            
+        
                 # Reset timeout after detection
                 self.db.set_default_timeout()
 
@@ -1021,7 +1013,6 @@ Examples:
             'detection_rate': detection_rate,  # Add explicit detection_rate field
             'mean_reconstruction_error': mean_reconstruction_error,
             'anomalies': anomalies[:100],  # Limit to first 100 for performance
-            'threshold': float(model.threshold),
             'mean_confidence': float(np.mean(confidence_scores)) if len(confidence_scores) > 0 else 0,
             'metrics': model.metrics if hasattr(model, 'metrics') else {}
         }
@@ -1036,7 +1027,8 @@ Examples:
     def prepare_detection_results_with_labels(self, df, predictions, confidence_scores, y_true, model, execution_time=None):
         """Prepare detection results with full metrics using ground truth labels"""
         from sklearn.metrics import (accuracy_score, precision_score, recall_score, 
-                                    f1_score, roc_curve, auc, confusion_matrix)
+                                    f1_score, confusion_matrix)
+    
         # Ensure y_true is numpy array and properly formatted
         if isinstance(y_true, list):
             y_true = np.array(y_true)
@@ -1048,7 +1040,7 @@ Examples:
             predictions = predictions[:min_len]
             confidence_scores = confidence_scores[:min_len]
             y_true = y_true[:min_len]
-            
+        
         anomalies = []
         anomaly_indices = np.where(predictions == 1)[0]
     
@@ -1059,20 +1051,20 @@ Examples:
         for idx in anomaly_indices:
             confidence = float(confidence_scores[idx]) if idx < len(confidence_scores) else 0.5
             reconstruction_error = float(reconstruction_errors[idx]) if idx < len(reconstruction_errors) else 0.5
-        
+    
             anomaly = {
                 'index': int(idx),
                 'confidence': confidence,
                 'reconstruction_error': reconstruction_error,
                 'severity': self.calculate_severity(confidence),
             }
-        
+    
             # Add some feature values for context
             if idx < len(df):
                 row = df.iloc[idx] if hasattr(df, 'iloc') else df[idx]
                 top_features = {}
                 feature_names = model.feature_names if model.feature_names else []
-            
+        
                 for i, feat in enumerate(feature_names[:5]):
                     if i < len(row):
                         val = row.iloc[i] if hasattr(row, 'iloc') else row[i]
@@ -1081,58 +1073,31 @@ Examples:
                         else:
                             top_features[feat] = str(val)
                 anomaly['top_features'] = top_features
-        
+    
             anomalies.append(anomaly)
 
         # Calculate confusion matrix
         cm = confusion_matrix(y_true, predictions)
-    
+
         if cm.shape == (2, 2):
             TN, FP, FN, TP = cm.ravel()
-        
+    
             # Calculate all metrics
             accuracy = accuracy_score(y_true, predictions)
             precision = precision_score(y_true, predictions, zero_division=0)
             recall = recall_score(y_true, predictions, zero_division=0)
             f1 = f1_score(y_true, predictions, zero_division=0)
-        
+    
             # Detection rate = TP / (TP + FN) = recall
             detection_rate = recall
-        
+    
             # False positive rate = FP / (FP + TN)
             false_positive_rate = FP / (FP + TN) if (FP + TN) > 0 else 0
-        
-            # Calculate ROC AUC
-            try:
-                fpr, tpr, thresholds = roc_curve(y_true, confidence_scores)
-                roc_auc = auc(fpr, tpr)
-            
-                # Find optimal threshold (Youden's J statistic)
-                youden_j = tpr - fpr
-                optimal_idx = np.argmax(youden_j)
-                optimal_threshold = thresholds[optimal_idx]
-            
-                # Metrics at optimal threshold
-                y_pred_optimal = (confidence_scores >= optimal_threshold).astype(int)
-                cm_opt = confusion_matrix(y_true, y_pred_optimal)
-                if cm_opt.shape == (2, 2):
-                    TN_opt, FP_opt, FN_opt, TP_opt = cm_opt.ravel()
-                    optimal_dr = TP_opt / (TP_opt + FN_opt) if (TP_opt + FN_opt) > 0 else 0
-                    optimal_far = FP_opt / (FP_opt + TN_opt) if (FP_opt + TN_opt) > 0 else 0
-                else:
-                    optimal_dr, optimal_far = 0, 0
-                
-            except Exception as e:
-                console.print(f"[yellow]Warning: Could not calculate ROC AUC: {e}[/yellow]")
-                roc_auc = 0
-                fpr, tpr, thresholds = [], [], []
-                optimal_threshold, optimal_dr, optimal_far = 0, 0, 0
+    
         else:
             # Handle case where confusion matrix isn't 2x2
             accuracy = precision = recall = f1 = detection_rate = false_positive_rate = 0
-            roc_auc = optimal_threshold = optimal_dr = optimal_far = 0
             TP = FP = TN = FN = 0
-            fpr, tpr, thresholds = [], [], []
 
         total_flows = int(len(predictions))
         anomalies_detected = int(len(anomalies))
@@ -1144,27 +1109,20 @@ Examples:
             'false_positive_rate': float(false_positive_rate),
             'mean_reconstruction_error': mean_reconstruction_error,
             'anomalies': anomalies[:100],
-            'threshold': float(model.threshold),
             'mean_confidence': float(np.mean(confidence_scores)) if len(confidence_scores) > 0 else 0,
-        
+    
             # Classification metrics
             'accuracy': float(accuracy),
             'precision': float(precision),
             'recall': float(recall),
             'f1_score': float(f1),
-        
+    
             # Confusion matrix values
             'true_positives': int(TP),
             'false_positives': int(FP),
             'true_negatives': int(TN),
             'false_negatives': int(FN),
-        
-            # ROC metrics
-            'roc_auc': float(roc_auc),
-            'optimal_threshold': float(optimal_threshold),
-            'optimal_detection_rate': float(optimal_dr),
-            'optimal_false_alarm_rate': float(optimal_far),
-        
+    
             # Model metrics
             'metrics': model.metrics if hasattr(model, 'metrics') else {}
         }
