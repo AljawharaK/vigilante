@@ -814,7 +814,7 @@ Examples:
                 label_column_name = None  # Store the actual column name
 
                 # Look for label columns (case-insensitive)
-                possible_label_cols = ['label', 'Label', 'attack_type', 'class', 'Label.1', ' LABEL', 'attack', 'Attack']
+                possible_label_cols = ['label', 'Label', 'attack_type', 'class', 'Label.1', 'LABEL', ' Label', 'attack', 'Attack']
                 for col in possible_label_cols:
                     if col in df.columns:
                         has_labels = True
