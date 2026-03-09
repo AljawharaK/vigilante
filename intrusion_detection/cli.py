@@ -814,7 +814,7 @@ Examples:
                 label_column_name = None  # Store the actual column name
 
                 # Look for label columns (case-insensitive)
-                possible_label_cols = ['label', 'Label', 'attack_cat', 'class', 'malicious', 'DDoS', 'Label.1', ' LABEL', 'attack', 'Attack']
+                possible_label_cols = ['label', 'Label', 'attack_type', 'class', 'Label.1', ' LABEL', 'attack', 'Attack']
                 for col in possible_label_cols:
                     if col in df.columns:
                         has_labels = True
@@ -911,16 +911,19 @@ Examples:
     
                 progress.update(task, completed=100)
         
-                # Reset timeout after detection
-                self.db.set_default_timeout()
-
         except Exception as e:
-            # Reset timeout even on error
-            self.db.set_default_timeout()
             console.print(f"[red]Detection failed: {e}[/red]")
             if hasattr(self.args, 'verbose') and self.args.verbose:
                 console.print(traceback.format_exc())
             return
+        finally:
+            # Always reset timeout, even on success or error
+            try:
+                self.db.set_default_timeout()
+            except Exception as timeout_error:
+                # Just log but don't fail if timeout reset fails
+                if hasattr(self.args, 'verbose') and self.args.verbose:
+                    console.print(f"[yellow]Note: Could not reset timeout: {timeout_error}[/yellow]")
 
         # Display results
         console.print(f"[green]✓ Detection analysis completed[/green]")

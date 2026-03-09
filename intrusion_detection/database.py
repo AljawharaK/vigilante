@@ -355,12 +355,19 @@ class DatabaseManager:
     def set_default_timeout(self):
         """Reset to default timeout"""
         try:
-            with self.conn.cursor() as cursor:
-                cursor.execute("SET statement_timeout = '30s'")
-                cursor.execute("SET idle_in_transaction_session_timeout = '2min'")
-            self.conn.commit()
+            if self.conn and not self.conn.closed:
+                with self.conn.cursor() as cursor:
+                    cursor.execute("SET statement_timeout = '30s'")
+                    cursor.execute("SET idle_in_transaction_session_timeout = '2min'")
+                self.conn.commit()
+            else:
+                # Connection is already closed, just log it
+                if hasattr(self, 'verbose') and self.verbose:
+                    print("ℹ️ Connection already closed, skipping timeout reset")
         except Exception as e:
-            print(f"⚠️ Could not reset timeout: {e}")
+            # Don't print error if connection is closed - it's expected
+            if "connection already closed" not in str(e).lower():
+                print(f"⚠️ Could not reset timeout: {e}")
 
     def get_all_models(self):
         """Get all models in the system (admin only)"""
@@ -959,6 +966,8 @@ class DatabaseManager:
     
     def close(self):
         """Close database connection"""
-        if self.conn:
+        if self.conn and not self.conn.closed:
             self.conn.close()
             print("✅ Database connection closed")
+        else:
+            print("ℹ️ Database connection already closed")
