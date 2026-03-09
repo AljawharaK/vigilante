@@ -814,34 +814,46 @@ Examples:
                 label_column_name = None  # Store the actual column name
 
                 # Look for label columns (case-insensitive)
-                possible_label_cols = ['label', 'Label', 'attack_type', 'class', 'Label.1', 'LABEL', ' Label', 'attack', 'Attack']
+                possible_label_cols = ['label', 'Label', ' Label', 'attack_type', 'class', 'Label.1', 'LABEL', 'attack', 'Attack']
                 for col in possible_label_cols:
                     if col in df.columns:
                         has_labels = True
                         label_col = col
                         label_column_name = col  # Store for later use
-                        y_true = df[col].values
-
+        
+                        # Get original labels first
+                        original_labels = df[col].values
+        
                         console.print(f"[green]✓ Found label column: '{col}'[/green]")
-                        console.print(f"  Original labels: {np.unique(y_true)}")
+                        console.print(f"  Original labels: {np.unique(original_labels)}")
 
                         # Convert string labels to binary (0 for normal/benign, 1 for attack/malicious)
-                        if y_true.dtype == 'object':
+                        if original_labels.dtype == 'object' or isinstance(original_labels[0], str):
                             # Define what counts as normal/benign (case-insensitive)
                             normal_terms = ['benign', 'Benign', 'BENIGN', 'normal', 'Normal', '0', 'false', 'no', 'legitimate']
-        
+            
                             y_true_binary = []
-                            for val in y_true:
+                            for val in original_labels:
                                 val_str = str(val).lower().strip()
-                                if any(term in val_str for term in normal_terms):
+                                # Check if this is a normal/benign label
+                                is_normal = False
+                                for term in normal_terms:
+                                    if term in val_str:
+                                        is_normal = True
+                                        break
+                
+                                if is_normal:
                                     y_true_binary.append(0)  # Normal
                                 else:
                                     y_true_binary.append(1)  # Attack/Malicious
-        
+            
                             y_true = np.array(y_true_binary)
                             console.print(f"  Converted to binary: 0=normal, 1=attack")
                             console.print(f"  Class distribution: Normal={np.sum(y_true==0)}, Attack={np.sum(y_true==1)}")
-    
+                        else:
+                            # Already numeric, just convert to int
+                            y_true = original_labels.astype(np.int32)
+
                         # Don't drop the label column yet - we need it for preprocessing alignment
                         # We'll use a copy for features but keep original for labels
                         break
@@ -870,17 +882,40 @@ Examples:
                 # Calculate execution time
                 execution_time = time.time() - start_time
     
-                # Prepare results with metrics - NOW USING THE CORRECT Y_TRUE
+                # Prepare results with metrics
                 if has_labels and y_true is not None:
-                    # Pass the original y_true that we preserved
-                    # But ensure it's the same length as X (should be, unless we dropped rows)
+                    # Ensure y_true is numpy array and properly formatted
+                    if isinstance(y_true, list):
+                        y_true = np.array(y_true)
+    
+                    # Ensure y_true is binary (0/1)
+                    if len(np.unique(y_true)) > 2:
+                        console.print(f"[yellow]Warning: Found {len(np.unique(y_true))} unique labels. Converting to binary...[/yellow]")
+                        normal_terms = ['benign', 'normal', 'legitimate', '0']
+                        y_true_binary = []
+                        for val in y_true:
+                            val_str = str(val).lower().strip()
+                            if any(term in val_str for term in normal_terms):
+                                y_true_binary.append(0)
+                            else:
+                                y_true_binary.append(1)
+                        y_true = np.array(y_true_binary)
+    
+                    # Ensure predictions are binary
+                    predictions = (predictions > 0.5).astype(int) if predictions.dtype != int else predictions
+    
+                    # Ensure same length
                     if len(y_true) != len(X):
                         console.print(f"[yellow]Warning: Label length ({len(y_true)}) doesn't match features ({len(X)}). Truncating...[/yellow]")
                         min_len = min(len(y_true), len(X))
                         y_true = y_true[:min_len]
                         predictions = predictions[:min_len]
                         confidence_scores = confidence_scores[:min_len]
-
+    
+                    # Double-check types
+                    console.print(f"[dim]Final types - y_true: {y_true.dtype}, predictions: {predictions.dtype}[/dim]")
+                    console.print(f"[dim]Final values - y_true unique: {np.unique(y_true)}, predictions unique: {np.unique(predictions)}[/dim]")
+    
                     # Calculate all metrics using ground truth labels
                     results = self.prepare_detection_results_with_labels(
                         df_features, predictions, confidence_scores, y_true, model, execution_time
@@ -1035,6 +1070,26 @@ Examples:
         # Ensure y_true is numpy array and properly formatted
         if isinstance(y_true, list):
             y_true = np.array(y_true)
+    
+        # Ensure y_true is binary (0/1) and int type
+        if y_true.dtype not in [np.int32, np.int64, int]:
+            try:
+                # Try to convert to int
+                y_true = y_true.astype(np.int32)
+            except:
+                # If conversion fails, map string labels to binary
+                normal_terms = ['benign', 'normal', 'legitimate', '0']
+                y_true_binary = []
+                for val in y_true:
+                    val_str = str(val).lower().strip()
+                    if any(term in val_str for term in normal_terms):
+                        y_true_binary.append(0)
+                    else:
+                        y_true_binary.append(1)
+                y_true = np.array(y_true_binary, dtype=np.int32)
+    
+        # Ensure predictions are int type
+        predictions = predictions.astype(np.int32)
     
         # Ensure predictions and y_true have the same length
         min_len = min(len(predictions), len(y_true))

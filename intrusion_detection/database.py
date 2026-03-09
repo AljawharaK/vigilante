@@ -346,8 +346,8 @@ class DatabaseManager:
         """Set longer timeout for long-running operations like detection"""
         try:
             with self.conn.cursor() as cursor:
-                cursor.execute("SET statement_timeout = '120min'")
-                cursor.execute("SET idle_in_transaction_session_timeout = '120min'")
+                cursor.execute("SET statement_timeout = '200min'")
+                cursor.execute("SET idle_in_transaction_session_timeout = '200min'")
             self.conn.commit()
         except Exception as e:
             print(f"⚠️ Could not set long timeout: {e}")
