@@ -1309,7 +1309,8 @@ Examples:
             table.add_row("Precision (TP/(TP+FP))", f"{results['precision']:.2%}")
             table.add_row("Recall (Detection Rate)", f"{results['recall']:.2%}")
             table.add_row("F1 Score", f"{results['f1_score']:.2%}")
-            table.add_row("ROC AUC", f"{results.get('roc_auc', 0):.4f}")
+            table.add_row("Detection Rate", f"{results['detection_rate']:.2%}")
+            table.add_row("False Positive Rate", f"{results['false_positive_rate']:.2%}")
     
         # Show confusion matrix if available
         if 'true_positives' in results:
@@ -1320,19 +1321,11 @@ Examples:
     
         table.add_row("Mean Reconstruction Error", f"{results.get('mean_reconstruction_error', 0):.6f}")
         table.add_row("Mean Confidence", f"{results.get('mean_confidence', 0):.6f}")
-        table.add_row("Detection Threshold", f"{results['threshold']:.6f}")
     
         if 'execution_time' in results:
             table.add_row("Execution Time", results['execution_time'])
     
         console.print(table)
-    
-        # Show optimal threshold info if available
-        if 'optimal_threshold' in results and results['optimal_threshold'] > 0:
-            console.print(f"\n[cyan]Optimal Threshold Analysis:[/cyan]")
-            console.print(f"  Optimal Threshold: {results['optimal_threshold']:.4f}")
-            console.print(f"  Detection Rate at Optimal: {results.get('optimal_detection_rate', 0):.2%}")
-            console.print(f"  False Alarm Rate at Optimal: {results.get('optimal_false_alarm_rate', 0):.2%}")
 
     def alternative_preprocessing(self, df: pd.DataFrame, model) -> np.ndarray:
         """Alternative preprocessing when standard preprocessing fails"""
