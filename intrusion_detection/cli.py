@@ -951,14 +951,6 @@ Examples:
             if hasattr(self.args, 'verbose') and self.args.verbose:
                 console.print(traceback.format_exc())
             return
-        finally:
-            # Always reset timeout, even on success or error
-            try:
-                self.db.set_default_timeout()
-            except Exception as timeout_error:
-                # Just log but don't fail if timeout reset fails
-                if hasattr(self.args, 'verbose') and self.args.verbose:
-                    console.print(f"[yellow]Note: Could not reset timeout: {timeout_error}[/yellow]")
 
         # Display results
         console.print(f"[green]✓ Detection analysis completed[/green]")
@@ -997,7 +989,9 @@ Examples:
         # Tell user how to get explanations
         console.print(f"\n[yellow]For full explanations, use:[/yellow]")
         console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
-
+        
+        self.db.set_default_timeout()
+        
     def prepare_detection_results(self, df, predictions, confidence_scores, model, execution_time=None):
         """Prepare detection results in structured format with JSON serializable types"""
         anomalies = []
