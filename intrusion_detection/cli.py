@@ -891,7 +891,7 @@ Examples:
                     # Ensure y_true is binary (0/1)
                     if len(np.unique(y_true)) > 2:
                         console.print(f"[yellow]Warning: Found {len(np.unique(y_true))} unique labels. Converting to binary...[/yellow]")
-                        normal_terms = ['benign', 'normal', 'legitimate', '0']
+                        normal_terms = ['benign', 'Benign', 'BENIGN', 'normal', 'Normal', '0', 'false', 'no', 'legitimate']
                         y_true_binary = []
                         for val in y_true:
                             val_str = str(val).lower().strip()
