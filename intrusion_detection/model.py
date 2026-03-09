@@ -14,7 +14,7 @@ warnings.filterwarnings('ignore')
 # ========================
 FEATURE_ALIGNMENT_MAP = {
     # UNSW-NB15 feature -> Possible names in other datasets
-    'dur': ['dur', 'Flow Duration', 'flow_duration', 'Duration', 'Dur', ' duration', 'Flow Duration'],
+    'dur': ['dur', 'Flow Duration', ' Flow Duration', 'flow_duration', 'Duration', 'Dur', ' duration', 'Flow Duration'],
     'spkts': ['spkts', 'Tot Fwd Pkts', ' Total Fwd Packets', 'Total Fwd Packets', 'fwd_pkts', 'Fwd Packets', 
               'Fwd Pkts', 'Fwd Packets', 'Fwd Pkts/s', 'Tot Fwd Pkts'],
     'dpkts': ['dpkts', 'Tot Bwd Pkts', ' Total Backward Packets','Total Bwd Packets', 'bwd_pkts', 'Bwd Packets', 
@@ -37,7 +37,7 @@ FEATURE_ALIGNMENT_MAP = {
 
 # Common feature variations with spaces and special characters
 FEATURE_VARIATIONS = {
-    'Flow Duration': ['Flow Duration', 'flow_duration', ' Flow Duration', 'Duration', 'dur'],
+    'Flow Duration': ['dur', 'Flow Duration', ' Flow Duration', 'flow_duration', 'Duration', 'Dur', ' duration', 'Flow Duration'],
     'Tot Fwd Pkts': ['Tot Fwd Pkts', ' Total Backward Packets','Total Fwd Packets', 'tot_fwd_pkts', ' Fwd Pkts', 
                      'Fwd Packets', 'fwd_pkts', 'spkts'],
     'Tot Bwd Pkts': ['Tot Bwd Pkts', ' Total Backward Packets', 'Total Bwd Packets', 'tot_bwd_pkts', ' Bwd Pkts', 

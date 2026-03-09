@@ -1744,7 +1744,7 @@ Examples:
                 
                     # Define all possible feature names for the 10 core features
                     feature_variations = {
-                        'dur': ['dur', 'Flow Duration', ' Flow Duration', 'flow_duration', 'Duration', 'Dur', 'duration'],
+                        'dur': ['dur', 'Flow Duration', ' Flow Duration', 'flow_duration', 'Duration', 'Dur', ' duration', 'Flow Duration'],
                         'spkts': ['spkts', 'Tot Fwd Pkts', ' Total Fwd Packets', 'Total Fwd Packets', 'fwd_pkts', 'Fwd Packets', 'Fwd Pkts'],
                         'dpkts': ['dpkts', 'Tot Bwd Pkts', ' Total Backward Packets', 'Total Bwd Packets', 'bwd_pkts', 'Bwd Packets', 'Bwd Pkts'],
                         'sbytes': ['sbytes', 'TotLen Fwd Pkts', 'Total Length of Fwd Packets', 'fwd_bytes', 'Fwd Bytes'],
@@ -1908,7 +1908,7 @@ Examples:
             if idx < len(self.original_features):
                 row = self.original_features.iloc[idx]
                 feature_variations = {
-                    'dur': ['dur', 'Flow Duration', ' Flow Duration', 'flow_duration', 'Duration', 'Dur', 'duration'],
+                    'dur': ['dur', 'Flow Duration', ' Flow Duration', 'flow_duration', 'Duration', 'Dur', ' duration', 'Flow Duration'],
                     'spkts': ['spkts', 'Tot Fwd Pkts', ' Total Fwd Packets', 'Total Fwd Packets', 'fwd_pkts', 'Fwd Packets', 'Fwd Pkts'],
                     'dpkts': ['dpkts', 'Tot Bwd Pkts', ' Total Backward Packets', 'Total Bwd Packets', 'bwd_pkts', 'Bwd Packets', 'Bwd Pkts'],
                     'sbytes': ['sbytes', 'TotLen Fwd Pkts', 'Total Length of Fwd Packets', 'fwd_bytes', 'Fwd Bytes'],
