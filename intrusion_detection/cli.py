@@ -999,8 +999,6 @@ Examples:
         # Tell user how to get explanations
         console.print(f"\n[yellow]For full explanations, use:[/yellow]")
         console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
-        
-        self.db.set_default_timeout()
 
     def prepare_detection_results(self, df, predictions, confidence_scores, model, execution_time=None):
         """Prepare detection results in structured format with JSON serializable types"""
@@ -1746,16 +1744,16 @@ Examples:
                 
                     # Define all possible feature names for the 10 core features
                     feature_variations = {
-                        'dur': ['dur', 'Flow Duration', 'flow_duration', 'Duration', 'Dur', 'duration'],
-                        'spkts': ['spkts', 'Tot Fwd Pkts', 'Total Fwd Packets', 'fwd_pkts', 'Fwd Packets', 'Fwd Pkts'],
-                        'dpkts': ['dpkts', 'Tot Bwd Pkts', 'Total Bwd Packets', 'bwd_pkts', 'Bwd Packets', 'Bwd Pkts'],
+                        'dur': ['dur', 'Flow Duration', ' Flow Duration', 'flow_duration', 'Duration', 'Dur', 'duration'],
+                        'spkts': ['spkts', 'Tot Fwd Pkts', ' Total Fwd Packets', 'Total Fwd Packets', 'fwd_pkts', 'Fwd Packets', 'Fwd Pkts'],
+                        'dpkts': ['dpkts', 'Tot Bwd Pkts', ' Total Backward Packets', 'Total Bwd Packets', 'bwd_pkts', 'Bwd Packets', 'Bwd Pkts'],
                         'sbytes': ['sbytes', 'TotLen Fwd Pkts', 'Total Length of Fwd Packets', 'fwd_bytes', 'Fwd Bytes'],
-                        'dbytes': ['dbytes', 'TotLen Bwd Pkts', 'Total Length of Bwd Packets', 'bwd_bytes', 'Bwd Bytes'],
+                        'dbytes': ['dbytes', 'TotLen Bwd Pkts', ' Total Length of Bwd Packets' ,'Total Length of Bwd Packets', 'bwd_bytes', 'Bwd Bytes'],
                         'rate': ['rate', 'Flow Byts/s', 'Flow Bytes/s', 'flow_bytes_per_sec', 'Bytes/s'],
-                        'smean': ['smean', 'Fwd Pkt Len Mean', 'Fwd Packet Length Mean', 'fwd_pkt_len_mean'],
-                        'dmean': ['dmean', 'Bwd Pkt Len Mean', 'Bwd Packet Length Mean', 'bwd_pkt_len_mean'],
-                        'swin': ['swin', 'Init Fwd Win Byts', 'Init Fwd Window Bytes', 'fwd_win'],
-                        'dwin': ['dwin', 'Init Bwd Win Byts', 'Init Bwd Window Bytes', 'bwd_win']
+                        'smean': ['smean', 'Fwd Pkt Len Mean', ' Fwd Packet Length Mean', 'Fwd Packet Length Mean', 'fwd_pkt_len_mean'],
+                        'dmean': ['dmean', 'Bwd Pkt Len Mean', ' Bwd Packet Length Mean', 'Bwd Packet Length Mean', 'bwd_pkt_len_mean'],
+                        'swin': ['swin', 'Init Fwd Win Byts', 'Init_Win_bytes_forward', 'Init Fwd Window Bytes', 'fwd_win'],
+                        'dwin': ['dwin', 'Init Bwd Win Byts', ' Init_Win_bytes_backward', 'Init Bwd Window Bytes', 'bwd_win']
                     }
                 
                     self.feature_mapping = {}
@@ -1910,16 +1908,16 @@ Examples:
             if idx < len(self.original_features):
                 row = self.original_features.iloc[idx]
                 feature_variations = {
-                    'dur': ['dur', 'Flow Duration', 'flow_duration', 'Duration', 'Dur', 'duration'],
-                    'spkts': ['spkts', 'Tot Fwd Pkts', 'Total Fwd Packets', 'fwd_pkts', 'Fwd Packets', 'Fwd Pkts'],
-                    'dpkts': ['dpkts', 'Tot Bwd Pkts', 'Total Bwd Packets', 'bwd_pkts', 'Bwd Packets', 'Bwd Pkts'],
+                    'dur': ['dur', 'Flow Duration', ' Flow Duration', 'flow_duration', 'Duration', 'Dur', 'duration'],
+                    'spkts': ['spkts', 'Tot Fwd Pkts', ' Total Fwd Packets', 'Total Fwd Packets', 'fwd_pkts', 'Fwd Packets', 'Fwd Pkts'],
+                    'dpkts': ['dpkts', 'Tot Bwd Pkts', ' Total Backward Packets', 'Total Bwd Packets', 'bwd_pkts', 'Bwd Packets', 'Bwd Pkts'],
                     'sbytes': ['sbytes', 'TotLen Fwd Pkts', 'Total Length of Fwd Packets', 'fwd_bytes', 'Fwd Bytes'],
-                    'dbytes': ['dbytes', 'TotLen Bwd Pkts', 'Total Length of Bwd Packets', 'bwd_bytes', 'Bwd Bytes'],
+                    'dbytes': ['dbytes', 'TotLen Bwd Pkts', ' Total Length of Bwd Packets' ,'Total Length of Bwd Packets', 'bwd_bytes', 'Bwd Bytes'],
                     'rate': ['rate', 'Flow Byts/s', 'Flow Bytes/s', 'flow_bytes_per_sec', 'Bytes/s'],
-                    'smean': ['smean', 'Fwd Pkt Len Mean', 'Fwd Packet Length Mean', 'fwd_pkt_len_mean'],
-                    'dmean': ['dmean', 'Bwd Pkt Len Mean', 'Bwd Packet Length Mean', 'bwd_pkt_len_mean'],
-                    'swin': ['swin', 'Init Fwd Win Byts', 'Init Fwd Window Bytes', 'fwd_win'],
-                    'dwin': ['dwin', 'Init Bwd Win Byts', 'Init Bwd Window Bytes', 'bwd_win']
+                    'smean': ['smean', 'Fwd Pkt Len Mean', ' Fwd Packet Length Mean', 'Fwd Packet Length Mean', 'fwd_pkt_len_mean'],
+                    'dmean': ['dmean', 'Bwd Pkt Len Mean', ' Bwd Packet Length Mean', 'Bwd Packet Length Mean', 'bwd_pkt_len_mean'],
+                    'swin': ['swin', 'Init Fwd Win Byts', 'Init_Win_bytes_forward', 'Init Fwd Window Bytes', 'fwd_win'],
+                    'dwin': ['dwin', 'Init Bwd Win Byts', ' Init_Win_bytes_backward', 'Init Bwd Window Bytes', 'bwd_win']
                 }
             
                 # For each core feature, try to find a match in the row
