@@ -970,18 +970,6 @@ Examples:
 
     def prepare_detection_results(self, df, predictions, confidence_scores, model, execution_time=None):
         """Prepare detection results in structured format with JSON serializable types"""
-        # Ensure y_true is numpy array and properly formatted
-        if isinstance(y_true, list):
-            y_true = np.array(y_true)
-    
-        # Ensure predictions and y_true have the same length
-        min_len = min(len(predictions), len(y_true))
-        if len(predictions) != len(y_true):
-            console.print(f"[yellow]Warning: Truncating to match lengths: predictions={len(predictions)}, y_true={len(y_true)}[/yellow]")
-            predictions = predictions[:min_len]
-            confidence_scores = confidence_scores[:min_len]
-            y_true = y_true[:min_len]
-        
         anomalies = []
         anomaly_indices = np.where(predictions == 1)[0]
     
@@ -1049,7 +1037,18 @@ Examples:
         """Prepare detection results with full metrics using ground truth labels"""
         from sklearn.metrics import (accuracy_score, precision_score, recall_score, 
                                     f1_score, roc_curve, auc, confusion_matrix)
+        # Ensure y_true is numpy array and properly formatted
+        if isinstance(y_true, list):
+            y_true = np.array(y_true)
     
+        # Ensure predictions and y_true have the same length
+        min_len = min(len(predictions), len(y_true))
+        if len(predictions) != len(y_true):
+            console.print(f"[yellow]Warning: Truncating to match lengths: predictions={len(predictions)}, y_true={len(y_true)}[/yellow]")
+            predictions = predictions[:min_len]
+            confidence_scores = confidence_scores[:min_len]
+            y_true = y_true[:min_len]
+            
         anomalies = []
         anomaly_indices = np.where(predictions == 1)[0]
     
