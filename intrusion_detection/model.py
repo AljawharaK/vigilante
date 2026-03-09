@@ -633,42 +633,43 @@ class IntrusionDetectionModel:
         """
         available = []
         mapping = {}
-        
+    
         # Normalize dataframe columns for matching
         df_columns = df.columns.tolist()
-        normalized_df_cols = {self._normalize_name(col): col for col in df_columns}
-        
+    
         print("\n[Feature Matching]")
         print(f"DataFrame has {len(df_columns)} columns")
-        
+    
         for feature in self.CORE_FEATURES:
             matched = None
-            normalized_feat = self._normalize_name(feature)
-            
-            # Try direct match
+        
+            # Try direct match (case-sensitive)
             if feature in df_columns:
                 matched = feature
             # Try case-insensitive match
             elif feature.lower() in [col.lower() for col in df_columns]:
                 matched = next(col for col in df_columns if col.lower() == feature.lower())
-            # Try normalized match
-            elif normalized_feat in normalized_df_cols:
-                matched = normalized_df_cols[normalized_feat]
             # Try mapping from alignment dictionary
             else:
                 for possible_name in FEATURE_ALIGNMENT_MAP.get(feature, []):
-                    norm_possible = self._normalize_name(possible_name)
-                    if norm_possible in normalized_df_cols:
-                        matched = normalized_df_cols[norm_possible]
+                    if possible_name in df_columns:
+                        matched = possible_name
                         break
-            
+                    # Try case-insensitive match for each variation
+                    elif possible_name.lower() in [col.lower() for col in df_columns]:
+                        matched = next(col for col in df_columns if col.lower() == possible_name.lower())
+                        break
+        
             if matched:
                 available.append(feature)
                 mapping[feature] = matched
                 print(f"  ✓ '{feature}' → '{matched}'")
             else:
-                print(f"  ✗ '{feature}' not found")
-        
+                print(f"  ✓ '{feature}' → '0 (filling with zeros)'")
+                # Still add to available for core features, but mapping will be None
+                available.append(feature)
+                mapping[feature] = None
+    
         return available, mapping
     
     def _normalize_name(self, name: str) -> str:
@@ -731,9 +732,13 @@ class IntrusionDetectionModel:
         # Create aligned dataframe with exactly the core features
         aligned_data = {}
         for feature in self.CORE_FEATURES:
-            if feature in feature_mapping:
+            if feature in feature_mapping and feature_mapping[feature] is not None:
                 # Use the mapped column
-                aligned_data[feature] = df_processed[feature_mapping[feature]]
+                try:
+                    # Ensure we're getting numeric values
+                    aligned_data[feature] = pd.to_numeric(df_processed[feature_mapping[feature]], errors='coerce')
+                except:
+                    aligned_data[feature] = 0
             else:
                 # Feature not found, fill with zeros
                 aligned_data[feature] = 0
