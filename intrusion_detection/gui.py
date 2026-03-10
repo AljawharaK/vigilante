@@ -593,7 +593,7 @@ class VigilanteGUI:
                 horizontal_alignment=CrossAxisAlignment.CENTER,
                 alignment=MainAxisAlignment.CENTER,
             ),
-            alignment=alignment.center,
+            alignment=Alignment.CENTER,
             expand=True,
         )
         
