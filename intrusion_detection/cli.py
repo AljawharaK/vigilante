@@ -125,11 +125,16 @@ Examples:
         explain_parser.add_argument('--input', help='Detection results JSON')
         
         # Model management
-        list_parser = subparsers.add_parser('list-models', help='List available models')
+        subparsers.add_parser('list-models', help='List available models')
         
         # System info
         subparsers.add_parser('status', help='Show system status')
         
+        # GUI command
+        gui_parser = subparsers.add_parser('interactive-gui', help='Launch interactive GUI mode')
+        gui_parser.add_argument('--port', type=int, default=8550, help='Port for GUI server')
+        gui_parser.add_argument('--web', action='store_true', help='Run as web app (opens in browser)')
+
         # Version flag (outside subparsers)
         parser.add_argument('--version', action='store_true', help='Show version information')
         parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
@@ -209,6 +214,35 @@ Examples:
         
         return True
     
+    def handle_interactive_gui(self, args):
+        """Launch the interactive GUI mode"""
+        console.print("[cyan]Starting Vigilante Interactive GUI...[/cyan]")
+    
+        try:
+            # Import flet
+            import flet as ft
+        
+            # Import the GUI module
+            from gui import main as gui_main
+        
+            # Set environment variables for flet
+            os.environ['FLET_SERVER_PORT'] = str(args.port)
+        
+            if args.web:
+                os.environ['FLET_WEB'] = 'true'
+                console.print(f"[green]✓ GUI will open in your browser at http://localhost:{args.port}[/green]")
+            else:
+                console.print(f"[green]✓ GUI window opening on port {args.port}...[/green]")
+            
+            # Run the GUI
+            ft.app(target=gui_main)
+        
+        except ImportError as e:
+            console.print(f"[red]Error: Could not launch GUI - {e}[/red]")
+            console.print("[yellow]Make sure flet is installed: pip install flet[/yellow]")
+        except Exception as e:
+            console.print(f"[red]Error launching GUI: {e}[/red]")
+
     def handle_login(self, args):
         """Handle login with OTP verification"""
         # Get username
@@ -2230,6 +2264,7 @@ Examples:
                 'explain': self.handle_explain,
                 'list-models': self.handle_list_models,
                 'status': self.handle_status,
+                'interactive-gui': self.handle_interactive_gui,
             }
             
             # Admin commands
