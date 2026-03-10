@@ -223,7 +223,7 @@ Examples:
             import flet as ft
         
             # Import the GUI module
-            from gui import main as gui_main
+            from .gui import main as gui_main
         
             # Set environment variables for flet
             os.environ['FLET_SERVER_PORT'] = str(args.port)

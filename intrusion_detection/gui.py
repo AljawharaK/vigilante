@@ -30,11 +30,11 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import Vigilante modules
-from intrusion_detection.database import DatabaseManager
-from intrusion_detection.auth import AuthManager
-from intrusion_detection.model import IntrusionDetectionModel
-from intrusion_detection.model_trainer import ModelTrainer
-from intrusion_detection.utils import get_system_info
+from .database import DatabaseManager
+from .auth import AuthManager
+from .model import IntrusionDetectionModel
+from .model_trainer import ModelTrainer
+from .utils import get_system_info
 
 # =====================================================================
 # THEME CONSTANTS - Modern Cyber Security Style

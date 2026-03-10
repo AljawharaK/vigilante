@@ -19,7 +19,7 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "interactive-gui":
         # Launch GUI
         try:
-            from gui import main as gui_main
+            from .gui import main as gui_main
             gui_main()
         except ImportError as e:
             print(f"Error: Could not launch GUI - {e}")
@@ -27,7 +27,7 @@ def main():
             sys.exit(1)
     else:
         # Run normal CLI
-        from intrusion_detection.cli import main as cli_main
+        from .cli import main as cli_main
         cli_main()
 
 if __name__ == "__main__":
