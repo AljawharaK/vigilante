@@ -6,13 +6,12 @@ Built with Flet - Modern Python GUI framework
 
 import flet as ft
 from flet import (
-    Page, Container, Column, Row, Text, 
+    Alignment, Page, Container, Column, Row, Text, 
     ElevatedButton, TextField, Dropdown, dropdown,
     AlertDialog, TextButton, ProgressRing,
-    Card, Icon, icons, margin, padding,
-    border, border_radius, alignment, MainAxisAlignment,
-    CrossAxisAlignment, ThemeMode, Tabs, Tab,
-    ListView, ProgressBar, FilePicker
+    Card, Icon, margin, padding,
+    border, border_radius, Alignment, MainAxisAlignment,
+    CrossAxisAlignment, ThemeMode, ProgressBar, FilePicker
 )
 import asyncio
 import threading
@@ -37,7 +36,7 @@ from .model_trainer import ModelTrainer
 from .utils import get_system_info
 
 # =====================================================================
-# THEME CONSTANTS - Modern Cyber Security Style
+# THEME CONSTANTS
 # =====================================================================
 
 class AppTheme:
@@ -122,10 +121,8 @@ class VigilanteGUI:
         self.page.bgcolor = AppTheme.BACKGROUND
         self.page.padding = 0
         self.page.spacing = 0
-        self.page.window_width = 1200
-        self.page.window_height = 800
-        self.page.window_min_width = 800
-        self.page.window_min_height = 600
+        self.page.window.width = 1200
+        self.page.window.height = 800
         
         # Set custom theme
         self.page.theme = ft.Theme(
@@ -178,9 +175,8 @@ class VigilanteGUI:
                     Row(
                         controls=[
                             Icon(
-                                ft.icons.SECURITY,
+                                ft.Icon(ft.Icons.SECURITY, size=24),
                                 color=AppTheme.PRIMARY,
-                                size=30,
                             ),
                             Text(
                                 "VIGILANTE",
@@ -225,7 +221,7 @@ class VigilanteGUI:
             height=10,
             bgcolor=AppTheme.SUCCESS,
             border_radius=border_radius.all(5),
-            animate=ft.Animation(1000, ft.AnimationCurve.BOUNCE),
+            animate=ft.Animation(duration=300, curve=ft.AnimationCurve.BOUNCE_OUT),
         )
         
     def create_navigation_rail(self) -> Container:
@@ -241,7 +237,7 @@ class VigilanteGUI:
                     # Logo/Icon at top
                     Container(
                         content=Icon(
-                            ft.icons.SHIELD_MOON,
+                            ft.Icon(ft.Icons.SECURITY, size=24),
                             color=AppTheme.PRIMARY,
                             size=40,
                         ),
@@ -249,17 +245,17 @@ class VigilanteGUI:
                     ),
                     
                     # Navigation buttons
-                    self.create_nav_button(ft.icons.DASHBOARD, "Dashboard", "dashboard", True),
-                    self.create_nav_button(ft.icons.ANALYTICS, "Detection", "detection"),
-                    self.create_nav_button(ft.icons.MODEL_TRAINING, "Training", "training"),
-                    self.create_nav_button(ft.icons.HISTORY, "History", "history"),
-                    self.create_nav_button(ft.icons.SETTINGS, "Settings", "settings"),
+                    self.create_nav_button(ft.Icon(ft.Icons.DASHBOARD, size=24), "Dashboard", "dashboard", True),
+                    self.create_nav_button(ft.Icon(ft.Icons.ANALYTICS, size=24), "Detection", "detection"),
+                    self.create_nav_button(ft.Icon(ft.Icons.MODEL_TRAINING, size=24), "Training", "training"),
+                    self.create_nav_button(ft.Icon(ft.Icons.HISTORY, size=24), "History", "history"),
+                    self.create_nav_button(ft.Icon(ft.Icons.SETTINGS, size=24), "Settings", "settings"),
                     
                     # Spacer to push logout to bottom
                     Container(expand=True),
                     
                     # Logout button at bottom
-                    self.create_nav_button(ft.icons.LOGOUT, "Logout", "logout", False, AppTheme.ERROR),
+                    self.create_nav_button(icon=ft.Icon(ft.Icons.LOGOUT, size=24), tooltip="Logout", view="logout", selected=False, color=AppTheme.ERROR),
                 ],
                 horizontal_alignment=CrossAxisAlignment.CENTER,
                 spacing=5,
@@ -311,7 +307,7 @@ class VigilanteGUI:
         self.email_field = TextField(
             label="Email",
             hint_text="Enter your email",
-            prefix_icon=ft.icons.EMAIL,
+            prefix_icon=ft.Icon(ft.Icons.EMAIL, size=24),
             border_color=AppTheme.PRIMARY,
             width=300,
         )
@@ -321,7 +317,7 @@ class VigilanteGUI:
             hint_text="Enter your password",
             password=True,
             can_reveal_password=True,
-            prefix_icon=ft.icons.LOCK,
+            prefix_icon=ft.Icon(ft.Icons.LOCK, size=24),
             border_color=AppTheme.PRIMARY,
             width=300,
         )
@@ -329,7 +325,7 @@ class VigilanteGUI:
         self.otp_field = TextField(
             label="OTP Code",
             hint_text="Enter 6-digit OTP",
-            prefix_icon=ft.icons.PIN,
+            prefix_icon=ft.Icon(ft.Icons.PIN, size=24),
             border_color=AppTheme.PRIMARY,
             width=300,
             visible=False,
@@ -341,7 +337,7 @@ class VigilanteGUI:
         login_card = Container(
             content=Column(
                 controls=[
-                    Icon(ft.icons.SECURITY, color=AppTheme.PRIMARY, size=60),
+                    Icon(ft.Icon(ft.Icons.SECURITY, size=40), color=AppTheme.PRIMARY),
                     Text("VIGILANTE", size=32, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
                     Text("Intrusion Detection System", size=16, color=AppTheme.TEXT_SECONDARY),
                     Container(height=30),
@@ -451,10 +447,10 @@ class VigilanteGUI:
         # Create stat cards
         stats_row = Row(
             controls=[
-                self.create_stat_card("Total Detections", stats["total_detections"], ft.icons.ANALYTICS),
-                self.create_stat_card("Anomalies Found", stats["anomalies_found"], ft.icons.WARNING, AppTheme.ERROR),
-                self.create_stat_card("Models Trained", stats["models_trained"], ft.icons.MODEL_TRAINING),
-                self.create_stat_card("System Uptime", stats["uptime"], ft.icons.ACCESS_TIME),
+                self.create_stat_card("Total Detections", stats["total_detections"], ft.Icon(ft.Icons.ANALYTICS, size=40)),
+                self.create_stat_card("Anomalies Found", stats["anomalies_found"], ft.Icon(ft.Icons.WARNING, size=40), AppTheme.ERROR),
+                self.create_stat_card("Models Trained", stats["models_trained"], ft.Icon(ft.Icons.MODEL_TRAINING, size=40)),
+                self.create_stat_card("System Uptime", stats["uptime"], ft.Icon(ft.Icons.ACCESS_TIME, size=40)),
             ],
             spacing=10,
         )
@@ -573,7 +569,7 @@ class VigilanteGUI:
             ],
             heading_row_color=AppTheme.SURFACE,
             heading_row_height=40,
-            data_row_color={ft.MaterialState.HOVERED: AppTheme.PRIMARY + "20"},
+            data_row_color={ft.ControlState.HOVERED: AppTheme.PRIMARY + "20"},
             column_spacing=20,
             divider_thickness=0,
         )
@@ -591,7 +587,7 @@ class VigilanteGUI:
         return Container(
             content=Column(
                 controls=[
-                    Icon(ft.icons.SHOW_CHART, size=50, color=AppTheme.TEXT_SECONDARY),
+                    Icon(ft.Icon(ft.Icons.SHOW_CHART, size=50), color=AppTheme.TEXT_SECONDARY),
                     Text("Chart visualization will appear here", color=AppTheme.TEXT_SECONDARY),
                 ],
                 horizontal_alignment=CrossAxisAlignment.CENTER,
@@ -651,7 +647,7 @@ class VigilanteGUI:
                                             self.file_path,
                                             ElevatedButton(
                                                 "Browse",
-                                                icon=ft.icons.FOLDER_OPEN,
+                                                icon=ft.Icon(ft.Icons.FOLDER_OPEN, size=24),
                                                 on_click=self.pick_file,
                                                 style=ft.ButtonStyle(
                                                     color=AppTheme.PRIMARY,
@@ -667,7 +663,7 @@ class VigilanteGUI:
                                             self.model_dropdown,
                                             ElevatedButton(
                                                 "Run Detection",
-                                                icon=ft.icons.PLAY_ARROW,
+                                                icon=ft.Icon(ft.Icons.PLAY_ARROW, size=24),
                                                 on_click=self.run_detection,
                                                 style=ft.ButtonStyle(
                                                     color=AppTheme.SECONDARY,
@@ -766,7 +762,7 @@ class VigilanteGUI:
                                             self.train_file,
                                             ElevatedButton(
                                                 "Browse",
-                                                icon=ft.icons.FOLDER_OPEN,
+                                                icon=ft.Icon(ft.Icons.FOLDER_OPEN, size=24),
                                                 on_click=self.pick_training_file,
                                                 style=ft.ButtonStyle(
                                                     color=AppTheme.PRIMARY,
@@ -803,7 +799,7 @@ class VigilanteGUI:
                                         controls=[
                                             ElevatedButton(
                                                 "Start Training",
-                                                icon=ft.icons.TRAIN,
+                                                icon=ft.Icon(ft.Icons.TRAIN, size=24),
                                                 on_click=self.start_training,
                                                 style=ft.ButtonStyle(
                                                     color=AppTheme.SECONDARY,
@@ -867,13 +863,13 @@ class VigilanteGUI:
                         Container(
                             content=Column(
                                 controls=[
-                                    Icon(ft.icons.HISTORY, size=50, color=AppTheme.TEXT_SECONDARY),
+                                    Icon(ft.Icon(ft.Icons.HISTORY, size=50), color=AppTheme.TEXT_SECONDARY),
                                     Text("No detection history available", color=AppTheme.TEXT_SECONDARY),
                                 ],
                                 horizontal_alignment=CrossAxisAlignment.CENTER,
                                 alignment=MainAxisAlignment.CENTER,
                             ),
-                            alignment=alignment.center,
+                            alignment=Alignment.CENTER,
                             expand=True,
                         ),
                     ],
@@ -908,7 +904,7 @@ class VigilanteGUI:
                         ),
                         ft.DataCell(
                             ft.IconButton(
-                                icon=ft.icons.VISIBILITY,
+                                icon=ft.Icons.VISIBILITY,
                                 icon_color=AppTheme.PRIMARY,
                                 tooltip="View Details",
                                 on_click=lambda e, i=h: self.view_detection_details(i),
@@ -920,7 +916,7 @@ class VigilanteGUI:
             ],
             heading_row_color=AppTheme.SURFACE,
             heading_row_height=40,
-            data_row_color={ft.MaterialState.HOVERED: AppTheme.PRIMARY + "20"},
+            data_row_color={ft.ControlState.HOVERED: AppTheme.PRIMARY + "20"},
             column_spacing=20,
             divider_thickness=0,
         )
@@ -965,17 +961,17 @@ class VigilanteGUI:
                                     Container(height=10),
                                     
                                     ListTile(
-                                        leading=Icon(ft.icons.PERSON, color=AppTheme.PRIMARY),
+                                        leading=Icon(ft.Icon(ft.Icons.PERSON, size=24), color=AppTheme.PRIMARY),
                                         title=Text(f"Username: {user.get('username', 'N/A')}"),
                                     ),
                                     
                                     ListTile(
-                                        leading=Icon(ft.icons.EMAIL, color=AppTheme.PRIMARY),
+                                        leading=Icon(ft.Icon(ft.Icons.EMAIL, size=24), color=AppTheme.PRIMARY),
                                         title=Text(f"Email: {user.get('email', 'N/A')}"),
                                     ),
                                     
                                     ListTile(
-                                        leading=Icon(ft.icons.ADMIN_PANEL_SETTINGS, color=AppTheme.PRIMARY),
+                                        leading=Icon(ft.Icon(ft.Icons.ADMIN_PANEL_SETTINGS, size=24), color=AppTheme.PRIMARY),
                                         title=Text(f"Role: {self.auth.current_role or 'N/A'}"),
                                     ),
                                     
@@ -983,7 +979,7 @@ class VigilanteGUI:
                                     
                                     ElevatedButton(
                                         "Change Password",
-                                        icon=ft.icons.LOCK_RESET,
+                                        icon=ft.Icon(ft.Icons.LOCK_RESET, size=24),
                                         on_click=self.change_password,
                                         style=ft.ButtonStyle(
                                             color=AppTheme.PRIMARY,
@@ -1007,17 +1003,17 @@ class VigilanteGUI:
                                     Container(height=10),
                                     
                                     ListTile(
-                                        leading=Icon(ft.icons.COMPUTER, color=AppTheme.PRIMARY),
+                                        leading=Icon(ft.Icon(ft.Icons.COMPUTER, size=24), color=AppTheme.PRIMARY),
                                         title=Text(f"System: {os.name}"),
                                     ),
                                     
                                     ListTile(
-                                        leading=Icon(ft.icons.DATABASE, color=AppTheme.PRIMARY),
+                                        leading=Icon(ft.Icon(ft.Icons.DATASET, size=24), color=AppTheme.PRIMARY),
                                         title=Text("Database: Connected"),
                                     ),
                                     
                                     ListTile(
-                                        leading=Icon(ft.icons.MODEL_TRAINING, color=AppTheme.PRIMARY),
+                                        leading=Icon(ft.Icon(ft.Icons.MODEL_TRAINING, size=24), color=AppTheme.PRIMARY),
                                         title=Text(f"Models: {len(self.get_user_models())}"),
                                     ),
                                 ],
@@ -1064,7 +1060,7 @@ class VigilanteGUI:
             ],
             heading_row_color=AppTheme.SURFACE,
             heading_row_height=40,
-            data_row_color={ft.MaterialState.HOVERED: AppTheme.PRIMARY + "20"},
+            data_row_color={ft.ControlState.HOVERED: AppTheme.PRIMARY + "20"},
             column_spacing=20,
             divider_thickness=0,
         )
@@ -1204,18 +1200,18 @@ class VigilanteGUI:
                 self.create_stat_card(
                     "Total Flows",
                     str(data["total_flows"]),
-                    ft.icons.DATA_USAGE
+                    ft.Icon(ft.Icons.DATA_USAGE, size=24)
                 ),
                 self.create_stat_card(
                     "Anomalies Found",
                     str(len(data["anomalies"])),
-                    ft.icons.WARNING,
+                    ft.Icon(ft.Icons.WARNING, size=24),
                     AppTheme.ERROR
                 ),
                 self.create_stat_card(
                     "Detection Rate",
                     f"{len(data['anomalies'])/data['total_flows']*100:.1f}%",
-                    ft.icons.PERCENT
+                    ft.Icon(ft.Icons.PERCENT, size=24)
                 ),
             ],
             spacing=10,
@@ -1227,7 +1223,7 @@ class VigilanteGUI:
                 Container(
                     content=Row(
                         controls=[
-                            Icon(ft.icons.WARNING, color=AppTheme.get_severity_color(a["severity"])),
+                            Icon(ft.Icon(ft.Icons.WARNING, size=24), color=AppTheme.get_severity_color(a["severity"])),
                             Text(f"Flow #{a['index']} - Confidence: {a['confidence']:.2f}"),
                         ],
                         spacing=10,
