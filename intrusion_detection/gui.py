@@ -9,7 +9,7 @@ from flet import (
     Page, Container, Column, Row, Text, 
     ElevatedButton, TextField, Dropdown, dropdown,
     AlertDialog, TextButton, ProgressRing,
-    Card, Icon, icons, colors, margin, padding,
+    Card, Icon, icons, margin, padding,
     border, border_radius, alignment, MainAxisAlignment,
     CrossAxisAlignment, ThemeMode, Tabs, Tab,
     ListView, ProgressBar, FilePicker, FilePickerResultEvent
