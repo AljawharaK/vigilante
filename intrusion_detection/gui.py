@@ -12,7 +12,7 @@ from flet import (
     Card, Icon, icons, margin, padding,
     border, border_radius, alignment, MainAxisAlignment,
     CrossAxisAlignment, ThemeMode, Tabs, Tab,
-    ListView, ProgressBar, FilePicker, FilePickerResultEvent
+    ListView, ProgressBar, FilePicker
 )
 import asyncio
 import threading
@@ -1087,11 +1087,11 @@ class VigilanteGUI:
     
     async def pick_file(self, e):
         """Open file picker for detection input"""
-        def on_file_picked(e: FilePickerResultEvent):
+        def on_file_picked(e):
             if e.files:
                 self.file_path.value = e.files[0].path
                 self.page.update()
-                
+            
         self.file_picker.on_result = on_file_picked
         self.file_picker.pick_files(
             allow_multiple=False,
@@ -1100,11 +1100,11 @@ class VigilanteGUI:
         
     async def pick_training_file(self, e):
         """Open file picker for training data"""
-        def on_file_picked(e: FilePickerResultEvent):
+        def on_file_picked(e):
             if e.files:
                 self.train_file.value = e.files[0].path
                 self.page.update()
-                
+            
         self.file_picker.on_result = on_file_picked
         self.file_picker.pick_files(
             allow_multiple=False,

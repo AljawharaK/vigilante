@@ -9,7 +9,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     name="vigilante",
     version="1.0.0",
-    author_email="aljawharakqs@gmail.com",
+    author_email="noreply@updates.vigilanteapps.com",
     description="A CLI tool for intrusion detection using computational intelligence artificial immune system algorithms.",
     long_description=long_description,
     long_description_content_type="text/markdown",
