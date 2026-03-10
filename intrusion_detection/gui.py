@@ -130,7 +130,6 @@ class VigilanteGUI:
         # Set custom theme
         self.page.theme = ft.Theme(
             color_scheme_seed=AppTheme.PRIMARY,
-            visual_density=ft.ThemeVisualDensity.COMFORTABLE,
         )
         
     def setup_ui(self):
@@ -226,7 +225,7 @@ class VigilanteGUI:
             height=10,
             bgcolor=AppTheme.SUCCESS,
             border_radius=border_radius.all(5),
-            animate=ft.animation.Animation(1000, "BOUNCE"),
+            animate=ft.Animation(1000, ft.AnimationCurve.BOUNCE),
         )
         
     def create_navigation_rail(self) -> Container:
@@ -279,10 +278,7 @@ class VigilanteGUI:
                 on_click=lambda e, v=view: self.navigate_to(v),
                 style=ft.ButtonStyle(
                     shape=ft.RoundedRectangleBorder(radius=25),
-                    bgcolor={
-                        ft.MaterialState.DEFAULT: AppTheme.SURFACE if selected else AppTheme.SECONDARY,
-                        ft.MaterialState.HOVERED: AppTheme.PRIMARY + "20",
-                    },
+                    bgcolor=AppTheme.SURFACE if selected else AppTheme.SECONDARY,
                 ),
             ),
             padding=padding.all(10),
@@ -340,7 +336,7 @@ class VigilanteGUI:
         )
         
         self.login_status = Text("", size=12)
-        self.login_progress = ProgressRing(visible=False, width=30, height=30)
+        self.login_progress = ft.ProgressRing(visible=False, width=30, height=30)
         
         login_card = Container(
             content=Column(
