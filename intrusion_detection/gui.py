@@ -173,7 +173,7 @@ class VigilanteGUI:
             visible=False,
         )
         
-        self.login_button = ft.ElevatedButton(
+        self.login_button = ft.Button(
             "Login",
             icon=ft.Icons.LOGIN,
             on_click=self.handle_login,
@@ -186,7 +186,7 @@ class VigilanteGUI:
             height=45,
         )
         
-        self.verify_otp_button = ft.ElevatedButton(
+        self.verify_otp_button = ft.Button(
             "Verify OTP",
             icon=ft.Icons.VERIFIED,
             on_click=self.handle_verify_otp,
@@ -442,6 +442,9 @@ class VigilanteGUI:
         role_color = AppTheme.PRIMARY if self.auth.is_admin() else AppTheme.INFO
         role_icon = ft.Icons.ADMIN_PANEL_SETTINGS if self.auth.is_admin() else ft.Icons.VISIBILITY
         
+        # Safely get username
+        username = self.auth.current_user.get('username', 'Unknown') if self.auth.current_user else 'Unknown'
+        
         return Container(
             content=Row(
                 controls=[
@@ -473,13 +476,13 @@ class VigilanteGUI:
                                     controls=[
                                         Icon(role_icon, size=16, color=role_color),
                                         Text(
-                                            self.auth.current_role,
+                                            self.auth.current_role or "Analyst",
                                             size=14,
                                             color=role_color,
                                             weight=ft.FontWeight.BOLD,
                                         ),
                                         Text(
-                                            f"({self.auth.current_user['username']})",
+                                            f"({username})",
                                             size=12,
                                             color=AppTheme.TEXT_SECONDARY,
                                         ),
@@ -929,8 +932,8 @@ class VigilanteGUI:
             rows=[
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(Text(str(m['id']))),
-                        ft.DataCell(Text(m['name'][:20])),
+                        ft.DataCell(Text(str(m.get('id', '')))),
+                        ft.DataCell(Text(m.get('name', 'N/A')[:20])),
                         ft.DataCell(Text(m.get('model_type', 'rnsa_knn'))),
                         ft.DataCell(Text(f"{m.get('accuracy', 0):.2%}" if m.get('accuracy') else "N/A")),
                         ft.DataCell(Text(f"{m.get('precision', 0):.2%}" if m.get('precision') else "N/A")),
@@ -997,10 +1000,10 @@ class VigilanteGUI:
     def show_model_details(self, model: Dict):
         """Show detailed model information"""
         details = f"""
-Model ID: {model['id']}
-Name: {model['name']}
+Model ID: {model.get('id', 'N/A')}
+Name: {model.get('name', 'N/A')}
 Type: {model.get('model_type', 'rnsa_knn')}
-Created: {model['created_at']}
+Created: {model.get('created_at', 'N/A')}
 
 Performance Metrics:
 • Accuracy: {model.get('accuracy', 0):.2%}
@@ -1016,7 +1019,7 @@ Training:
 Path: {model.get('model_path', 'N/A')}
         """
         
-        self.show_dialog(f"Model Details: {model['name']}", details)
+        self.show_dialog(f"Model Details: {model.get('name', 'Unknown')}", details)
     
     # =====================================================================
     # ADMIN VIEWS
@@ -1027,6 +1030,26 @@ Path: {model.get('model_path', 'N/A')}
         
         # Get all users
         users = self.get_all_users()
+        
+        # Convert tuple results to dict for each user
+        user_dicts = []
+        for user in users:
+            if isinstance(user, dict):
+                user_dict = user
+            elif isinstance(user, tuple):
+                # Convert tuple to dict using column names from cursor description
+                # This is a simplified version - in reality you'd get column names from cursor
+                user_dict = {
+                    'id': user[0] if len(user) > 0 else '',
+                    'username': user[1] if len(user) > 1 else '',
+                    'email': user[2] if len(user) > 2 else '',
+                    'role_name': user[3] if len(user) > 3 else 'Analyst',
+                    'is_active': user[4] if len(user) > 4 else True,
+                    'last_login': user[5] if len(user) > 5 else None,
+                }
+            else:
+                continue
+            user_dicts.append(user_dict)
         
         # Create users table
         users_table = ft.DataTable(
@@ -1082,7 +1105,7 @@ Path: {model.get('model_path', 'N/A')}
                         ),
                     ]
                 )
-                for u in users
+                for u in user_dicts
             ],
             heading_row_color=AppTheme.SURFACE,
             heading_row_height=40,
@@ -1092,7 +1115,7 @@ Path: {model.get('model_path', 'N/A')}
         )
         
         # Create new user button
-        create_user_button = ft.ElevatedButton(
+        create_user_button = ft.Button(
             "Create New User",
             icon=ft.Icons.PERSON_ADD,
             on_click=self.show_create_user_dialog,
@@ -1140,7 +1163,10 @@ Path: {model.get('model_path', 'N/A')}
                     LEFT JOIN roles r ON u.role_id = r.id
                     ORDER BY u.id
                 """)
-                return cursor.fetchall()
+                # Convert to list of dicts
+                columns = [desc[0] for desc in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(columns, row)) for row in rows]
         except Exception as e:
             print(f"Error getting users: {e}")
             return []
@@ -1315,6 +1341,25 @@ Path: {model.get('model_path', 'N/A')}
         # Get audit logs
         audit_logs = self.db.get_audit_logs(30)
         
+        # Convert tuple results to dict for each log if needed
+        log_dicts = []
+        for log in audit_logs:
+            if isinstance(log, dict):
+                log_dict = log
+            elif isinstance(log, tuple):
+                # Convert tuple to dict using expected structure
+                log_dict = {
+                    'id': log[0] if len(log) > 0 else '',
+                    'created_at': log[1] if len(log) > 1 else datetime.now(),
+                    'username': log[2] if len(log) > 2 else 'System',
+                    'action': log[3] if len(log) > 3 else '',
+                    'resource': log[4] if len(log) > 4 else '-',
+                    'status': log[5] if len(log) > 5 else 'success',
+                }
+            else:
+                continue
+            log_dicts.append(log_dict)
+        
         return Container(
             content=Column(
                 controls=[
@@ -1341,7 +1386,7 @@ Path: {model.get('model_path', 'N/A')}
                                 controls=[
                                     Text("Recent Audit Logs", size=18, weight=ft.FontWeight.BOLD),
                                     Container(height=10),
-                                    self.create_audit_logs_table(audit_logs[:10]),
+                                    self.create_audit_logs_table(log_dicts[:10]),
                                 ],
                                 spacing=0,
                             ),
@@ -1364,6 +1409,9 @@ Path: {model.get('model_path', 'N/A')}
                 padding=ft.Padding.all(20),
             )
         
+        # Filter out None values in logs
+        filtered_logs = [log for log in logs if log is not None]
+        
         table = ft.DataTable(
             columns=[
                 ft.DataColumn(Text("Time")),
@@ -1375,21 +1423,21 @@ Path: {model.get('model_path', 'N/A')}
             rows=[
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(Text(log['created_at'].strftime("%Y-%m-%d %H:%M") if hasattr(log['created_at'], 'strftime') else str(log['created_at'])[:16])),
+                        ft.DataCell(Text(log['created_at'].strftime("%Y-%m-%d %H:%M") if hasattr(log['created_at'], 'strftime') else str(log.get('created_at', ''))[:16])),
                         ft.DataCell(Text(log.get('username', 'System'))),
-                        ft.DataCell(Text(log['action'])),
-                        ft.DataCell(Text(log.get('resource', '-')[:20])),
+                        ft.DataCell(Text(log.get('action', ''))),
+                        ft.DataCell(Text(str(log.get('resource', '-'))[:20] if log.get('resource') else '-')),
                         ft.DataCell(
                             Container(
-                                content=Text(log['status']),
-                                bgcolor=AppTheme.SUCCESS if log['status'] == 'success' else AppTheme.ERROR,
+                                content=Text(log.get('status', 'success')),
+                                bgcolor=AppTheme.SUCCESS if log.get('status') == 'success' else AppTheme.ERROR,
                                 padding=ft.Padding.all(5),
                                 border_radius=ft.BorderRadius.all(5),
                             )
                         ),
                     ]
                 )
-                for log in logs
+                for log in filtered_logs
             ],
             heading_row_color=AppTheme.SURFACE,
             heading_row_height=40,
@@ -1412,6 +1460,12 @@ Path: {model.get('model_path', 'N/A')}
     
     def create_settings_content(self) -> Container:
         """Create settings interface"""
+        
+        # Safely get user info
+        username = self.auth.current_user.get('username', 'Unknown') if self.auth.current_user else 'Unknown'
+        email = self.auth.current_user.get('email', 'Not available') if self.auth.current_user else 'Not available'
+        role = self.auth.current_role or 'Analyst'
+        
         return Container(
             content=Column(
                 controls=[
@@ -1427,17 +1481,17 @@ Path: {model.get('model_path', 'N/A')}
                                     
                                     self.create_list_tile(
                                         leading=Icon(ft.Icons.PERSON, color=AppTheme.PRIMARY),
-                                        title=Text(f"Username: {self.auth.current_user['username']}"),
+                                        title=Text(f"Username: {username}"),
                                     ),
                                     
                                     self.create_list_tile(
                                         leading=Icon(ft.Icons.EMAIL, color=AppTheme.PRIMARY),
-                                        title=Text(f"Email: {self.auth.current_user['email']}"),
+                                        title=Text(f"Email: {email}"),
                                     ),
                                     
                                     self.create_list_tile(
                                         leading=Icon(ft.Icons.ADMIN_PANEL_SETTINGS, color=AppTheme.PRIMARY),
-                                        title=Text(f"Role: {self.auth.current_role}"),
+                                        title=Text(f"Role: {role}"),
                                     ),
                                     
                                     Container(height=20),
