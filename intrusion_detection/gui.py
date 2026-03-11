@@ -6,12 +6,12 @@ Built with Flet - Modern Python GUI framework
 
 import flet as ft
 from flet import (
-    Alignment, Page, Container, Column, Row, Text, 
+    Page, Container, Column, Row, Text, 
     ElevatedButton, TextField, Dropdown, dropdown,
     AlertDialog, TextButton, ProgressRing,
     Card, Icon, margin, padding,
-    border, border_radius, Alignment, MainAxisAlignment,
-    CrossAxisAlignment, ThemeMode, ProgressBar, FilePicker
+    border, border_radius, MainAxisAlignment,
+    CrossAxisAlignment, ThemeMode, ProgressBar
 )
 import asyncio
 import threading
@@ -86,7 +86,6 @@ class AppTheme:
 class VigilanteGUI:
     """Main GUI Application Class"""
     
-    # In VigilanteGUI.__init__ method, replace the FilePicker initialization:
     def __init__(self, page: Page):
         self.page = page
         self.db = DatabaseManager()
@@ -94,40 +93,44 @@ class VigilanteGUI:
         self.trainer = ModelTrainer()
         self.current_model = None
         self.session_file = Path.home() / ".vigilante_session"
-    
-        # File pickers - Flet 0.82 uses FilePicker without overlay
-        self.file_picker = ft.FilePicker(on_result=self.on_file_picked)
-        self.training_file_picker = ft.FilePicker(on_result=self.on_training_file_picked)
+        
+        # File pickers - Flet 0.82 compatible
+        self.file_picker = ft.FilePicker()
+        self.training_file_picker = ft.FilePicker()
         self.page.overlay.extend([self.file_picker, self.training_file_picker])
-    
+        
+        # Set file picker callbacks
+        self.file_picker.on_result = self.on_file_picked
+        self.training_file_picker.on_result = self.on_training_file_picked
+        
         # Queue for background tasks
         self.task_queue = queue.Queue()
         self.result_queue = queue.Queue()
-    
+        
         # Setup page
         self.setup_page()
-    
+        
         # Load session if exists
         self.load_session()
-    
+        
         # Setup UI
         self.setup_ui()
-    
+        
         # Start background task processor
         self.page.run_task(self.process_tasks)
-        
-    def on_file_picked(self, e: ft.FilePickerResultEvent):
+    
+    def on_file_picked(self, e):
         """Handle file picker result for detection"""
         if e.files:
             self.file_path.value = e.files[0].path
             self.page.update()
-
-    def on_training_file_picked(self, e: ft.FilePickerResultEvent):
+    
+    def on_training_file_picked(self, e):
         """Handle file picker result for training"""
         if e.files:
             self.train_file.value = e.files[0].path
             self.page.update()
-
+    
     def setup_page(self):
         """Configure page settings"""
         self.page.title = "Vigilante - Intrusion Detection System"
@@ -142,7 +145,7 @@ class VigilanteGUI:
         self.page.theme = ft.Theme(
             color_scheme_seed=AppTheme.PRIMARY,
         )
-        
+    
     def setup_ui(self):
         """Initialize UI components"""
         
@@ -180,7 +183,7 @@ class VigilanteGUI:
         )
         
         self.page.add(main_layout)
-        
+    
     def create_header(self) -> Container:
         """Create application header"""
         return Container(
@@ -189,7 +192,8 @@ class VigilanteGUI:
                     Row(
                         controls=[
                             Icon(
-                                ft.Icon(ft.Icons.SECURITY, size=24),
+                                ft.Icon(ft.icons.SECURITY),
+                                size=24,
                                 color=AppTheme.PRIMARY,
                             ),
                             Text(
@@ -227,7 +231,7 @@ class VigilanteGUI:
             padding=padding.all(15),
             border=border.all(1, AppTheme.BORDER),
         )
-        
+    
     def create_status_indicator(self) -> Container:
         """Create online status indicator"""
         return Container(
@@ -237,34 +241,34 @@ class VigilanteGUI:
             border_radius=border_radius.all(5),
             animate=ft.Animation(duration=300, curve=ft.AnimationCurve.BOUNCE_OUT),
         )
-        
+    
     def create_navigation_rail(self) -> Container:
         """Create navigation rail with round buttons"""
         nav_buttons = [
-            self.create_nav_button(ft.Icon(ft.Icons.DASHBOARD, size=24), "Dashboard", "dashboard", True),
-            self.create_nav_button(ft.Icon(ft.Icons.ANALYTICS, size=24), "Detection & Training", "detection"),
-            self.create_nav_button(ft.Icon(ft.Icons.HISTORY, size=24), "System Report", "system_report"),
+            self.create_nav_button(ft.Icon(ft.icons.DASHBOARD), "Dashboard", "dashboard", True),
+            self.create_nav_button(ft.Icon(ft.icons.ANALYTICS), "Detection & Training", "detection"),
+            self.create_nav_button(ft.Icon(ft.icons.HISTORY), "System Report", "system_report"),
         ]
-    
+        
         # Add admin-only buttons if user is admin
         if self.auth.is_admin():
             nav_buttons.extend([
-                self.create_nav_button(ft.Icon(ft.Icons.PEOPLE, size=24), "Manage Users", "manage_users"),
-                self.create_nav_button(ft.Icon(ft.Icons.MODEL_TRAINING, size=24), "Manage Models", "manage_models"),
+                self.create_nav_button(ft.Icon(ft.icons.PEOPLE), "Manage Users", "manage_users"),
+                self.create_nav_button(ft.Icon(ft.icons.MODEL_TRAINING), "Manage Models", "manage_models"),
             ])
-    
-        nav_buttons.append(self.create_nav_button(ft.Icon(ft.Icons.SETTINGS, size=24), "Edit Profile", "settings"))
-    
+        
+        nav_buttons.append(self.create_nav_button(ft.Icon(ft.icons.SETTINGS), "Edit Profile", "settings"))
+        
         # Add all buttons to column
         buttons_column = Column(
             controls=nav_buttons,
             horizontal_alignment=CrossAxisAlignment.CENTER,
             spacing=5,
         )
-    
+        
         # Add logout button separately
-        logout_button = self.create_nav_button(ft.Icon(ft.Icons.LOGOUT, size=24), "Logout", "logout", False, AppTheme.ERROR)
-    
+        logout_button = self.create_nav_button(ft.Icon(ft.icons.LOGOUT), "Logout", "logout", False, AppTheme.ERROR)
+        
         return Container(
             width=80,
             bgcolor=AppTheme.SECONDARY,
@@ -276,8 +280,9 @@ class VigilanteGUI:
                     # Logo/Icon at top
                     Container(
                         content=Icon(
-                            ft.Icon(ft.Icons.SECURITY, size=40),
+                            ft.Icon(ft.icons.SECURITY),
                             color=AppTheme.PRIMARY,
+                            size=40,
                         ),
                         padding=padding.all(15),
                     ),
@@ -292,7 +297,7 @@ class VigilanteGUI:
                 expand=True,
             ),
         )
-
+    
     def create_nav_button(self, icon_name, tooltip: str, view: str, 
                           selected: bool = False, color: str = None) -> Container:
         """Create a round navigation button - Flet 0.82 compatible"""
@@ -310,7 +315,7 @@ class VigilanteGUI:
             ),
             padding=padding.all(10),
         )
-        
+    
     def navigate_to(self, view: str):
         """Handle navigation between views"""
         # Load appropriate view
@@ -318,10 +323,20 @@ class VigilanteGUI:
             content = self.create_dashboard_content()
         elif view == "detection":
             content = self.create_detection_content()
-        elif view == "training":
-            content = self.create_training_content()
-        elif view == "history":
-            content = self.create_history_content()
+        elif view == "system_report":
+            content = self.create_system_report_content()
+        elif view == "manage_users":
+            # Check if user is admin
+            if not self.auth.is_admin():
+                self.show_dialog("Access Denied", "This page is only available to administrators")
+                return
+            content = self.create_manage_users_content()
+        elif view == "manage_models":
+            # Check if user is admin
+            if not self.auth.is_admin():
+                self.show_dialog("Access Denied", "This page is only available to administrators")
+                return
+            content = self.create_manage_models_content()
         elif view == "settings":
             content = self.create_settings_content()
         elif view == "logout":
@@ -329,16 +344,16 @@ class VigilanteGUI:
             content = self.create_login_content()
         else:
             content = self.create_dashboard_content()
-            
+        
         self.content_container.content = content
         self.page.update()
-        
+    
     def create_login_content(self) -> Container:
         """Create login screen"""
         self.email_field = TextField(
             label="Email",
             hint_text="Enter your email",
-            prefix_icon=ft.Icon(ft.Icons.EMAIL, size=24),
+            prefix_icon=ft.Icon(ft.icons.EMAIL),
             border_color=AppTheme.PRIMARY,
             width=300,
         )
@@ -348,7 +363,7 @@ class VigilanteGUI:
             hint_text="Enter your password",
             password=True,
             can_reveal_password=True,
-            prefix_icon=ft.Icon(ft.Icons.LOCK, size=24),
+            prefix_icon=ft.Icon(ft.icons.LOCK),
             border_color=AppTheme.PRIMARY,
             width=300,
         )
@@ -356,7 +371,7 @@ class VigilanteGUI:
         self.otp_field = TextField(
             label="OTP Code",
             hint_text="Enter 6-digit OTP",
-            prefix_icon=ft.Icon(ft.Icons.PIN, size=24),
+            prefix_icon=ft.icons.PIN,
             border_color=AppTheme.PRIMARY,
             width=300,
             visible=False,
@@ -368,7 +383,7 @@ class VigilanteGUI:
         login_card = Container(
             content=Column(
                 controls=[
-                    Icon(ft.Icon(ft.Icons.SECURITY, size=40), color=AppTheme.PRIMARY),
+                    Icon(ft.Icon(ft.icons.SECURITY), size=40, color=AppTheme.PRIMARY),
                     Text("VIGILANTE", size=32, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
                     Text("Intrusion Detection System", size=16, color=AppTheme.TEXT_SECONDARY),
                     Container(height=30),
@@ -414,7 +429,7 @@ class VigilanteGUI:
             ),
             expand=True,
         )
-        
+    
     async def handle_login(self, e):
         """Handle login button click"""
         email = self.email_field.value
@@ -426,7 +441,7 @@ class VigilanteGUI:
             self.login_status.color = AppTheme.ERROR
             self.page.update()
             return
-            
+        
         self.login_progress.visible = True
         self.login_status.value = ""
         self.page.update()
@@ -451,9 +466,9 @@ class VigilanteGUI:
         else:
             self.login_status.value = result["message"]
             self.login_status.color = AppTheme.ERROR
-            
-        self.page.update()
         
+        self.page.update()
+    
     def perform_login(self, email: str, password: str, otp: str = None):
         """Perform login (runs in thread)"""
         try:
@@ -468,40 +483,7 @@ class VigilanteGUI:
                 return self.auth.login(username, password)
         except Exception as e:
             return {"success": False, "message": str(e)}
-
-    # handle admin pages
-    def navigate_to(self, view: str):
-        """Handle navigation between views"""
-        # Load appropriate view
-        if view == "dashboard":
-            content = self.create_dashboard_content()
-        elif view == "detection":
-            content = self.create_detection_content()
-        elif view == "system_report":
-            content = self.create_system_report_content()
-        elif view == "manage_users":
-            # Check if user is admin
-            if not self.auth.is_admin():
-                self.show_dialog("Access Denied", "This page is only available to administrators")
-                return
-            content = self.create_manage_users_content()
-        elif view == "manage_models":
-            # Check if user is admin
-            if not self.auth.is_admin():
-                self.show_dialog("Access Denied", "This page is only available to administrators")
-                return
-            content = self.create_manage_models_content()
-        elif view == "settings":
-            content = self.create_settings_content()
-        elif view == "logout":
-            self.logout()
-            content = self.create_login_content()
-        else:
-            content = self.create_dashboard_content()
-        
-        self.content_container.content = content
-        self.page.update()
-
+    
     def create_system_report_content(self) -> Container:
         """Create system report view for analysts"""
         return Container(
@@ -509,7 +491,7 @@ class VigilanteGUI:
                 controls=[
                     Text("System Report", size=24, weight=ft.FontWeight.BOLD),
                     Container(height=20),
-                
+                    
                     # Period selection
                     Row(
                         controls=[
@@ -526,7 +508,7 @@ class VigilanteGUI:
                             ),
                             ElevatedButton(
                                 "Generate Summary",
-                                icon=ft.Icon(ft.Icons.FILE_DOWNLOAD, size=24),
+                                icon=ft.Icon(ft.icons.SUMMARY),
                                 on_click=self.generate_summary,
                                 style=ft.ButtonStyle(
                                     color=AppTheme.SECONDARY,
@@ -537,7 +519,7 @@ class VigilanteGUI:
                         spacing=10,
                     ),
                     Container(height=20),
-                
+                    
                     # Summary results area
                     Container(
                         content=Column(
@@ -560,12 +542,27 @@ class VigilanteGUI:
             ),
             expand=True,
         )
-
+    
+    def create_summary_stats_placeholder(self) -> Container:
+        """Create placeholder for summary stats"""
+        return Container(
+            content=Column(
+                controls=[
+                    Icon(ft.Icon(ft.icons.ANALYTICS), size=50, color=AppTheme.TEXT_SECONDARY),
+                    Text("Select a period and generate summary", color=AppTheme.TEXT_SECONDARY),
+                ],
+                horizontal_alignment=CrossAxisAlignment.CENTER,
+                alignment=MainAxisAlignment.CENTER,
+            ),
+            alignment=ft.alignment.center,
+            expand=True,
+        )
+    
     def create_manage_users_content(self) -> Container:
         """Create user management view (admin only)"""
         # Fetch users from database
-        users = self.db.get_all_users() if hasattr(self.db, 'get_all_users') else []
-    
+        users = self.get_all_users()
+        
         # Create users table
         users_table = ft.DataTable(
             columns=[
@@ -593,13 +590,13 @@ class VigilanteGUI:
                             Row(
                                 controls=[
                                     ft.IconButton(
-                                        icon=ft.Icon(ft.Icons.EDIT, size=24),
+                                        icon=ft.icons.EDIT,
                                         icon_color=AppTheme.PRIMARY,
                                         tooltip="Edit User",
                                         on_click=lambda e, u=user: self.edit_user(u),
                                     ),
                                     ft.IconButton(
-                                        icon=ft.Icon(ft.Icons.DELETE, size=24),
+                                        icon=ft.icons.DELETE,
                                         icon_color=AppTheme.ERROR,
                                         tooltip="Deactivate User",
                                         on_click=lambda e, u=user: self.deactivate_user(u),
@@ -618,7 +615,7 @@ class VigilanteGUI:
             column_spacing=20,
             divider_thickness=0,
         )
-    
+        
         return Container(
             content=Column(
                 controls=[
@@ -627,7 +624,7 @@ class VigilanteGUI:
                             Text("Manage Users", size=24, weight=ft.FontWeight.BOLD),
                             ElevatedButton(
                                 "Create New User",
-                                icon=ft.Icon(ft.Icons.PERSON_ADD, size=24),
+                                icon=ft.Icon(ft.icons.PERSON_ADD),
                                 on_click=self.create_user,
                                 style=ft.ButtonStyle(
                                     color=AppTheme.SECONDARY,
@@ -638,7 +635,7 @@ class VigilanteGUI:
                         alignment=MainAxisAlignment.SPACE_BETWEEN,
                     ),
                     Container(height=20),
-                
+                    
                     Container(
                         content=Column(
                             controls=[users_table],
@@ -653,12 +650,12 @@ class VigilanteGUI:
             ),
             expand=True,
         )
-
+    
     def create_manage_models_content(self) -> Container:
         """Create model management view (admin only)"""
         # Get all models from database
-        models = self.db.get_all_models() if hasattr(self.db, 'get_all_models') else []
-    
+        models = self.get_all_models()
+        
         # Create models table
         models_table = ft.DataTable(
             columns=[
@@ -683,7 +680,7 @@ class VigilanteGUI:
                         ft.DataCell(Text(m.get('created_at', '')[:10] if m.get('created_at') else 'N/A')),
                         ft.DataCell(
                             ft.IconButton(
-                                icon=ft.Icon(ft.Icons.INFO, size=24),
+                                icon=ft.Icon(ft.icons.INFO),
                                 icon_color=AppTheme.PRIMARY,
                                 tooltip="View Details",
                                 on_click=lambda e, model=m: self.view_model_details(model),
@@ -699,13 +696,13 @@ class VigilanteGUI:
             column_spacing=20,
             divider_thickness=0,
         )
-    
+        
         return Container(
             content=Column(
                 controls=[
                     Text("Manage Models", size=24, weight=ft.FontWeight.BOLD),
                     Container(height=20),
-                
+                    
                     Container(
                         content=Column(
                             controls=[models_table],
@@ -720,7 +717,7 @@ class VigilanteGUI:
             ),
             expand=True,
         )
-        
+    
     def create_dashboard_content(self) -> Container:
         """Create dashboard with statistics"""
         
@@ -730,15 +727,15 @@ class VigilanteGUI:
         # Create stat cards
         stats_row = Row(
             controls=[
-                self.create_stat_card("Total Detections", stats["total_detections"], ft.Icon(ft.Icons.ANALYTICS, size=40)),
-                self.create_stat_card("Anomalies Found", stats["anomalies_found"], ft.Icon(ft.Icons.WARNING, size=40), AppTheme.ERROR),
-                self.create_stat_card("Models Trained", stats["models_trained"], ft.Icon(ft.Icons.MODEL_TRAINING, size=40)),
-                self.create_stat_card("System Uptime", stats["uptime"], ft.Icon(ft.Icons.ACCESS_TIME, size=40)),
+                self.create_stat_card("Total Detections", stats["total_detections"], ft.Icon(ft.icons.ANALYTICS)),
+                self.create_stat_card("Anomalies Found", stats["anomalies_found"], ft.Icon(ft.icons.WARNING), AppTheme.ERROR),
+                self.create_stat_card("Models Trained", stats["models_trained"], ft.Icon(ft.icons.MODEL_TRAINING)),
+                self.create_stat_card("System Uptime", stats["uptime"], ft.Icon(ft.icons.ACCESS_TIME)),
             ],
             spacing=10,
         )
         
-        # Create recent anomalies table (using Flet DataTable)
+        # Create recent anomalies table
         anomalies_table = self.create_anomalies_table(stats["recent_anomalies"])
         
         # Create chart placeholder
@@ -797,10 +794,10 @@ class VigilanteGUI:
         )
     
     def generate_summary(self, e):
-        """Generate detection summary (handle_summary functionality)"""
-        # Implementation from handle_summary in cli.py
-        pass
-
+        """Generate detection summary"""
+        # TODO: Implement summary generation
+        self.show_dialog("Info", "Summary generation will be implemented")
+    
     def create_user(self, e):
         """Create new user dialog"""
         username_field = TextField(label="Username")
@@ -813,39 +810,43 @@ class VigilanteGUI:
             ],
             value="Analyst",
         )
-    
+        
         async def confirm_create(e):
-            # Call handle_admin_user_create functionality
-            result = await self.run_in_thread(
-                self.db.create_user,
-                username_field.value,
-                "temp123",  # temporary password
-                email_field.value,
-                role_dropdown.value,
-                self.auth.current_user['id']
-            )
-            self.page.dialog.open = False
-            await self.show_dialog("Success", f"User created with temporary password: temp123")
-            self.navigate_to("manage_users")  # Refresh
+            try:
+                # Create user with temporary password
+                result = await self.run_in_thread(
+                    self.db.create_user,
+                    username_field.value,
+                    self.auth.hash_password("temp123"),
+                    email_field.value,
+                    role_dropdown.value,
+                    self.auth.current_user['id']
+                )
+                self.page.dialog.open = False
+                await self.show_dialog("Success", f"User created with temporary password: temp123")
+                self.navigate_to("manage_users")  # Refresh
+            except Exception as ex:
+                await self.show_dialog("Error", str(ex))
             self.page.update()
-    
+        
         dialog = ft.AlertDialog(
             title=Text("Create New User"),
             content=Column(
                 controls=[username_field, email_field, role_dropdown],
                 tight=True,
                 spacing=10,
+                width=400,
             ),
             actions=[
                 ft.TextButton("Cancel", on_click=lambda e: self.close_dialog()),
                 ft.ElevatedButton("Create", on_click=confirm_create),
             ],
         )
-    
+        
         self.page.dialog = dialog
         dialog.open = True
         self.page.update()
-
+    
     def edit_user(self, user):
         """Edit user dialog"""
         role_dropdown = ft.Dropdown(
@@ -856,20 +857,22 @@ class VigilanteGUI:
             ],
             value=user.get('role_name', 'Analyst'),
         )
-    
+        
         async def confirm_edit(e):
-            # Call handle_admin_user_modify functionality
-            result = await self.run_in_thread(
-                self.db.update_user_role,
-                user['id'],
-                role_dropdown.value,
-                self.auth.current_user['id']
-            )
-            self.page.dialog.open = False
-            await self.show_dialog("Success", "User role updated")
-            self.navigate_to("manage_users")  # Refresh
+            try:
+                result = await self.run_in_thread(
+                    self.db.update_user_role,
+                    user['id'],
+                    role_dropdown.value,
+                    self.auth.current_user['id']
+                )
+                self.page.dialog.open = False
+                await self.show_dialog("Success", "User role updated")
+                self.navigate_to("manage_users")  # Refresh
+            except Exception as ex:
+                await self.show_dialog("Error", str(ex))
             self.page.update()
-    
+        
         dialog = ft.AlertDialog(
             title=Text(f"Edit User: {user.get('username')}"),
             content=Column(
@@ -879,31 +882,34 @@ class VigilanteGUI:
                 ],
                 tight=True,
                 spacing=10,
+                width=400,
             ),
             actions=[
                 ft.TextButton("Cancel", on_click=lambda e: self.close_dialog()),
                 ft.ElevatedButton("Save", on_click=confirm_edit),
             ],
         )
-    
+        
         self.page.dialog = dialog
         dialog.open = True
         self.page.update()
-
+    
     def deactivate_user(self, user):
         """Deactivate user confirmation"""
         async def confirm_deactivate(e):
-            # Call handle_admin_user_deactivate functionality
-            result = await self.run_in_thread(
-                self.db.deactivate_user,
-                user['id'],
-                self.auth.current_user['id']
-            )
-            self.page.dialog.open = False
-            await self.show_dialog("Success", f"User {user.get('username')} deactivated")
-            self.navigate_to("manage_users")  # Refresh
+            try:
+                result = await self.run_in_thread(
+                    self.db.deactivate_user,
+                    user['id'],
+                    self.auth.current_user['id']
+                )
+                self.page.dialog.open = False
+                await self.show_dialog("Success", f"User {user.get('username')} deactivated")
+                self.navigate_to("manage_users")  # Refresh
+            except Exception as ex:
+                await self.show_dialog("Error", str(ex))
             self.page.update()
-    
+        
         dialog = ft.AlertDialog(
             title=Text("Deactivate User"),
             content=Text(f"Are you sure you want to deactivate {user.get('username')}?"),
@@ -912,11 +918,11 @@ class VigilanteGUI:
                 ft.ElevatedButton("Deactivate", on_click=confirm_deactivate, style=ft.ButtonStyle(bgcolor=AppTheme.ERROR)),
             ],
         )
-    
+        
         self.page.dialog = dialog
         dialog.open = True
         self.page.update()
-
+    
     def view_model_details(self, model):
         """View model details dialog"""
         dialog = ft.AlertDialog(
@@ -945,17 +951,17 @@ class VigilanteGUI:
                 ft.TextButton("Close", on_click=lambda e: self.close_dialog()),
             ],
         )
-    
+        
         self.page.dialog = dialog
         dialog.open = True
         self.page.update()
-
-    def create_stat_card(self, title: str, value: str, icon: str, color: str = None) -> Container:
+    
+    def create_stat_card(self, title: str, value: str, icon_name, color: str = None) -> Container:
         """Create a statistics card"""
         return Container(
             content=Column(
                 controls=[
-                    Icon(icon, color=color or AppTheme.PRIMARY, size=30),
+                    Icon(icon_name, color=color or AppTheme.PRIMARY, size=30),
                     Text(value, size=24, weight=ft.FontWeight.BOLD, color=color or AppTheme.PRIMARY),
                     Text(title, size=14, color=AppTheme.TEXT_SECONDARY),
                 ],
@@ -968,7 +974,7 @@ class VigilanteGUI:
             border_radius=border_radius.all(10),
             border=border.all(1, AppTheme.BORDER),
         )
-        
+    
     def create_anomalies_table(self, anomalies: List[Dict]) -> Container:
         """Create table of recent anomalies using Flet DataTable"""
         
@@ -977,8 +983,8 @@ class VigilanteGUI:
                 content=Text("No recent anomalies", color=AppTheme.TEXT_SECONDARY),
                 padding=padding.all(20),
             )
-            
-        # Create DataTable with proper Flet syntax
+        
+        # Create DataTable
         table = ft.DataTable(
             columns=[
                 ft.DataColumn(Text("Date")),
@@ -1018,22 +1024,22 @@ class VigilanteGUI:
             ),
             height=250,
         )
-        
+    
     def create_chart_placeholder(self) -> Container:
         """Create placeholder for charts"""
         return Container(
             content=Column(
                 controls=[
-                    Icon(ft.Icon(ft.Icons.SHOW_CHART, size=50), color=AppTheme.TEXT_SECONDARY),
+                    Icon(ft.Icon(ft.icons.SHOW_CHART), size=50, color=AppTheme.TEXT_SECONDARY),
                     Text("Chart visualization will appear here", color=AppTheme.TEXT_SECONDARY),
                 ],
                 horizontal_alignment=CrossAxisAlignment.CENTER,
                 alignment=MainAxisAlignment.CENTER,
             ),
-            alignment=Alignment.CENTER,
+            alignment=ft.alignment.center,
             expand=True,
         )
-        
+    
     def create_detection_content(self) -> Container:
         """Create detection interface"""
         
@@ -1073,7 +1079,7 @@ class VigilanteGUI:
                     Container(height=20),
                     
                     # Input section
-                    Card(
+                    ft.Card(
                         content=Container(
                             content=Column(
                                 controls=[
@@ -1084,7 +1090,7 @@ class VigilanteGUI:
                                             self.file_path,
                                             ElevatedButton(
                                                 "Browse",
-                                                icon=ft.Icon(ft.Icons.FOLDER_OPEN, size=24),
+                                                icon=ft.Icon(ft.icons.FOLDER_OPEN),
                                                 on_click=self.pick_file,
                                                 style=ft.ButtonStyle(
                                                     color=AppTheme.PRIMARY,
@@ -1100,7 +1106,7 @@ class VigilanteGUI:
                                             self.model_dropdown,
                                             ElevatedButton(
                                                 "Run Detection",
-                                                icon=ft.Icon(ft.Icons.PLAY_ARROW, size=24),
+                                                icon=ft.Icon(ft.icons.PLAY_ARROW),
                                                 on_click=self.run_detection,
                                                 style=ft.ButtonStyle(
                                                     color=AppTheme.SECONDARY,
@@ -1130,7 +1136,7 @@ class VigilanteGUI:
             ),
             expand=True,
         )
-        
+    
     def create_training_content(self) -> Container:
         """Create model training interface"""
         
@@ -1187,7 +1193,7 @@ class VigilanteGUI:
                     Container(height=20),
                     
                     # Training configuration card
-                    Card(
+                    ft.Card(
                         content=Container(
                             content=Column(
                                 controls=[
@@ -1199,7 +1205,7 @@ class VigilanteGUI:
                                             self.train_file,
                                             ElevatedButton(
                                                 "Browse",
-                                                icon=ft.Icon(ft.Icons.FOLDER_OPEN, size=24),
+                                                icon=ft.Icon(ft.icons.FOLDER_OPEN),
                                                 on_click=self.pick_training_file,
                                                 style=ft.ButtonStyle(
                                                     color=AppTheme.PRIMARY,
@@ -1236,7 +1242,7 @@ class VigilanteGUI:
                                         controls=[
                                             ElevatedButton(
                                                 "Start Training",
-                                                icon=ft.Icon(ft.Icons.TRAIN, size=24),
+                                                icon=ft.Icon(ft.icons.TRAIN),
                                                 on_click=self.start_training,
                                                 style=ft.ButtonStyle(
                                                     color=AppTheme.SECONDARY,
@@ -1262,7 +1268,7 @@ class VigilanteGUI:
                     Container(height=20),
                     
                     # Recent models card
-                    Card(
+                    ft.Card(
                         content=Container(
                             content=Column(
                                 controls=[
@@ -1284,7 +1290,7 @@ class VigilanteGUI:
             ),
             expand=True,
         )
-        
+    
     def create_history_content(self) -> Container:
         """Create detection history view"""
         
@@ -1300,13 +1306,13 @@ class VigilanteGUI:
                         Container(
                             content=Column(
                                 controls=[
-                                    Icon(ft.Icon(ft.Icons.HISTORY, size=50), color=AppTheme.TEXT_SECONDARY),
+                                    Icon(ft.icon(ft.icons.HISTORY), size=50, color=AppTheme.TEXT_SECONDARY),
                                     Text("No detection history available", color=AppTheme.TEXT_SECONDARY),
                                 ],
                                 horizontal_alignment=CrossAxisAlignment.CENTER,
                                 alignment=MainAxisAlignment.CENTER,
                             ),
-                            alignment=Alignment.CENTER,
+                            alignment=ft.alignment.center,
                             expand=True,
                         ),
                     ],
@@ -1315,7 +1321,7 @@ class VigilanteGUI:
                 ),
                 expand=True,
             )
-            
+        
         # Create DataTable for history
         table = ft.DataTable(
             columns=[
@@ -1341,7 +1347,7 @@ class VigilanteGUI:
                         ),
                         ft.DataCell(
                             ft.IconButton(
-                                icon=ft.Icons.VISIBILITY,
+                                icon=ft.icon(ft.icons.VISIBILITY),
                                 icon_color=AppTheme.PRIMARY,
                                 tooltip="View Details",
                                 on_click=lambda e, i=h: self.view_detection_details(i),
@@ -1378,7 +1384,7 @@ class VigilanteGUI:
             ),
             expand=True,
         )
-        
+    
     def create_settings_content(self) -> Container:
         """Create settings interface"""
         
@@ -1390,7 +1396,7 @@ class VigilanteGUI:
                     Text("Settings", size=24, weight=ft.FontWeight.BOLD),
                     Container(height=20),
                     
-                    Card(
+                    ft.Card(
                         content=Container(
                             content=Column(
                                 controls=[
@@ -1398,17 +1404,17 @@ class VigilanteGUI:
                                     Container(height=10),
                                     
                                     ListTile(
-                                        leading=Icon(ft.Icon(ft.Icons.PERSON, size=24), color=AppTheme.PRIMARY),
+                                        leading=Icon(ft.Icon(ft.icons.PERSON), color=AppTheme.PRIMARY),
                                         title=Text(f"Username: {user.get('username', 'N/A')}"),
                                     ),
                                     
                                     ListTile(
-                                        leading=Icon(ft.Icon(ft.Icons.EMAIL, size=24), color=AppTheme.PRIMARY),
+                                        leading=Icon(ft.Icon(ft.icons.EMAIL), color=AppTheme.PRIMARY),
                                         title=Text(f"Email: {user.get('email', 'N/A')}"),
                                     ),
                                     
                                     ListTile(
-                                        leading=Icon(ft.Icon(ft.Icons.ADMIN_PANEL_SETTINGS, size=24), color=AppTheme.PRIMARY),
+                                        leading=Icon(ft.Icon(ft.icons.ADMIN_PANEL_SETTINGS), color=AppTheme.PRIMARY),
                                         title=Text(f"Role: {self.auth.current_role or 'N/A'}"),
                                     ),
                                     
@@ -1416,7 +1422,7 @@ class VigilanteGUI:
                                     
                                     ElevatedButton(
                                         "Change Password",
-                                        icon=ft.Icon(ft.Icons.LOCK_RESET, size=24),
+                                        icon=ft.icon(ft.icons.LOCK_RESET),
                                         on_click=self.change_password,
                                         style=ft.ButtonStyle(
                                             color=AppTheme.PRIMARY,
@@ -1432,7 +1438,7 @@ class VigilanteGUI:
                     
                     Container(height=20),
                     
-                    Card(
+                    ft.Card(
                         content=Container(
                             content=Column(
                                 controls=[
@@ -1440,17 +1446,17 @@ class VigilanteGUI:
                                     Container(height=10),
                                     
                                     ListTile(
-                                        leading=Icon(ft.Icon(ft.Icons.COMPUTER, size=24), color=AppTheme.PRIMARY),
+                                        leading=Icon(ft.Icon(ft.icons.COMPUTER), color=AppTheme.PRIMARY),
                                         title=Text(f"System: {os.name}"),
                                     ),
                                     
                                     ListTile(
-                                        leading=Icon(ft.Icon(ft.Icons.DATASET, size=24), color=AppTheme.PRIMARY),
+                                        leading=Icon(ft.Icon(ft.icons.DATASET), color=AppTheme.PRIMARY),
                                         title=Text("Database: Connected"),
                                     ),
                                     
                                     ListTile(
-                                        leading=Icon(ft.Icon(ft.Icons.MODEL_TRAINING, size=24), color=AppTheme.PRIMARY),
+                                        leading=Icon(ft.Icon(ft.icons.MODEL_TRAINING), color=AppTheme.PRIMARY),
                                         title=Text(f"Models: {len(self.get_user_models())}"),
                                     ),
                                 ],
@@ -1465,7 +1471,7 @@ class VigilanteGUI:
             ),
             expand=True,
         )
-        
+    
     def create_recent_models_table(self) -> Container:
         """Create table of recent models"""
         
@@ -1476,7 +1482,7 @@ class VigilanteGUI:
                 content=Text("No models trained yet", color=AppTheme.TEXT_SECONDARY),
                 padding=padding.all(20),
             )
-            
+        
         table = ft.DataTable(
             columns=[
                 ft.DataColumn(Text("Model")),
@@ -1509,43 +1515,31 @@ class VigilanteGUI:
                 height=200,
             ),
         )
-        
+    
     # =====================================================================
     # EVENT HANDLERS
     # =====================================================================
     
     async def pick_file(self, e):
         """Open file picker for detection input"""
-        def on_file_picked(e):
-            if e.files:
-                self.file_path.value = e.files[0].path
-                self.page.update()
-            
-        self.file_picker.on_result = on_file_picked
-        self.file_picker.pick_files(
+        await self.file_picker.pick_files(
             allow_multiple=False,
             allowed_extensions=["csv"]
         )
-        
+    
     async def pick_training_file(self, e):
         """Open file picker for training data"""
-        def on_file_picked(e):
-            if e.files:
-                self.train_file.value = e.files[0].path
-                self.page.update()
-            
-        self.file_picker.on_result = on_file_picked
-        self.file_picker.pick_files(
+        await self.training_file_picker.pick_files(
             allow_multiple=False,
             allowed_extensions=["csv"]
         )
-        
+    
     async def run_detection(self, e):
         """Run anomaly detection"""
         if not self.file_path.value or not self.model_dropdown.value:
             await self.show_dialog("Error", "Please select input file and model")
             return
-            
+        
         self.detection_results.content = Column(
             controls=[
                 ProgressRing(),
@@ -1570,9 +1564,9 @@ class VigilanteGUI:
                 f"Error: {result['message']}",
                 color=AppTheme.ERROR,
             )
-            
-        self.page.update()
         
+        self.page.update()
+    
     def perform_detection(self, file_path: str, model_id: int) -> Dict:
         """Perform detection (runs in thread)"""
         try:
@@ -1580,7 +1574,7 @@ class VigilanteGUI:
             model_data = self.db.get_model(model_id, self.auth.current_user['id'])
             if not model_data:
                 return {"success": False, "message": "Model not found"}
-                
+            
             # Load model
             model = IntrusionDetectionModel.load(model_data['model_path'])
             
@@ -1601,7 +1595,7 @@ class VigilanteGUI:
                     "confidence": float(confidence_scores[idx]),
                     "severity": self.calculate_severity(confidence_scores[idx]),
                 })
-                
+            
             # Save to database
             results = {
                 "total_flows": len(df),
@@ -1627,7 +1621,7 @@ class VigilanteGUI:
             
         except Exception as e:
             return {"success": False, "message": str(e)}
-            
+    
     def create_detection_results_view(self, data: Dict) -> Container:
         """Create view for detection results"""
         
@@ -1637,18 +1631,18 @@ class VigilanteGUI:
                 self.create_stat_card(
                     "Total Flows",
                     str(data["total_flows"]),
-                    ft.Icon(ft.Icons.DATA_USAGE, size=24)
+                    ft.icon(ft.icons.DATA_USAGE, size=24)
                 ),
                 self.create_stat_card(
                     "Anomalies Found",
                     str(len(data["anomalies"])),
-                    ft.Icon(ft.Icons.WARNING, size=24),
+                    ft.icon(ft.icons.WARNING, size=24),
                     AppTheme.ERROR
                 ),
                 self.create_stat_card(
                     "Detection Rate",
                     f"{len(data['anomalies'])/data['total_flows']*100:.1f}%",
-                    ft.Icon(ft.Icons.PERCENT, size=24)
+                    ft.icon(ft.icons.PERCENT, size=24)
                 ),
             ],
             spacing=10,
@@ -1660,7 +1654,7 @@ class VigilanteGUI:
                 Container(
                     content=Row(
                         controls=[
-                            Icon(ft.Icon(ft.Icons.WARNING, size=24), color=AppTheme.get_severity_color(a["severity"])),
+                            Icon(ft.icon(ft.icons.WARNING), color=AppTheme.get_severity_color(a["severity"])),
                             Text(f"Flow #{a['index']} - Confidence: {a['confidence']:.2f}"),
                         ],
                         spacing=10,
@@ -1691,17 +1685,17 @@ class VigilanteGUI:
             ],
             spacing=0,
         )
-        
+    
     async def start_training(self, e):
         """Start model training"""
         if not self.train_file.value:
             await self.show_dialog("Error", "Please select training data file")
             return
-            
+        
         if not self.model_name.value:
             await self.show_dialog("Error", "Please enter a model name")
             return
-            
+        
         self.training_progress.visible = True
         self.training_status.value = "Training in progress..."
         self.training_status.color = AppTheme.INFO
@@ -1725,9 +1719,9 @@ class VigilanteGUI:
         else:
             self.training_status.value = f"Error: {result['message']}"
             self.training_status.color = AppTheme.ERROR
-            
-        self.page.update()
         
+        self.page.update()
+    
     def perform_training(self, file_path: str, model_name: str, 
                         r_s: float, max_detectors: int, k: int) -> Dict:
         """Perform training (runs in thread)"""
@@ -1760,7 +1754,7 @@ class VigilanteGUI:
             
         except Exception as e:
             return {"success": False, "message": str(e)}
-            
+    
     async def change_password(self, e):
         """Show change password dialog"""
         
@@ -1772,7 +1766,7 @@ class VigilanteGUI:
             if new_pass.value != confirm_pass.value:
                 await self.show_dialog("Error", "Passwords do not match")
                 return
-                
+            
             # Change password in thread
             result = await self.run_in_thread(
                 self.auth.change_password,
@@ -1787,15 +1781,16 @@ class VigilanteGUI:
                 await self.show_dialog("Success", "Password changed successfully")
             else:
                 await self.show_dialog("Error", result["message"])
-                
-            self.page.update()
             
+            self.page.update()
+        
         dialog = AlertDialog(
             title=Text("Change Password"),
             content=Column(
                 controls=[old_pass, new_pass, confirm_pass],
                 tight=True,
                 spacing=10,
+                width=400,
             ),
             actions=[
                 TextButton("Cancel", on_click=lambda e: self.close_dialog()),
@@ -1806,12 +1801,12 @@ class VigilanteGUI:
         self.page.dialog = dialog
         dialog.open = True
         self.page.update()
-        
+    
     def close_dialog(self):
         """Close the current dialog"""
         self.page.dialog.open = False
         self.page.update()
-        
+    
     async def show_dialog(self, title: str, message: str):
         """Show a dialog"""
         dialog = AlertDialog(
@@ -1825,28 +1820,54 @@ class VigilanteGUI:
         self.page.dialog = dialog
         dialog.open = True
         self.page.update()
-        
+    
     def view_detection_details(self, detection: Dict):
         """View detailed detection results"""
-        # Implement detailed view
-        pass
-        
+        # TODO: Implement detailed view
+        self.show_dialog("Info", "Detailed view will be implemented")
+    
     def logout(self):
         """Logout user"""
         if self.auth.is_authenticated():
             self.auth.logout()
             self.clear_session()
-            
+    
     # =====================================================================
     # DATA HELPERS
     # =====================================================================
+    
+    def get_all_users(self) -> List[Dict]:
+        """Get all users from database (admin only)"""
+        try:
+            if not self.auth.is_admin():
+                return []
+            
+            # This method doesn't exist in your database.py, you'll need to add it
+            # For now, return empty list
+            return []
+        except Exception as e:
+            print(f"Error getting users: {e}")
+            return []
+    
+    def get_all_models(self) -> List[Dict]:
+        """Get all models from database (admin only)"""
+        try:
+            if not self.auth.is_admin():
+                return []
+            
+            # Use the existing method
+            models = self.db.get_all_models() if hasattr(self.db, 'get_all_models') else []
+            return [dict(m) for m in models]
+        except Exception as e:
+            print(f"Error getting all models: {e}")
+            return []
     
     def get_dashboard_stats(self) -> Dict:
         """Get statistics for dashboard"""
         try:
             if not self.auth.is_authenticated():
                 return self.get_empty_stats()
-                
+            
             # Get detection history for user
             history = self.db.get_detection_history(self.auth.current_user['id'], limit=100)
             
@@ -1869,7 +1890,7 @@ class VigilanteGUI:
         except Exception as e:
             print(f"Error getting dashboard stats: {e}")
             return self.get_empty_stats()
-            
+    
     def get_empty_stats(self) -> Dict:
         """Return empty statistics"""
         return {
@@ -1880,33 +1901,33 @@ class VigilanteGUI:
             "recent_anomalies": [],
             "detection_history": [],
         }
-            
+    
     def get_user_models(self) -> List[Dict]:
         """Get user's models"""
         try:
             if not self.auth.is_authenticated():
                 return []
-                
+            
             models = self.db.get_user_models(self.auth.current_user['id'])
             return [dict(m) for m in models]
             
         except Exception as e:
             print(f"Error getting models: {e}")
             return []
-            
+    
     def get_detection_history(self) -> List[Dict]:
         """Get detection history"""
         try:
             if not self.auth.is_authenticated():
                 return []
-                
+            
             history = self.db.get_detection_history(self.auth.current_user['id'], limit=100)
             return [dict(h) for h in history]
             
         except Exception as e:
             print(f"Error getting history: {e}")
             return []
-            
+    
     def calculate_severity(self, confidence: float) -> str:
         """Calculate severity based on confidence"""
         if confidence >= 0.95:
@@ -1919,7 +1940,7 @@ class VigilanteGUI:
             return "Low"
         else:
             return "Minimal"
-            
+    
     # =====================================================================
     # SESSION MANAGEMENT
     # =====================================================================
@@ -1936,7 +1957,7 @@ class VigilanteGUI:
                     print(f"Session loaded for {self.auth.current_user['username']}")
             except Exception as e:
                 print(f"Could not load session: {e}")
-                
+    
     def save_session(self):
         """Save session to file"""
         if self.auth.current_session:
@@ -1947,12 +1968,12 @@ class VigilanteGUI:
             }
             with open(self.session_file, 'w') as f:
                 json.dump(session_data, f, indent=2)
-                
+    
     def clear_session(self):
         """Clear session file"""
         if self.session_file.exists():
             self.session_file.unlink()
-            
+    
     # =====================================================================
     # ASYNC HELPERS
     # =====================================================================
@@ -1962,7 +1983,7 @@ class VigilanteGUI:
         return await asyncio.get_event_loop().run_in_executor(
             None, lambda: func(*args, **kwargs)
         )
-        
+    
     async def process_tasks(self):
         """Process background tasks"""
         while True:
@@ -1992,7 +2013,7 @@ class ListTile(ft.Row):
         controls = []
         if leading:
             controls.append(leading)
-            
+        
         text_col = Column(
             controls=[],
             spacing=0,
@@ -2001,12 +2022,12 @@ class ListTile(ft.Row):
             text_col.controls.append(title)
         if subtitle:
             text_col.controls.append(subtitle)
-            
+        
         controls.append(Container(content=text_col, expand=True))
         
         if trailing:
             controls.append(trailing)
-            
+        
         self.controls = controls
         self.vertical_alignment = CrossAxisAlignment.CENTER
         self.spacing = 10
@@ -2016,7 +2037,6 @@ class ListTile(ft.Row):
 # MAIN ENTRY POINT
 # =====================================================================
 
-# Update the main function at the end of gui.py:
 def main(page: Page):
     """Main GUI entry point"""
     # Check for session token from environment
@@ -2035,6 +2055,6 @@ if __name__ == "__main__":
         print("Error: flet is not installed.")
         print("Please install it with: pip install flet")
         sys.exit(1)
-        
+    
     # Run the app
     ft.app(target=main)
