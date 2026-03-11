@@ -70,6 +70,13 @@ vigilante -v or vigilante --verbose
 vigilante -h
 vigilante --help
 
+# Interactive GUI dashboard for both users
+vigilante interactive-gui
+# Running Interactive GUI as a website
+vigilante interactive-gui --web
+# Change the port of Interactive GUI
+vigilante interactive-gui --port 8550
+
 # Administrator user management & system monitoring
 # 1. Create analyst users
 vigilante admin user-create --username analyst1 --email analyst@company.com --role Analyst
