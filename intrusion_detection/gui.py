@@ -1947,16 +1947,27 @@ class VigilanteGUI:
     
     def load_session(self):
         """Load session from file"""
+        # First check for token from environment/GUI
+        if hasattr(self.page, 'session_token'):
+            session_token = self.page.session_token
+            if session_token and self.auth.validate_session(session_token):
+                print(f"Session loaded for {self.auth.current_user['username']}")
+                return True
+    
+        # Then check session file as fallback
         if self.session_file.exists():
             try:
                 with open(self.session_file, 'r') as f:
                     session_data = json.load(f)
-                    
+                
                 session_token = session_data.get('session_token')
                 if session_token and self.auth.validate_session(session_token):
                     print(f"Session loaded for {self.auth.current_user['username']}")
+                    return True
             except Exception as e:
                 print(f"Could not load session: {e}")
+    
+        return False
     
     def save_session(self):
         """Save session to file"""
@@ -2042,8 +2053,12 @@ def main(page: Page):
     # Check for session token from environment
     session_token = os.environ.get('VIGILANTE_SESSION_TOKEN')
     if session_token:
-        # Store in page data for the app to use
-        page.session.set("token", session_token)
+        # In Flet 0.82, use client_storage or store as page data
+        # Option 1: Store in client_storage (persists across sessions)
+        page.client_storage.set("vigilante.session_token", session_token)
+        
+        # Option 2: Store as a page attribute (only available in current session)
+        page.session_token = session_token
     
     app = VigilanteGUI(page)
 
