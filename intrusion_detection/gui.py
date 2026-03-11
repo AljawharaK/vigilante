@@ -1,39 +1,40 @@
 #!/usr/bin/env python3
 """
-Vigilante Intrusion Detection System - Interactive GUI
-Built with Flet - Modern Python GUI framework
+Vigilante Intrusion Detection System - GUI
+Production version with real authentication and database integration
 """
 
 import flet as ft
 from flet import (
     Page, Container, Column, Row, Text, 
-    ElevatedButton, TextField, Dropdown, dropdown,
+    TextField, Dropdown, dropdown,
     AlertDialog, TextButton, ProgressRing,
-    Card, Icon, margin, padding,
-    border, border_radius, MainAxisAlignment,
-    CrossAxisAlignment, ThemeMode, ProgressBar
+    Card, Icon, MainAxisAlignment, CrossAxisAlignment,
+    Alignment, ThemeMode, ProgressBar,
+    ButtonStyle, RoundedRectangleBorder, Animation, AnimationCurve,
+    ControlState,
 )
 import asyncio
-import threading
 import queue
-import json
 import os
 import sys
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List
+import json
 import pandas as pd
 import numpy as np
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, List
+import traceback
 from pathlib import Path
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import Vigilante modules
-from .database import DatabaseManager
-from .auth import AuthManager
-from .model import IntrusionDetectionModel
-from .model_trainer import ModelTrainer
-from .utils import get_system_info
+# Import real modules
+from intrusion_detection.database import DatabaseManager
+from intrusion_detection.auth import AuthManager
+from intrusion_detection.model import IntrusionDetectionModel
+from intrusion_detection.model_trainer import ModelTrainer
+from intrusion_detection.utils import json_serializable
 
 # =====================================================================
 # THEME CONSTANTS
@@ -44,13 +45,13 @@ class AppTheme:
     
     # Primary colors - Dark cyber theme
     PRIMARY = "#BFA7F3"  # Lilac purple
-    SECONDARY = "#Bc316A"  # Pinkish red
-    BACKGROUND = "#160C40"  # Dark navy
+    SECONDARY = "#1e293b"  # Lighter navy
+    BACKGROUND = "#0f172a"  # Dark navy
     SURFACE = "#1e293b"  # Lighter navy
-    ERROR = "#ff4d4d"  # Red
-    SUCCESS = "#4caf50"  # Green
-    WARNING = "#ff9800"  # Orange
-    INFO = "#2196f3"  # Blue
+    ERROR = "#ef4444"  # Red
+    SUCCESS = "#10b981"  # Green
+    WARNING = "#f59e0b"  # Orange
+    INFO = "#3b82f6"  # Blue
     
     # Text colors
     TEXT_PRIMARY = "#ffffff"
@@ -60,11 +61,11 @@ class AppTheme:
     BORDER = "#334155"
     
     # Severity colors
-    SEVERITY_CRITICAL = "#ff1744"  # Bright red
-    SEVERITY_HIGH = "#ff9100"  # Orange
-    SEVERITY_MEDIUM = "#ffea00"  # Yellow
-    SEVERITY_LOW = "#00e676"  # Green
-    SEVERITY_MINIMAL = "#2979ff"  # Blue
+    SEVERITY_CRITICAL = "#ef4444"  # Bright red
+    SEVERITY_HIGH = "#f97316"  # Orange
+    SEVERITY_MEDIUM = "#eab308"  # Yellow
+    SEVERITY_LOW = "#10b981"  # Green
+    SEVERITY_MINIMAL = "#3b82f6"  # Blue
     
     @classmethod
     def get_severity_color(cls, severity: str) -> str:
@@ -84,24 +85,30 @@ class AppTheme:
 # =====================================================================
 
 class VigilanteGUI:
-    """Main GUI Application Class"""
+    """Main GUI Application Class with real authentication and database"""
     
     def __init__(self, page: Page):
         self.page = page
+        
+        # Initialize real database and auth
         self.db = DatabaseManager()
         self.auth = AuthManager(self.db)
-        self.trainer = ModelTrainer()
+        
+        # Try to load session from environment (if coming from CLI)
+        session_token = os.environ.get('VIGILANTE_SESSION_TOKEN')
+        if session_token and self.auth.validate_session(session_token):
+            print(f"✅ Session loaded for {self.auth.current_user['username']}")
+        else:
+            self.auth.current_user = None
+            self.auth.current_session = None
+            self.auth.current_role = None
+        
         self.current_model = None
-        self.session_file = Path.home() / ".vigilante_session"
-        
-        # File pickers - Flet 0.82 compatible
-        self.file_picker = ft.FilePicker()
-        self.training_file_picker = ft.FilePicker()
-        self.page.overlay.extend([self.file_picker, self.training_file_picker])
-        
-        # Set file picker callbacks
-        self.file_picker.on_result = self.on_file_picked
-        self.training_file_picker.on_result = self.on_training_file_picked
+        self.file_path = None
+        self.train_file = None
+        self.model_dropdown = None
+        self.detection_results = None
+        self.trainer = ModelTrainer()
         
         # Queue for background tasks
         self.task_queue = queue.Queue()
@@ -110,27 +117,15 @@ class VigilanteGUI:
         # Setup page
         self.setup_page()
         
-        # Load session if exists
-        self.load_session()
-        
-        # Setup UI
-        self.setup_ui()
+        # Setup UI based on auth state
+        if self.auth.is_authenticated():
+            self.setup_authenticated_ui()
+        else:
+            self.setup_login_ui()
         
         # Start background task processor
         self.page.run_task(self.process_tasks)
-    
-    def on_file_picked(self, e):
-        """Handle file picker result for detection"""
-        if e.files:
-            self.file_path.value = e.files[0].path
-            self.page.update()
-    
-    def on_training_file_picked(self, e):
-        """Handle file picker result for training"""
-        if e.files:
-            self.train_file.value = e.files[0].path
-            self.page.update()
-    
+
     def setup_page(self):
         """Configure page settings"""
         self.page.title = "Vigilante - Intrusion Detection System"
@@ -138,31 +133,286 @@ class VigilanteGUI:
         self.page.bgcolor = AppTheme.BACKGROUND
         self.page.padding = 0
         self.page.spacing = 0
-        self.page.window.width = 1200
+        self.page.window.width = 1300
         self.page.window.height = 800
+        self.page.window.min_width = 1000
+        self.page.window.min_height = 600
         
         # Set custom theme
         self.page.theme = ft.Theme(
             color_scheme_seed=AppTheme.PRIMARY,
         )
     
-    def setup_ui(self):
-        """Initialize UI components"""
+    def setup_login_ui(self):
+        """Setup login interface"""
+        # Create login form
+        self.username_field = TextField(
+            label="Username",
+            prefix_icon=ft.Icons.PERSON,
+            border_color=AppTheme.PRIMARY,
+            focused_border_color=AppTheme.PRIMARY,
+            width=300,
+        )
         
-        # Create navigation rail
+        self.password_field = TextField(
+            label="Password",
+            prefix_icon=ft.Icons.LOCK,
+            password=True,
+            can_reveal_password=True,
+            border_color=AppTheme.PRIMARY,
+            focused_border_color=AppTheme.PRIMARY,
+            width=300,
+        )
+        
+        self.otp_field = TextField(
+            label="OTP Code (sent to your email)",
+            prefix_icon=ft.Icons.PIN,
+            border_color=AppTheme.PRIMARY,
+            focused_border_color=AppTheme.PRIMARY,
+            width=300,
+            visible=False,
+        )
+        
+        self.login_button = ft.ElevatedButton(
+            "Login",
+            icon=ft.Icons.LOGIN,
+            on_click=self.handle_login,
+            style=ButtonStyle(
+                color=AppTheme.BACKGROUND,
+                bgcolor=AppTheme.PRIMARY,
+                shape=RoundedRectangleBorder(radius=8),
+            ),
+            width=300,
+            height=45,
+        )
+        
+        self.verify_otp_button = ft.ElevatedButton(
+            "Verify OTP",
+            icon=ft.Icons.VERIFIED,
+            on_click=self.handle_verify_otp,
+            style=ButtonStyle(
+                color=AppTheme.BACKGROUND,
+                bgcolor=AppTheme.SUCCESS,
+                shape=RoundedRectangleBorder(radius=8),
+            ),
+            width=300,
+            height=45,
+            visible=False,
+        )
+        
+        self.login_status = Text("", color=AppTheme.TEXT_SECONDARY)
+        
+        # Create login container
+        login_container = Container(
+            content=Column(
+                controls=[
+                    Icon(ft.Icons.SECURITY, size=60, color=AppTheme.PRIMARY),
+                    Text("VIGILANTE", size=32, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                    Text("Intrusion Detection System", size=16, color=AppTheme.TEXT_SECONDARY),
+                    Container(height=30),
+                    self.username_field,
+                    Container(height=10),
+                    self.password_field,
+                    Container(height=10),
+                    self.otp_field,
+                    Container(height=20),
+                    self.login_button,
+                    self.verify_otp_button,
+                    Container(height=10),
+                    self.login_status,
+                ],
+                horizontal_alignment=CrossAxisAlignment.CENTER,
+                spacing=5,
+            ),
+            width=400,
+            padding=ft.Padding.all(40),
+            bgcolor=AppTheme.SURFACE,
+            border_radius=ft.BorderRadius.all(20),
+            border=ft.Border.all(2, AppTheme.PRIMARY + "40"),
+        )
+        
+        # Center on page
+        main_layout = Container(
+            content=Row(
+                controls=[login_container],
+                alignment=MainAxisAlignment.CENTER,
+                vertical_alignment=CrossAxisAlignment.CENTER,
+            ),
+            expand=True,
+        )
+        
+        self.page.clean()
+        self.page.add(main_layout)
+        self.page.update()
+    
+    def handle_login(self, e):
+        """Handle login button click"""
+        username = self.username_field.value
+        password = self.password_field.value
+        
+        if not username or not password:
+            self.login_status.value = "Please enter username and password"
+            self.login_status.color = AppTheme.ERROR
+            self.page.update()
+            return
+        
+        # Disable login button
+        self.login_button.disabled = True
+        self.login_status.value = "Verifying credentials..."
+        self.login_status.color = AppTheme.INFO
+        self.page.update()
+        
+        # Run login in background
+        self.page.run_task(self._async_login, username, password)
+    
+    async def _async_login(self, username: str, password: str):
+        """Async login process"""
+        try:
+            # Step 1: Login with credentials
+            result = await self.run_in_thread(
+                self.auth.login, username, password
+            )
+            
+            if not result['success']:
+                self.login_status.value = result['message']
+                self.login_status.color = AppTheme.ERROR
+                self.login_button.disabled = False
+                self.page.update()
+                return
+            
+            # Check if password needs to be changed
+            if result.get('requires_password_change'):
+                self.show_change_password_dialog(result['user_id'])
+                return
+            
+            # Show OTP field
+            self.login_status.value = f"OTP sent to {result['email']}"
+            self.login_status.color = AppTheme.SUCCESS
+            self.otp_field.visible = True
+            self.verify_otp_button.visible = True
+            self.login_button.visible = False
+            self.page.update()
+            
+        except Exception as e:
+            self.login_status.value = f"Login failed: {str(e)}"
+            self.login_status.color = AppTheme.ERROR
+            self.login_button.disabled = False
+            self.page.update()
+    
+    def handle_verify_otp(self, e):
+        """Handle OTP verification"""
+        otp_code = self.otp_field.value
+        
+        if not otp_code:
+            self.login_status.value = "Please enter OTP code"
+            self.login_status.color = AppTheme.ERROR
+            self.page.update()
+            return
+        
+        # Disable verify button
+        self.verify_otp_button.disabled = True
+        self.login_status.value = "Verifying OTP..."
+        self.login_status.color = AppTheme.INFO
+        self.page.update()
+        
+        # Run OTP verification in background
+        self.page.run_task(self._async_verify_otp, otp_code)
+    
+    async def _async_verify_otp(self, otp_code: str):
+        """Async OTP verification"""
+        try:
+            result = await self.run_in_thread(
+                self.auth.verify_otp, otp_code
+            )
+            
+            if result['success']:
+                # Login successful
+                self.setup_authenticated_ui()
+            else:
+                self.login_status.value = result['message']
+                self.login_status.color = AppTheme.ERROR
+                self.verify_otp_button.disabled = False
+                self.page.update()
+                
+        except Exception as e:
+            self.login_status.value = f"OTP verification failed: {str(e)}"
+            self.login_status.color = AppTheme.ERROR
+            self.verify_otp_button.disabled = False
+            self.page.update()
+    
+    def show_change_password_dialog(self, user_id: int):
+        """Show change password dialog"""
+        new_pass = TextField(
+            label="New Password",
+            password=True,
+            can_reveal_password=True,
+            width=300,
+        )
+        confirm_pass = TextField(
+            label="Confirm Password",
+            password=True,
+            can_reveal_password=True,
+            width=300,
+        )
+        
+        def change_password(e):
+            if new_pass.value != confirm_pass.value:
+                self.show_dialog("Error", "Passwords do not match")
+                return
+            if len(new_pass.value) < 8:
+                self.show_dialog("Error", "Password must be at least 8 characters")
+                return
+            
+            # Update password
+            try:
+                password_hash = self.auth.hash_password(new_pass.value)
+                self.db.reset_user_password(user_id, password_hash, must_change=False)
+                self.close_dialog()
+                self.show_dialog("Success", "Password changed successfully. Please login again.")
+            except Exception as e:
+                self.show_dialog("Error", f"Failed to change password: {str(e)}")
+        
+        dialog = AlertDialog(
+            title=Text("Change Password Required"),
+            content=Column(
+                controls=[
+                    Text("You must change your password before logging in."),
+                    Container(height=10),
+                    new_pass,
+                    confirm_pass,
+                ],
+                width=350,
+                height=200,
+            ),
+            actions=[
+                TextButton("Cancel", on_click=lambda e: self.close_dialog()),
+                TextButton("Change Password", on_click=change_password),
+            ],
+        )
+        
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+    
+    def setup_authenticated_ui(self):
+        """Setup main UI for authenticated user"""
+        # Clear page
+        self.page.clean()
+        
+        # Create navigation rail based on role
         self.nav_rail = self.create_navigation_rail()
         
-        # Create main content area
+        # Create main content area - start with dashboard
         self.content_container = Container(
             expand=True,
             bgcolor=AppTheme.SURFACE,
-            border_radius=border_radius.all(10),
-            padding=padding.all(20),
-            margin=margin.only(left=10, top=10, right=10, bottom=10),
-            content=self.create_login_content()
+            border_radius=ft.BorderRadius.all(10),
+            padding=ft.Padding.all(20),
+            margin=ft.Margin.only(left=10, top=10, right=10, bottom=10),
+            content=self.create_dashboard_content()
         )
         
-        # Create header
+        # Create header with role badge
         header = self.create_header()
         
         # Main layout
@@ -183,16 +433,22 @@ class VigilanteGUI:
         )
         
         self.page.add(main_layout)
+        self.page.update()
     
     def create_header(self) -> Container:
-        """Create application header"""
+        """Create application header with role badge"""
+        
+        # Determine role badge color
+        role_color = AppTheme.PRIMARY if self.auth.is_admin() else AppTheme.INFO
+        role_icon = ft.Icons.ADMIN_PANEL_SETTINGS if self.auth.is_admin() else ft.Icons.VISIBILITY
+        
         return Container(
             content=Row(
                 controls=[
                     Row(
                         controls=[
                             Icon(
-                                ft.Icon(ft.icons.SECURITY),
+                                ft.Icons.SECURITY,
                                 size=24,
                                 color=AppTheme.PRIMARY,
                             ),
@@ -210,26 +466,41 @@ class VigilanteGUI:
                         ],
                         spacing=10,
                     ),
-                    Container(
-                        content=Row(
-                            controls=[
-                                self.create_status_indicator(),
-                                Text(
-                                    "System Online",
-                                    size=14,
-                                    color=AppTheme.SUCCESS,
+                    Row(
+                        controls=[
+                            Container(
+                                content=Row(
+                                    controls=[
+                                        Icon(role_icon, size=16, color=role_color),
+                                        Text(
+                                            self.auth.current_role,
+                                            size=14,
+                                            color=role_color,
+                                            weight=ft.FontWeight.BOLD,
+                                        ),
+                                        Text(
+                                            f"({self.auth.current_user['username']})",
+                                            size=12,
+                                            color=AppTheme.TEXT_SECONDARY,
+                                        ),
+                                    ],
+                                    spacing=5,
                                 ),
-                            ],
-                            spacing=5,
-                        ),
-                        margin=margin.only(right=20),
+                                bgcolor=role_color + "20",
+                                padding=ft.Padding.all(8),
+                                border_radius=ft.BorderRadius.all(5),
+                                border=ft.Border.all(1, role_color + "40"),
+                            ),
+                            self.create_status_indicator(),
+                        ],
+                        spacing=10,
                     ),
                 ],
                 alignment=MainAxisAlignment.SPACE_BETWEEN,
             ),
             bgcolor=AppTheme.SECONDARY,
-            padding=padding.all(15),
-            border=border.all(1, AppTheme.BORDER),
+            padding=ft.Padding.all(15),
+            border=ft.Border.all(1, AppTheme.BORDER),
         )
     
     def create_status_indicator(self) -> Container:
@@ -238,26 +509,36 @@ class VigilanteGUI:
             width=10,
             height=10,
             bgcolor=AppTheme.SUCCESS,
-            border_radius=border_radius.all(5),
-            animate=ft.Animation(duration=300, curve=ft.AnimationCurve.BOUNCE_OUT),
+            border_radius=ft.BorderRadius.all(5),
+            animate=Animation(duration=300, curve=AnimationCurve.BOUNCE_OUT),
         )
     
     def create_navigation_rail(self) -> Container:
-        """Create navigation rail with round buttons"""
-        nav_buttons = [
-            self.create_nav_button(ft.Icon(ft.icons.DASHBOARD), "Dashboard", "dashboard", True),
-            self.create_nav_button(ft.Icon(ft.icons.ANALYTICS), "Detection & Training", "detection"),
-            self.create_nav_button(ft.Icon(ft.icons.HISTORY), "System Report", "system_report"),
-        ]
+        """Create navigation rail based on user role"""
         
-        # Add admin-only buttons if user is admin
+        nav_buttons = []
+        
+        # Dashboard is available to all roles
+        nav_buttons.append(
+            self.create_nav_button(ft.Icons.DASHBOARD, "Dashboard", "dashboard", True)
+        )
+        
+        # Models page (available to all)
+        nav_buttons.append(
+            self.create_nav_button(ft.Icons.LIST, "View Models", "models", False)
+        )
+        
+        # Admin-only pages
         if self.auth.is_admin():
             nav_buttons.extend([
-                self.create_nav_button(ft.Icon(ft.icons.PEOPLE), "Manage Users", "manage_users"),
-                self.create_nav_button(ft.Icon(ft.icons.MODEL_TRAINING), "Manage Models", "manage_models"),
+                self.create_nav_button(ft.Icons.PEOPLE, "Manage Users", "manage_users", False),
+                self.create_nav_button(ft.Icons.ADMIN_PANEL_SETTINGS, "System Admin", "system_admin", False),
             ])
         
-        nav_buttons.append(self.create_nav_button(ft.Icon(ft.icons.SETTINGS), "Edit Profile", "settings"))
+        # Settings and logout available to all
+        nav_buttons.extend([
+            self.create_nav_button(ft.Icons.SETTINGS, "Settings", "settings", False),
+        ])
         
         # Add all buttons to column
         buttons_column = Column(
@@ -267,24 +548,24 @@ class VigilanteGUI:
         )
         
         # Add logout button separately
-        logout_button = self.create_nav_button(ft.Icon(ft.icons.LOGOUT), "Logout", "logout", False, AppTheme.ERROR)
+        logout_button = self.create_nav_button(ft.Icons.LOGOUT, "Logout", "logout", False, AppTheme.ERROR)
         
         return Container(
             width=80,
             bgcolor=AppTheme.SECONDARY,
-            border=border.all(1, AppTheme.BORDER),
-            border_radius=border_radius.all(10),
-            margin=margin.all(10),
+            border=ft.Border.all(1, AppTheme.BORDER),
+            border_radius=ft.BorderRadius.all(10),
+            margin=ft.Margin.all(10),
             content=Column(
                 controls=[
                     # Logo/Icon at top
                     Container(
                         content=Icon(
-                            ft.Icon(ft.icons.SECURITY),
+                            ft.Icons.SECURITY,
                             color=AppTheme.PRIMARY,
                             size=40,
                         ),
-                        padding=padding.all(15),
+                        padding=ft.Padding.all(15),
                     ),
                     # Navigation buttons
                     Container(content=buttons_column, expand=True),
@@ -300,7 +581,7 @@ class VigilanteGUI:
     
     def create_nav_button(self, icon_name, tooltip: str, view: str, 
                           selected: bool = False, color: str = None) -> Container:
-        """Create a round navigation button - Flet 0.82 compatible"""
+        """Create a round navigation button"""
         return Container(
             content=ft.IconButton(
                 icon=icon_name,
@@ -308,232 +589,126 @@ class VigilanteGUI:
                 icon_color=color or (AppTheme.PRIMARY if selected else AppTheme.TEXT_SECONDARY),
                 tooltip=tooltip,
                 on_click=lambda e, v=view: self.navigate_to(v),
-                style=ft.ButtonStyle(
-                    shape=ft.RoundedRectangleBorder(radius=25),
-                    bgcolor={ft.ControlState.DEFAULT: AppTheme.SURFACE if selected else AppTheme.SECONDARY},
+                style=ButtonStyle(
+                    shape=RoundedRectangleBorder(radius=25),
+                    bgcolor={ControlState.DEFAULT: AppTheme.SURFACE if selected else AppTheme.SECONDARY},
                 ),
             ),
-            padding=padding.all(10),
+            padding=ft.Padding.all(10),
         )
     
     def navigate_to(self, view: str):
         """Handle navigation between views"""
+        
+        # Check permissions for admin-only pages
+        if view in ["manage_users", "system_admin"] and not self.auth.is_admin():
+            self.show_dialog("Access Denied", "This page is only accessible to Administrators.")
+            return
+        
         # Load appropriate view
         if view == "dashboard":
             content = self.create_dashboard_content()
-        elif view == "detection":
-            content = self.create_detection_content()
-        elif view == "system_report":
-            content = self.create_system_report_content()
-        elif view == "manage_users":
-            # Check if user is admin
-            if not self.auth.is_admin():
-                self.show_dialog("Access Denied", "This page is only available to administrators")
-                return
+        elif view == "models":
+            content = self.create_models_content()
+        elif view == "manage_users" and self.auth.is_admin():
             content = self.create_manage_users_content()
-        elif view == "manage_models":
-            # Check if user is admin
-            if not self.auth.is_admin():
-                self.show_dialog("Access Denied", "This page is only available to administrators")
-                return
-            content = self.create_manage_models_content()
+        elif view == "system_admin" and self.auth.is_admin():
+            content = self.create_system_admin_content()
         elif view == "settings":
             content = self.create_settings_content()
         elif view == "logout":
-            self.logout()
-            content = self.create_login_content()
+            self.handle_logout()
+            return
         else:
             content = self.create_dashboard_content()
         
         self.content_container.content = content
         self.page.update()
     
-    def create_login_content(self) -> Container:
-        """Create login screen"""
-        self.email_field = TextField(
-            label="Email",
-            hint_text="Enter your email",
-            prefix_icon=ft.Icon(ft.icons.EMAIL),
-            border_color=AppTheme.PRIMARY,
-            width=300,
-        )
-        
-        self.password_field = TextField(
-            label="Password",
-            hint_text="Enter your password",
-            password=True,
-            can_reveal_password=True,
-            prefix_icon=ft.Icon(ft.icons.LOCK),
-            border_color=AppTheme.PRIMARY,
-            width=300,
-        )
-        
-        self.otp_field = TextField(
-            label="OTP Code",
-            hint_text="Enter 6-digit OTP",
-            prefix_icon=ft.icons.PIN,
-            border_color=AppTheme.PRIMARY,
-            width=300,
-            visible=False,
-        )
-        
-        self.login_status = Text("", size=12)
-        self.login_progress = ft.ProgressRing(visible=False, width=30, height=30)
-        
-        login_card = Container(
-            content=Column(
-                controls=[
-                    Icon(ft.Icon(ft.icons.SECURITY), size=40, color=AppTheme.PRIMARY),
-                    Text("VIGILANTE", size=32, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                    Text("Intrusion Detection System", size=16, color=AppTheme.TEXT_SECONDARY),
-                    Container(height=30),
-                    self.email_field,
-                    Container(height=10),
-                    self.password_field,
-                    Container(height=10),
-                    self.otp_field,
-                    Container(height=20),
-                    Row(
-                        controls=[
-                            ElevatedButton(
-                                "Login",
-                                on_click=self.handle_login,
-                                style=ft.ButtonStyle(
-                                    color=AppTheme.SECONDARY,
-                                    bgcolor=AppTheme.PRIMARY,
-                                    shape=ft.RoundedRectangleBorder(radius=8),
-                                ),
-                            ),
-                            self.login_progress,
-                        ],
-                        alignment=MainAxisAlignment.CENTER,
-                        spacing=10,
-                    ),
-                    self.login_status,
-                ],
-                horizontal_alignment=CrossAxisAlignment.CENTER,
-                spacing=5,
-            ),
-            width=400,
-            padding=padding.all(40),
-            bgcolor=AppTheme.SURFACE,
-            border_radius=border_radius.all(20),
-            border=border.all(2, AppTheme.PRIMARY + "40"),
-        )
-        
-        return Container(
-            content=Row(
-                controls=[login_card],
-                alignment=MainAxisAlignment.CENTER,
-                vertical_alignment=CrossAxisAlignment.CENTER,
-            ),
-            expand=True,
-        )
+    def handle_logout(self):
+        """Handle logout"""
+        self.auth.logout()
+        self.setup_login_ui()
     
-    async def handle_login(self, e):
-        """Handle login button click"""
-        email = self.email_field.value
-        password = self.password_field.value
-        otp = self.otp_field.value if self.otp_field.visible else None
+    # =====================================================================
+    # DASHBOARD VIEW
+    # =====================================================================
+    
+    def create_dashboard_content(self) -> Container:
+        """Create dashboard with statistics and recent detections"""
         
-        if not email or not password:
-            self.login_status.value = "Please enter email and password"
-            self.login_status.color = AppTheme.ERROR
-            self.page.update()
-            return
+        # Get real stats from database
+        stats = self.get_dashboard_stats()
+        recent_detections = self.get_recent_detections()
+        user_models = self.db.get_user_models(self.auth.current_user['id'])
         
-        self.login_progress.visible = True
-        self.login_status.value = ""
-        self.page.update()
-        
-        # Run login in thread to avoid blocking UI
-        result = await self.run_in_thread(
-            self.perform_login, email, password, otp
+        # Create stat cards
+        stats_row = Row(
+            controls=[
+                self.create_stat_card("Total Detections", stats["total_detections"], ft.Icons.ANALYTICS),
+                self.create_stat_card("Anomalies Found", stats["anomalies_found"], ft.Icons.WARNING, AppTheme.ERROR),
+                self.create_stat_card("Models Trained", stats["models_trained"], ft.Icons.MODEL_TRAINING),
+                self.create_stat_card("Last Detection", stats["last_detection"], ft.Icons.ACCESS_TIME),
+            ],
+            spacing=10,
         )
         
-        self.login_progress.visible = False
+        # Create recent detections table
+        detections_table = self.create_detections_table(recent_detections)
         
-        if result["success"]:
-            if result.get("requires_otp"):
-                # Show OTP field
-                self.otp_field.visible = True
-                self.login_status.value = "OTP sent to your email"
-                self.login_status.color = AppTheme.INFO
-            else:
-                # Login complete
-                self.save_session()
-                self.navigate_to("dashboard")
-        else:
-            self.login_status.value = result["message"]
-            self.login_status.color = AppTheme.ERROR
+        # Create models list
+        models_section = self.create_models_section(user_models)
         
-        self.page.update()
-    
-    def perform_login(self, email: str, password: str, otp: str = None):
-        """Perform login (runs in thread)"""
-        try:
-            # Extract username from email (simplified - adjust as needed)
-            username = email.split('@')[0]
-            
-            if otp:
-                # Verify OTP
-                return self.auth.verify_otp(otp)
-            else:
-                # Initial login
-                return self.auth.login(username, password)
-        except Exception as e:
-            return {"success": False, "message": str(e)}
-    
-    def create_system_report_content(self) -> Container:
-        """Create system report view for analysts"""
         return Container(
             content=Column(
                 controls=[
-                    Text("System Report", size=24, weight=ft.FontWeight.BOLD),
+                    Text("Dashboard", size=24, weight=ft.FontWeight.BOLD),
                     Container(height=20),
-                    
-                    # Period selection
+                    stats_row,
+                    Container(height=20),
                     Row(
                         controls=[
-                            ft.Dropdown(
-                                label="Report Period",
-                                value="7d",
-                                options=[
-                                    ft.dropdown.Option("1d", "Last 24 Hours"),
-                                    ft.dropdown.Option("7d", "Last 7 Days"),
-                                    ft.dropdown.Option("30d", "Last 30 Days"),
-                                    ft.dropdown.Option("90d", "Last 90 Days"),
-                                ],
-                                width=200,
-                            ),
-                            ElevatedButton(
-                                "Generate Summary",
-                                icon=ft.Icon(ft.icons.SUMMARY),
-                                on_click=self.generate_summary,
-                                style=ft.ButtonStyle(
-                                    color=AppTheme.SECONDARY,
-                                    bgcolor=AppTheme.PRIMARY,
+                            Container(
+                                content=Column(
+                                    controls=[
+                                        Text("Recent Detections", size=18, weight=ft.FontWeight.BOLD),
+                                        Container(height=10),
+                                        detections_table,
+                                    ],
+                                    spacing=0,
+                                    expand=True,
                                 ),
+                                expand=1,
+                                bgcolor=AppTheme.SECONDARY,
+                                padding=ft.Padding.all(20),
+                                border_radius=ft.BorderRadius.all(10),
+                                height=400,
+                            ),
+                            Container(
+                                content=Column(
+                                    controls=[
+                                        Row(
+                                            controls=[
+                                                Text("My Models", size=18, weight=ft.FontWeight.BOLD),
+                                                Text(f"({len(user_models)} total)", 
+                                                     size=14, color=AppTheme.TEXT_SECONDARY),
+                                            ],
+                                            spacing=10,
+                                        ),
+                                        Container(height=10),
+                                        models_section,
+                                    ],
+                                    spacing=0,
+                                    expand=True,
+                                ),
+                                expand=1,
+                                bgcolor=AppTheme.SECONDARY,
+                                padding=ft.Padding.all(20),
+                                border_radius=ft.BorderRadius.all(10),
+                                height=400,
                             ),
                         ],
                         spacing=10,
-                    ),
-                    Container(height=20),
-                    
-                    # Summary results area
-                    Container(
-                        content=Column(
-                            controls=[
-                                Text("Detection Summary", size=18, weight=ft.FontWeight.BOLD),
-                                Container(height=10),
-                                # Summary stats will be populated here
-                                self.create_summary_stats_placeholder(),
-                            ],
-                            spacing=0,
-                        ),
-                        bgcolor=AppTheme.SECONDARY,
-                        padding=padding.all(20),
-                        border_radius=border_radius.all(10),
                         expand=True,
                     ),
                 ],
@@ -543,63 +718,240 @@ class VigilanteGUI:
             expand=True,
         )
     
-    def create_summary_stats_placeholder(self) -> Container:
-        """Create placeholder for summary stats"""
+    def get_dashboard_stats(self) -> Dict[str, Any]:
+        """Get real dashboard statistics from database"""
+        user_id = self.auth.current_user['id']
+        
+        try:
+            # Get detection summary for last 30 days
+            summary = self.db.get_detection_summary(user_id, 30)
+            
+            total_detections = sum(d.get('total_detections', 0) for d in summary)
+            total_anomalies = sum(d.get('total_anomalies', 0) for d in summary)
+            
+            # Get user models
+            models = self.db.get_user_models(user_id)
+            models_count = len(models)
+            
+            # Get last detection time
+            last_detection = "Never"
+            if models:
+                # Get most recent detection
+                history = self.db.get_detection_history(user_id, 1)
+                if history:
+                    last_detection = history[0]['created_at'].strftime("%Y-%m-%d %H:%M")
+            
+            return {
+                "total_detections": f"{total_detections:,}",
+                "anomalies_found": f"{total_anomalies:,}",
+                "models_trained": str(models_count),
+                "last_detection": last_detection,
+            }
+            
+        except Exception as e:
+            print(f"Error getting dashboard stats: {e}")
+            return {
+                "total_detections": "0",
+                "anomalies_found": "0",
+                "models_trained": "0",
+                "last_detection": "Error",
+            }
+    
+    def get_recent_detections(self, limit: int = 10) -> List[Dict]:
+        """Get recent detections from database"""
+        user_id = self.auth.current_user['id']
+        
+        try:
+            history = self.db.get_detection_history(user_id, limit)
+            return history
+        except Exception as e:
+            print(f"Error getting recent detections: {e}")
+            return []
+    
+    def create_detections_table(self, detections: List[Dict]) -> Container:
+        """Create table of recent detections"""
+        
+        if not detections:
+            return Container(
+                content=Text("No recent detections", color=AppTheme.TEXT_SECONDARY),
+                padding=ft.Padding.all(20),
+            )
+        
+        # Create DataTable
+        table = ft.DataTable(
+            columns=[
+                ft.DataColumn(Text("Date")),
+                ft.DataColumn(Text("Model")),
+                ft.DataColumn(Text("Total Flows")),
+                ft.DataColumn(Text("Anomalies")),
+                ft.DataColumn(Text("Rate")),
+            ],
+            rows=[
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(Text(d['created_at'].strftime("%Y-%m-%d %H:%M") if hasattr(d['created_at'], 'strftime') else str(d['created_at'])[:16])),
+                        ft.DataCell(Text(d.get('model_name', 'N/A')[:15])),
+                        ft.DataCell(Text(f"{d['total_flows']:,}" if d['total_flows'] else "0")),
+                        ft.DataCell(
+                            Container(
+                                content=Text(str(d['anomalies_detected'])),
+                                bgcolor=AppTheme.ERROR if d['anomalies_detected'] > 0 else AppTheme.SUCCESS,
+                                padding=ft.Padding.all(5),
+                                border_radius=ft.BorderRadius.all(5),
+                            )
+                        ),
+                        ft.DataCell(Text(f"{(d['anomalies_detected']/d['total_flows']*100):.1f}%" if d['total_flows'] and d['total_flows'] > 0 else "0%")),
+                    ]
+                )
+                for d in detections
+            ],
+            heading_row_color=AppTheme.SURFACE,
+            heading_row_height=40,
+            data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "20"},
+            column_spacing=20,
+            divider_thickness=0,
+        )
+        
         return Container(
             content=Column(
-                controls=[
-                    Icon(ft.Icon(ft.icons.ANALYTICS), size=50, color=AppTheme.TEXT_SECONDARY),
-                    Text("Select a period and generate summary", color=AppTheme.TEXT_SECONDARY),
-                ],
-                horizontal_alignment=CrossAxisAlignment.CENTER,
-                alignment=MainAxisAlignment.CENTER,
+                controls=[table],
+                scroll=ft.ScrollMode.AUTO,
             ),
-            alignment=ft.alignment.center,
+            height=250,
+        )
+    
+    def create_models_section(self, models) -> Container:
+        """Create a section displaying user's models"""
+        
+        if not models:
+            return Container(
+                content=Column(
+                    controls=[
+                        Icon(ft.Icons.INFO, size=40, color=AppTheme.TEXT_SECONDARY),
+                        Text("No models trained yet", color=AppTheme.TEXT_SECONDARY),
+                    ],
+                    horizontal_alignment=CrossAxisAlignment.CENTER,
+                    alignment=MainAxisAlignment.CENTER,
+                ),
+                alignment=Alignment.CENTER,
+                expand=True,
+            )
+        
+        # Create a list of model cards
+        model_cards = []
+        for model in models[:5]:  # Show top 5 models
+            accuracy = model.get('accuracy', 0)
+            accuracy_color = AppTheme.SUCCESS if accuracy > 0.9 else AppTheme.WARNING if accuracy > 0.7 else AppTheme.ERROR
+            
+            model_card = Container(
+                content=Row(
+                    controls=[
+                        Icon(ft.Icons.MODEL_TRAINING, color=AppTheme.PRIMARY, size=20),
+                        Column(
+                            controls=[
+                                Text(
+                                    (model['name'][:20] + "..." if len(model['name']) > 20 else model['name']),
+                                    size=14, 
+                                    weight=ft.FontWeight.BOLD
+                                ),
+                                Text(
+                                    f"Accuracy: {accuracy:.2%}" if accuracy else "N/A", 
+                                    size=12, 
+                                    color=accuracy_color
+                                ),
+                            ],
+                            spacing=2,
+                            expand=True,
+                        ),
+                        Text(
+                            model['created_at'].strftime("%Y-%m-%d") if hasattr(model['created_at'], 'strftime') else "N/A",
+                            size=12, 
+                            color=AppTheme.TEXT_SECONDARY
+                        ),
+                    ],
+                    spacing=10,
+                ),
+                padding=ft.Padding.all(10),
+                border=ft.Border.all(1, AppTheme.BORDER),
+                border_radius=ft.BorderRadius.all(5),
+                margin=ft.Margin.only(bottom=5),
+                on_click=lambda e, m=model: self.show_model_details(m),
+            )
+            model_cards.append(model_card)
+        
+        return Container(
+            content=Column(
+                controls=model_cards,
+                scroll=ft.ScrollMode.AUTO,
+                spacing=5,
+            ),
             expand=True,
         )
     
-    def create_manage_users_content(self) -> Container:
-        """Create user management view (admin only)"""
-        # Fetch users from database
-        users = self.get_all_users()
+    # =====================================================================
+    # MODELS VIEW
+    # =====================================================================
+    
+    def create_models_content(self) -> Container:
+        """Create models list view"""
         
-        # Create users table
-        users_table = ft.DataTable(
+        # Get user's models
+        user_models = self.db.get_user_models(self.auth.current_user['id'])
+        
+        if not user_models:
+            return Container(
+                content=Column(
+                    controls=[
+                        Icon(ft.Icons.INFO, size=60, color=AppTheme.TEXT_SECONDARY),
+                        Text("No models trained yet", size=18, color=AppTheme.TEXT_SECONDARY),
+                    ],
+                    horizontal_alignment=CrossAxisAlignment.CENTER,
+                    alignment=MainAxisAlignment.CENTER,
+                ),
+                alignment=Alignment.CENTER,
+                expand=True,
+            )
+        
+        # Create models table
+        models_table = ft.DataTable(
             columns=[
-                ft.DataColumn(Text("Username")),
-                ft.DataColumn(Text("Email")),
-                ft.DataColumn(Text("Role")),
-                ft.DataColumn(Text("Status")),
+                ft.DataColumn(Text("ID")),
+                ft.DataColumn(Text("Name")),
+                ft.DataColumn(Text("Type")),
+                ft.DataColumn(Text("Accuracy")),
+                ft.DataColumn(Text("Precision")),
+                ft.DataColumn(Text("Recall")),
+                ft.DataColumn(Text("F1")),
+                ft.DataColumn(Text("Detectors")),
+                ft.DataColumn(Text("Created")),
                 ft.DataColumn(Text("Actions")),
             ],
             rows=[
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(Text(user.get('username', ''))),
-                        ft.DataCell(Text(user.get('email', ''))),
-                        ft.DataCell(Text(user.get('role_name', 'Analyst'))),
+                        ft.DataCell(Text(str(m['id']))),
+                        ft.DataCell(Text(m['name'][:20])),
+                        ft.DataCell(Text(m.get('model_type', 'rnsa_knn'))),
+                        ft.DataCell(Text(f"{m.get('accuracy', 0):.2%}" if m.get('accuracy') else "N/A")),
+                        ft.DataCell(Text(f"{m.get('precision', 0):.2%}" if m.get('precision') else "N/A")),
+                        ft.DataCell(Text(f"{m.get('recall', 0):.2%}" if m.get('recall') else "N/A")),
+                        ft.DataCell(Text(f"{m.get('f1_score', 0):.2%}" if m.get('f1_score') else "N/A")),
+                        ft.DataCell(Text(str(m.get('detectors_count', 'N/A')))),
                         ft.DataCell(
-                            Container(
-                                content=Text("Active" if user.get('is_active', True) else "Inactive"),
-                                bgcolor=AppTheme.SUCCESS if user.get('is_active', True) else AppTheme.ERROR,
-                                padding=padding.all(5),
-                                border_radius=border_radius.all(5),
+                            Text(
+                                m['created_at'].strftime("%Y-%m-%d")
+                                if hasattr(m['created_at'], 'strftime')
+                                else "N/A"
                             )
                         ),
                         ft.DataCell(
                             Row(
                                 controls=[
                                     ft.IconButton(
-                                        icon=ft.icons.EDIT,
+                                        icon=ft.Icons.INFO,
                                         icon_color=AppTheme.PRIMARY,
-                                        tooltip="Edit User",
-                                        on_click=lambda e, u=user: self.edit_user(u),
-                                    ),
-                                    ft.IconButton(
-                                        icon=ft.icons.DELETE,
-                                        icon_color=AppTheme.ERROR,
-                                        tooltip="Deactivate User",
-                                        on_click=lambda e, u=user: self.deactivate_user(u),
+                                        tooltip="View Details",
+                                        on_click=lambda e, model=m: self.show_model_details(model),
                                     ),
                                 ],
                                 spacing=5,
@@ -607,11 +959,11 @@ class VigilanteGUI:
                         ),
                     ]
                 )
-                for user in users
+                for m in user_models
             ],
             heading_row_color=AppTheme.SURFACE,
             heading_row_height=40,
-            data_row_color={ft.ControlState.HOVERED: AppTheme.PRIMARY + "20"},
+            data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "20"},
             column_spacing=20,
             divider_thickness=0,
         )
@@ -621,16 +973,143 @@ class VigilanteGUI:
                 controls=[
                     Row(
                         controls=[
-                            Text("Manage Users", size=24, weight=ft.FontWeight.BOLD),
-                            ElevatedButton(
-                                "Create New User",
-                                icon=ft.Icon(ft.icons.PERSON_ADD),
-                                on_click=self.create_user,
-                                style=ft.ButtonStyle(
-                                    color=AppTheme.SECONDARY,
-                                    bgcolor=AppTheme.PRIMARY,
-                                ),
-                            ),
+                            Text("My Models", size=24, weight=ft.FontWeight.BOLD),
+                        ],
+                        alignment=MainAxisAlignment.SPACE_BETWEEN,
+                    ),
+                    Container(height=20),
+                    
+                    Container(
+                        content=Column(
+                            controls=[models_table],
+                            scroll=ft.ScrollMode.AUTO,
+                            expand=True,
+                        ),
+                        expand=True,
+                    ),
+                ],
+                spacing=0,
+                expand=True,
+            ),
+            expand=True,
+        )
+    
+    def show_model_details(self, model: Dict):
+        """Show detailed model information"""
+        details = f"""
+Model ID: {model['id']}
+Name: {model['name']}
+Type: {model.get('model_type', 'rnsa_knn')}
+Created: {model['created_at']}
+
+Performance Metrics:
+• Accuracy: {model.get('accuracy', 0):.2%}
+• Precision: {model.get('precision', 0):.2%}
+• Recall: {model.get('recall', 0):.2%}
+• F1 Score: {model.get('f1_score', 0):.2%}
+
+Training:
+• Samples: {model.get('training_samples', 'N/A')}
+• Features: {model.get('features_count', 'N/A')}
+• Detectors: {model.get('detectors_count', 'N/A')}
+
+Path: {model.get('model_path', 'N/A')}
+        """
+        
+        self.show_dialog(f"Model Details: {model['name']}", details)
+    
+    # =====================================================================
+    # ADMIN VIEWS
+    # =====================================================================
+    
+    def create_manage_users_content(self) -> Container:
+        """Create user management view (Admin only)"""
+        
+        # Get all users
+        users = self.get_all_users()
+        
+        # Create users table
+        users_table = ft.DataTable(
+            columns=[
+                ft.DataColumn(Text("ID")),
+                ft.DataColumn(Text("Username")),
+                ft.DataColumn(Text("Email")),
+                ft.DataColumn(Text("Role")),
+                ft.DataColumn(Text("Status")),
+                ft.DataColumn(Text("Last Login")),
+                ft.DataColumn(Text("Actions")),
+            ],
+            rows=[
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(Text(str(u.get('id', '')))),
+                        ft.DataCell(Text(u.get('username', ''))),
+                        ft.DataCell(Text(u.get('email', ''))),
+                        ft.DataCell(Text(u.get('role_name', 'Analyst'))),
+                        ft.DataCell(
+                            Container(
+                                content=Text("Active" if u.get('is_active', True) else "Inactive"),
+                                bgcolor=AppTheme.SUCCESS if u.get('is_active', True) else AppTheme.ERROR,
+                                padding=ft.Padding.all(5),
+                                border_radius=ft.BorderRadius.all(5),
+                            )
+                        ),
+                        ft.DataCell(
+                            Text(
+                                u['last_login'].strftime("%Y-%m-%d %H:%M") 
+                                if u.get('last_login') and hasattr(u['last_login'], 'strftime')
+                                else "Never"
+                            )
+                        ),
+                        ft.DataCell(
+                            Row(
+                                controls=[
+                                    ft.IconButton(
+                                        icon=ft.Icons.EDIT,
+                                        icon_color=AppTheme.PRIMARY,
+                                        tooltip="Edit User",
+                                        on_click=lambda e, user=u: self.show_edit_user_dialog(user),
+                                    ),
+                                    ft.IconButton(
+                                        icon=ft.Icons.DELETE,
+                                        icon_color=AppTheme.ERROR,
+                                        tooltip="Deactivate User",
+                                        on_click=lambda e, user=u: self.deactivate_user(user),
+                                    ),
+                                ],
+                                spacing=5,
+                            )
+                        ),
+                    ]
+                )
+                for u in users
+            ],
+            heading_row_color=AppTheme.SURFACE,
+            heading_row_height=40,
+            data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "20"},
+            column_spacing=20,
+            divider_thickness=0,
+        )
+        
+        # Create new user button
+        create_user_button = ft.ElevatedButton(
+            "Create New User",
+            icon=ft.Icons.PERSON_ADD,
+            on_click=self.show_create_user_dialog,
+            style=ButtonStyle(
+                color=AppTheme.BACKGROUND,
+                bgcolor=AppTheme.PRIMARY,
+                shape=RoundedRectangleBorder(radius=8),
+            ),
+        )
+        
+        return Container(
+            content=Column(
+                controls=[
+                    Row(
+                        controls=[
+                            Text("Manage Users (Admin Only)", size=24, weight=ft.FontWeight.BOLD),
+                            create_user_button,
                         ],
                         alignment=MainAxisAlignment.SPACE_BETWEEN,
                     ),
@@ -651,195 +1130,85 @@ class VigilanteGUI:
             expand=True,
         )
     
-    def create_manage_models_content(self) -> Container:
-        """Create model management view (admin only)"""
-        # Get all models from database
-        models = self.get_all_models()
-        
-        # Create models table
-        models_table = ft.DataTable(
-            columns=[
-                ft.DataColumn(Text("ID")),
-                ft.DataColumn(Text("Model Name")),
-                ft.DataColumn(Text("Owner")),
-                ft.DataColumn(Text("Type")),
-                ft.DataColumn(Text("Accuracy")),
-                ft.DataColumn(Text("Detectors")),
-                ft.DataColumn(Text("Created")),
-                ft.DataColumn(Text("Actions")),
-            ],
-            rows=[
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(Text(str(m.get('id', '')))),
-                        ft.DataCell(Text(m.get('name', '')[:20])),
-                        ft.DataCell(Text(m.get('username', 'N/A'))),
-                        ft.DataCell(Text(m.get('model_type', 'rnsa_knn'))),
-                        ft.DataCell(Text(f"{m.get('accuracy', 0):.2%}" if m.get('accuracy') else "N/A")),
-                        ft.DataCell(Text(str(m.get('detectors_count', 'N/A')))),
-                        ft.DataCell(Text(m.get('created_at', '')[:10] if m.get('created_at') else 'N/A')),
-                        ft.DataCell(
-                            ft.IconButton(
-                                icon=ft.Icon(ft.icons.INFO),
-                                icon_color=AppTheme.PRIMARY,
-                                tooltip="View Details",
-                                on_click=lambda e, model=m: self.view_model_details(model),
-                            )
-                        ),
-                    ]
-                )
-                for m in models
-            ],
-            heading_row_color=AppTheme.SURFACE,
-            heading_row_height=40,
-            data_row_color={ft.ControlState.HOVERED: AppTheme.PRIMARY + "20"},
-            column_spacing=20,
-            divider_thickness=0,
-        )
-        
-        return Container(
-            content=Column(
-                controls=[
-                    Text("Manage Models", size=24, weight=ft.FontWeight.BOLD),
-                    Container(height=20),
-                    
-                    Container(
-                        content=Column(
-                            controls=[models_table],
-                            scroll=ft.ScrollMode.AUTO,
-                            expand=True,
-                        ),
-                        expand=True,
-                    ),
-                ],
-                spacing=0,
-                expand=True,
-            ),
-            expand=True,
-        )
+    def get_all_users(self) -> List[Dict]:
+        """Get all users from database"""
+        try:
+            with self.db.conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT u.*, r.name as role_name
+                    FROM users u
+                    LEFT JOIN roles r ON u.role_id = r.id
+                    ORDER BY u.id
+                """)
+                return cursor.fetchall()
+        except Exception as e:
+            print(f"Error getting users: {e}")
+            return []
     
-    def create_dashboard_content(self) -> Container:
-        """Create dashboard with statistics"""
-        
-        # Get stats
-        stats = self.get_dashboard_stats()
-        
-        # Create stat cards
-        stats_row = Row(
-            controls=[
-                self.create_stat_card("Total Detections", stats["total_detections"], ft.Icon(ft.icons.ANALYTICS)),
-                self.create_stat_card("Anomalies Found", stats["anomalies_found"], ft.Icon(ft.icons.WARNING), AppTheme.ERROR),
-                self.create_stat_card("Models Trained", stats["models_trained"], ft.Icon(ft.icons.MODEL_TRAINING)),
-                self.create_stat_card("System Uptime", stats["uptime"], ft.Icon(ft.icons.ACCESS_TIME)),
-            ],
-            spacing=10,
-        )
-        
-        # Create recent anomalies table
-        anomalies_table = self.create_anomalies_table(stats["recent_anomalies"])
-        
-        # Create chart placeholder
-        chart = self.create_chart_placeholder()
-        
-        return Container(
-            content=Column(
-                controls=[
-                    Text("Dashboard", size=24, weight=ft.FontWeight.BOLD),
-                    Container(height=20),
-                    stats_row,
-                    Container(height=20),
-                    Row(
-                        controls=[
-                            Container(
-                                content=Column(
-                                    controls=[
-                                        Text("Recent Anomalies", size=18, weight=ft.FontWeight.BOLD),
-                                        Container(height=10),
-                                        anomalies_table,
-                                    ],
-                                    spacing=0,
-                                    expand=True,
-                                ),
-                                expand=1,
-                                bgcolor=AppTheme.SECONDARY,
-                                padding=padding.all(20),
-                                border_radius=border_radius.all(10),
-                                height=400,
-                            ),
-                            Container(
-                                content=Column(
-                                    controls=[
-                                        Text("Detection Trends", size=18, weight=ft.FontWeight.BOLD),
-                                        Container(height=10),
-                                        chart,
-                                    ],
-                                    spacing=0,
-                                    expand=True,
-                                ),
-                                expand=1,
-                                bgcolor=AppTheme.SECONDARY,
-                                padding=padding.all(20),
-                                border_radius=border_radius.all(10),
-                                height=400,
-                            ),
-                        ],
-                        spacing=10,
-                        expand=True,
-                    ),
-                ],
-                spacing=0,
-                expand=True,
-            ),
-            expand=True,
-        )
-    
-    def generate_summary(self, e):
-        """Generate detection summary"""
-        # TODO: Implement summary generation
-        self.show_dialog("Info", "Summary generation will be implemented")
-    
-    def create_user(self, e):
-        """Create new user dialog"""
-        username_field = TextField(label="Username")
-        email_field = TextField(label="Email")
-        role_dropdown = ft.Dropdown(
+    def show_create_user_dialog(self, e):
+        """Show create user dialog"""
+        username = TextField(label="Username", width=300)
+        email = TextField(label="Email", width=300)
+        role = Dropdown(
             label="Role",
             options=[
-                ft.dropdown.Option("Analyst"),
-                ft.dropdown.Option("Administrator"),
+                dropdown.Option("Analyst"),
+                dropdown.Option("Administrator"),
             ],
             value="Analyst",
+            width=300,
         )
         
-        async def confirm_create(e):
+        def create_user(e):
+            if not username.value or not email.value:
+                self.show_dialog("Error", "Please fill in all fields")
+                return
+            
             try:
-                # Create user with temporary password
-                result = await self.run_in_thread(
-                    self.db.create_user,
-                    username_field.value,
-                    self.auth.hash_password("temp123"),
-                    email_field.value,
-                    role_dropdown.value,
-                    self.auth.current_user['id']
+                # Generate temporary password
+                temp_password = "temp123"
+                password_hash = self.auth.hash_password(temp_password)
+                
+                # Create user
+                user_id = self.db.create_user(
+                    username=username.value,
+                    password_hash=password_hash,
+                    email=email.value,
+                    role=role.value,
+                    created_by=self.auth.current_user['id']
                 )
-                self.page.dialog.open = False
-                await self.show_dialog("Success", f"User created with temporary password: temp123")
-                self.navigate_to("manage_users")  # Refresh
-            except Exception as ex:
-                await self.show_dialog("Error", str(ex))
-            self.page.update()
+                
+                self.close_dialog()
+                self.show_dialog(
+                    "User Created",
+                    f"User '{username.value}' created successfully!\n"
+                    f"Temporary password: {temp_password}\n"
+                    f"User must change password on first login."
+                )
+                
+                # Refresh page
+                self.content_container.content = self.create_manage_users_content()
+                self.page.update()
+                
+            except Exception as e:
+                self.show_dialog("Error", f"Failed to create user: {str(e)}")
         
-        dialog = ft.AlertDialog(
+        dialog = AlertDialog(
             title=Text("Create New User"),
             content=Column(
-                controls=[username_field, email_field, role_dropdown],
-                tight=True,
-                spacing=10,
-                width=400,
+                controls=[
+                    username,
+                    Container(height=10),
+                    email,
+                    Container(height=10),
+                    role,
+                ],
+                width=350,
+                height=200,
             ),
             actions=[
-                ft.TextButton("Cancel", on_click=lambda e: self.close_dialog()),
-                ft.ElevatedButton("Create", on_click=confirm_create),
+                TextButton("Cancel", on_click=lambda e: self.close_dialog()),
+                TextButton("Create", on_click=create_user),
             ],
         )
         
@@ -847,46 +1216,51 @@ class VigilanteGUI:
         dialog.open = True
         self.page.update()
     
-    def edit_user(self, user):
-        """Edit user dialog"""
-        role_dropdown = ft.Dropdown(
+    def show_edit_user_dialog(self, user: Dict):
+        """Show edit user dialog"""
+        role = Dropdown(
             label="Role",
             options=[
-                ft.dropdown.Option("Analyst"),
-                ft.dropdown.Option("Administrator"),
+                dropdown.Option("Analyst"),
+                dropdown.Option("Administrator"),
             ],
             value=user.get('role_name', 'Analyst'),
+            width=300,
         )
         
-        async def confirm_edit(e):
+        def update_user(e):
             try:
-                result = await self.run_in_thread(
-                    self.db.update_user_role,
+                self.db.update_user_role(
                     user['id'],
-                    role_dropdown.value,
+                    role.value,
                     self.auth.current_user['id']
                 )
-                self.page.dialog.open = False
-                await self.show_dialog("Success", "User role updated")
-                self.navigate_to("manage_users")  # Refresh
-            except Exception as ex:
-                await self.show_dialog("Error", str(ex))
-            self.page.update()
+                
+                self.close_dialog()
+                self.show_dialog("Success", f"User '{user['username']}' updated")
+                
+                # Refresh page
+                self.content_container.content = self.create_manage_users_content()
+                self.page.update()
+                
+            except Exception as e:
+                self.show_dialog("Error", f"Failed to update user: {str(e)}")
         
-        dialog = ft.AlertDialog(
-            title=Text(f"Edit User: {user.get('username')}"),
+        dialog = AlertDialog(
+            title=Text(f"Edit User: {user['username']}"),
             content=Column(
                 controls=[
-                    Text(f"Email: {user.get('email')}"),
-                    role_dropdown,
+                    Text(f"Username: {user['username']}"),
+                    Text(f"Email: {user['email']}"),
+                    Container(height=10),
+                    role,
                 ],
-                tight=True,
-                spacing=10,
-                width=400,
+                width=350,
+                height=150,
             ),
             actions=[
-                ft.TextButton("Cancel", on_click=lambda e: self.close_dialog()),
-                ft.ElevatedButton("Save", on_click=confirm_edit),
+                TextButton("Cancel", on_click=lambda e: self.close_dialog()),
+                TextButton("Update", on_click=update_user),
             ],
         )
         
@@ -894,28 +1268,37 @@ class VigilanteGUI:
         dialog.open = True
         self.page.update()
     
-    def deactivate_user(self, user):
-        """Deactivate user confirmation"""
-        async def confirm_deactivate(e):
+    def deactivate_user(self, user: Dict):
+        """Deactivate a user"""
+        
+        def confirm_deactivate(e):
             try:
-                result = await self.run_in_thread(
-                    self.db.deactivate_user,
-                    user['id'],
-                    self.auth.current_user['id']
-                )
-                self.page.dialog.open = False
-                await self.show_dialog("Success", f"User {user.get('username')} deactivated")
-                self.navigate_to("manage_users")  # Refresh
-            except Exception as ex:
-                await self.show_dialog("Error", str(ex))
-            self.page.update()
+                # Prevent deactivating the only admin
+                if user.get('role_name') == 'Administrator':
+                    admin_count = self.db.count_admins()
+                    if admin_count <= 1:
+                        self.show_dialog("Error", "Cannot deactivate the only Administrator")
+                        return
+                
+                self.db.deactivate_user(user['id'], self.auth.current_user['id'])
+                self.db.invalidate_user_sessions(user['id'])
+                
+                self.close_dialog()
+                self.show_dialog("Success", f"User '{user['username']}' deactivated")
+                
+                # Refresh page
+                self.content_container.content = self.create_manage_users_content()
+                self.page.update()
+                
+            except Exception as e:
+                self.show_dialog("Error", f"Failed to deactivate user: {str(e)}")
         
-        dialog = ft.AlertDialog(
-            title=Text("Deactivate User"),
-            content=Text(f"Are you sure you want to deactivate {user.get('username')}?"),
+        dialog = AlertDialog(
+            title=Text("Confirm Deactivation"),
+            content=Text(f"Are you sure you want to deactivate user '{user['username']}'?"),
             actions=[
-                ft.TextButton("Cancel", on_click=lambda e: self.close_dialog()),
-                ft.ElevatedButton("Deactivate", on_click=confirm_deactivate, style=ft.ButtonStyle(bgcolor=AppTheme.ERROR)),
+                TextButton("Cancel", on_click=lambda e: self.close_dialog()),
+                TextButton("Deactivate", on_click=confirm_deactivate),
             ],
         )
         
@@ -923,96 +1306,94 @@ class VigilanteGUI:
         dialog.open = True
         self.page.update()
     
-    def view_model_details(self, model):
-        """View model details dialog"""
-        dialog = ft.AlertDialog(
-            title=Text(f"Model Details: {model.get('name')}"),
-            content=Column(
-                controls=[
-                    Text(f"ID: {model.get('id')}"),
-                    Text(f"Owner: {model.get('username')}"),
-                    Text(f"Type: {model.get('model_type', 'rnsa_knn')}"),
-                    Text(f"Accuracy: {model.get('accuracy', 'N/A'):.2%}" if model.get('accuracy') else "Accuracy: N/A"),
-                    Text(f"Precision: {model.get('precision', 'N/A'):.2%}" if model.get('precision') else "Precision: N/A"),
-                    Text(f"Recall: {model.get('recall', 'N/A'):.2%}" if model.get('recall') else "Recall: N/A"),
-                    Text(f"F1 Score: {model.get('f1_score', 'N/A'):.2%}" if model.get('f1_score') else "F1 Score: N/A"),
-                    Text(f"Training Samples: {model.get('training_samples', 'N/A')}"),
-                    Text(f"Detectors: {model.get('detectors_count', 'N/A')}"),
-                    Text(f"Created: {model.get('created_at')}"),
-                    Text(f"Path: {model.get('model_path')}"),
-                ],
-                tight=True,
-                spacing=5,
-                scroll=ft.ScrollMode.AUTO,
-                width=400,
-                height=400,
-            ),
-            actions=[
-                ft.TextButton("Close", on_click=lambda e: self.close_dialog()),
-            ],
-        )
+    def create_system_admin_content(self) -> Container:
+        """Create system administration view"""
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
-    
-    def create_stat_card(self, title: str, value: str, icon_name, color: str = None) -> Container:
-        """Create a statistics card"""
+        # Get database stats
+        db_stats = self.db.get_database_stats()
+        
+        # Get audit logs
+        audit_logs = self.db.get_audit_logs(30)
+        
         return Container(
             content=Column(
                 controls=[
-                    Icon(icon_name, color=color or AppTheme.PRIMARY, size=30),
-                    Text(value, size=24, weight=ft.FontWeight.BOLD, color=color or AppTheme.PRIMARY),
-                    Text(title, size=14, color=AppTheme.TEXT_SECONDARY),
+                    Text("System Administration", size=24, weight=ft.FontWeight.BOLD),
+                    Container(height=20),
+                    
+                    # Stats cards
+                    Row(
+                        controls=[
+                            self.create_stat_card("Total Users", str(db_stats.get('counts', {}).get('user_count', 0)), ft.Icons.PEOPLE),
+                            self.create_stat_card("Total Models", str(db_stats.get('counts', {}).get('model_count', 0)), ft.Icons.MODEL_TRAINING),
+                            self.create_stat_card("Total Detections", str(db_stats.get('counts', {}).get('detection_count', 0)), ft.Icons.ANALYTICS),
+                            self.create_stat_card("Active Sessions", str(db_stats.get('counts', {}).get('active_sessions', 0)), ft.Icons.LOGIN),
+                        ],
+                        spacing=10,
+                    ),
+                    
+                    Container(height=20),
+                    
+                    # Recent audit logs
+                    Card(
+                        content=Container(
+                            content=Column(
+                                controls=[
+                                    Text("Recent Audit Logs", size=18, weight=ft.FontWeight.BOLD),
+                                    Container(height=10),
+                                    self.create_audit_logs_table(audit_logs[:10]),
+                                ],
+                                spacing=0,
+                            ),
+                            padding=ft.Padding.all(20),
+                        ),
+                    ),
                 ],
-                horizontal_alignment=CrossAxisAlignment.CENTER,
-                spacing=5,
+                spacing=0,
+                expand=True,
             ),
             expand=True,
-            bgcolor=AppTheme.SECONDARY,
-            padding=padding.all(20),
-            border_radius=border_radius.all(10),
-            border=border.all(1, AppTheme.BORDER),
         )
     
-    def create_anomalies_table(self, anomalies: List[Dict]) -> Container:
-        """Create table of recent anomalies using Flet DataTable"""
+    def create_audit_logs_table(self, logs: List[Dict]) -> Container:
+        """Create audit logs table"""
         
-        if not anomalies:
+        if not logs:
             return Container(
-                content=Text("No recent anomalies", color=AppTheme.TEXT_SECONDARY),
-                padding=padding.all(20),
+                content=Text("No audit logs found", color=AppTheme.TEXT_SECONDARY),
+                padding=ft.Padding.all(20),
             )
         
-        # Create DataTable
         table = ft.DataTable(
             columns=[
-                ft.DataColumn(Text("Date")),
-                ft.DataColumn(Text("Source")),
-                ft.DataColumn(Text("Destination")),
-                ft.DataColumn(Text("Confidence")),
+                ft.DataColumn(Text("Time")),
+                ft.DataColumn(Text("User")),
+                ft.DataColumn(Text("Action")),
+                ft.DataColumn(Text("Resource")),
+                ft.DataColumn(Text("Status")),
             ],
             rows=[
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(Text(a.get("detected_at", "N/A")[:10] if a.get("detected_at") else "N/A")),
-                        ft.DataCell(Text(a.get("src_ip", "N/A"))),
-                        ft.DataCell(Text(a.get("dst_ip", "N/A"))),
+                        ft.DataCell(Text(log['created_at'].strftime("%Y-%m-%d %H:%M") if hasattr(log['created_at'], 'strftime') else str(log['created_at'])[:16])),
+                        ft.DataCell(Text(log.get('username', 'System'))),
+                        ft.DataCell(Text(log['action'])),
+                        ft.DataCell(Text(log.get('resource', '-')[:20])),
                         ft.DataCell(
                             Container(
-                                content=Text(f"{a.get('confidence', 0):.2f}"),
-                                bgcolor=AppTheme.get_severity_color(a.get("severity", "Low")),
-                                padding=padding.all(5),
-                                border_radius=border_radius.all(5),
+                                content=Text(log['status']),
+                                bgcolor=AppTheme.SUCCESS if log['status'] == 'success' else AppTheme.ERROR,
+                                padding=ft.Padding.all(5),
+                                border_radius=ft.BorderRadius.all(5),
                             )
                         ),
                     ]
                 )
-                for a in anomalies[:5]
+                for log in logs
             ],
             heading_row_color=AppTheme.SURFACE,
             heading_row_height=40,
-            data_row_color={ft.ControlState.HOVERED: AppTheme.PRIMARY + "20"},
+            data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "20"},
             column_spacing=20,
             divider_thickness=0,
         )
@@ -1022,447 +1403,88 @@ class VigilanteGUI:
                 controls=[table],
                 scroll=ft.ScrollMode.AUTO,
             ),
-            height=250,
+            height=300,
         )
     
-    def create_chart_placeholder(self) -> Container:
-        """Create placeholder for charts"""
-        return Container(
-            content=Column(
-                controls=[
-                    Icon(ft.Icon(ft.icons.SHOW_CHART), size=50, color=AppTheme.TEXT_SECONDARY),
-                    Text("Chart visualization will appear here", color=AppTheme.TEXT_SECONDARY),
-                ],
-                horizontal_alignment=CrossAxisAlignment.CENTER,
-                alignment=MainAxisAlignment.CENTER,
-            ),
-            alignment=ft.alignment.center,
-            expand=True,
-        )
-    
-    def create_detection_content(self) -> Container:
-        """Create detection interface"""
-        
-        # File picker display
-        self.file_path = TextField(
-            label="Input File",
-            hint_text="Select CSV file for detection",
-            read_only=True,
-            expand=True,
-        )
-        
-        # Model selection
-        models = self.get_user_models()
-        self.model_dropdown = Dropdown(
-            label="Select Model",
-            hint_text="Choose a trained model",
-            options=[
-                dropdown.Option(key=str(m["id"]), text=m["name"][:30])
-                for m in models
-            ] if models else [dropdown.Option(key="", text="No models available")],
-            width=300,
-        )
-        
-        # Results area
-        self.detection_results = Container(
-            content=Text("No detection results yet", color=AppTheme.TEXT_SECONDARY),
-            bgcolor=AppTheme.SECONDARY,
-            border_radius=border_radius.all(10),
-            padding=padding.all(20),
-            expand=True,
-        )
-        
-        return Container(
-            content=Column(
-                controls=[
-                    Text("Anomaly Detection", size=24, weight=ft.FontWeight.BOLD),
-                    Container(height=20),
-                    
-                    # Input section
-                    ft.Card(
-                        content=Container(
-                            content=Column(
-                                controls=[
-                                    Text("Input Configuration", size=18, weight=ft.FontWeight.BOLD),
-                                    Container(height=10),
-                                    Row(
-                                        controls=[
-                                            self.file_path,
-                                            ElevatedButton(
-                                                "Browse",
-                                                icon=ft.Icon(ft.icons.FOLDER_OPEN),
-                                                on_click=self.pick_file,
-                                                style=ft.ButtonStyle(
-                                                    color=AppTheme.PRIMARY,
-                                                    shape=ft.RoundedRectangleBorder(radius=8),
-                                                ),
-                                            ),
-                                        ],
-                                        spacing=10,
-                                    ),
-                                    Container(height=10),
-                                    Row(
-                                        controls=[
-                                            self.model_dropdown,
-                                            ElevatedButton(
-                                                "Run Detection",
-                                                icon=ft.Icon(ft.icons.PLAY_ARROW),
-                                                on_click=self.run_detection,
-                                                style=ft.ButtonStyle(
-                                                    color=AppTheme.SECONDARY,
-                                                    bgcolor=AppTheme.PRIMARY,
-                                                    shape=ft.RoundedRectangleBorder(radius=8),
-                                                ),
-                                            ),
-                                        ],
-                                        spacing=10,
-                                    ),
-                                ],
-                                spacing=0,
-                            ),
-                            padding=padding.all(20),
-                        ),
-                    ),
-                    
-                    Container(height=20),
-                    
-                    # Results section
-                    Text("Detection Results", size=18, weight=ft.FontWeight.BOLD),
-                    Container(height=10),
-                    self.detection_results,
-                ],
-                spacing=0,
-                expand=True,
-            ),
-            expand=True,
-        )
-    
-    def create_training_content(self) -> Container:
-        """Create model training interface"""
-        
-        # Training parameters
-        self.train_file = TextField(
-            label="Training Data",
-            hint_text="Select CSV file for training",
-            read_only=True,
-            expand=True,
-        )
-        
-        self.model_name = TextField(
-            label="Model Name",
-            hint_text="Enter a name for this model",
-            width=300,
-        )
-        
-        self.r_s_value = TextField(
-            label="Self Radius (r_s)",
-            hint_text="0.01",
-            value="0.01",
-            width=150,
-        )
-        
-        self.max_detectors = TextField(
-            label="Max Detectors",
-            hint_text="1000",
-            value="1000",
-            width=150,
-        )
-        
-        self.k_value = TextField(
-            label="K (neighbors)",
-            hint_text="1",
-            value="1",
-            width=150,
-        )
-        
-        # Training progress
-        self.training_progress = ProgressBar(
-            width=600,
-            visible=False,
-        )
-        
-        self.training_status = Text("", color=AppTheme.TEXT_SECONDARY)
-        
-        # Recent models table
-        recent_models_table = self.create_recent_models_table()
-        
-        return Container(
-            content=Column(
-                controls=[
-                    Text("Model Training", size=24, weight=ft.FontWeight.BOLD),
-                    Container(height=20),
-                    
-                    # Training configuration card
-                    ft.Card(
-                        content=Container(
-                            content=Column(
-                                controls=[
-                                    Text("Training Configuration", size=18, weight=ft.FontWeight.BOLD),
-                                    Container(height=10),
-                                    
-                                    Row(
-                                        controls=[
-                                            self.train_file,
-                                            ElevatedButton(
-                                                "Browse",
-                                                icon=ft.Icon(ft.icons.FOLDER_OPEN),
-                                                on_click=self.pick_training_file,
-                                                style=ft.ButtonStyle(
-                                                    color=AppTheme.PRIMARY,
-                                                    shape=ft.RoundedRectangleBorder(radius=8),
-                                                ),
-                                            ),
-                                        ],
-                                        spacing=10,
-                                    ),
-                                    
-                                    Container(height=10),
-                                    
-                                    Row(
-                                        controls=[
-                                            self.model_name,
-                                        ],
-                                        spacing=10,
-                                    ),
-                                    
-                                    Container(height=10),
-                                    
-                                    Row(
-                                        controls=[
-                                            self.r_s_value,
-                                            self.max_detectors,
-                                            self.k_value,
-                                        ],
-                                        spacing=10,
-                                    ),
-                                    
-                                    Container(height=20),
-                                    
-                                    Row(
-                                        controls=[
-                                            ElevatedButton(
-                                                "Start Training",
-                                                icon=ft.Icon(ft.icons.TRAIN),
-                                                on_click=self.start_training,
-                                                style=ft.ButtonStyle(
-                                                    color=AppTheme.SECONDARY,
-                                                    bgcolor=AppTheme.PRIMARY,
-                                                    shape=ft.RoundedRectangleBorder(radius=8),
-                                                ),
-                                            ),
-                                            self.training_progress,
-                                        ],
-                                        spacing=20,
-                                        vertical_alignment=CrossAxisAlignment.CENTER,
-                                    ),
-                                    
-                                    Container(height=10),
-                                    self.training_status,
-                                ],
-                                spacing=0,
-                            ),
-                            padding=padding.all(20),
-                        ),
-                    ),
-                    
-                    Container(height=20),
-                    
-                    # Recent models card
-                    ft.Card(
-                        content=Container(
-                            content=Column(
-                                controls=[
-                                    Text("Recent Models", size=18, weight=ft.FontWeight.BOLD),
-                                    Container(height=10),
-                                    recent_models_table,
-                                ],
-                                spacing=0,
-                                expand=True,
-                            ),
-                            padding=padding.all(20),
-                            height=300,
-                        ),
-                        expand=True,
-                    ),
-                ],
-                spacing=0,
-                expand=True,
-            ),
-            expand=True,
-        )
-    
-    def create_history_content(self) -> Container:
-        """Create detection history view"""
-        
-        # Get detection history
-        history = self.get_detection_history()
-        
-        if not history:
-            return Container(
-                content=Column(
-                    controls=[
-                        Text("Detection History", size=24, weight=ft.FontWeight.BOLD),
-                        Container(height=20),
-                        Container(
-                            content=Column(
-                                controls=[
-                                    Icon(ft.icon(ft.icons.HISTORY), size=50, color=AppTheme.TEXT_SECONDARY),
-                                    Text("No detection history available", color=AppTheme.TEXT_SECONDARY),
-                                ],
-                                horizontal_alignment=CrossAxisAlignment.CENTER,
-                                alignment=MainAxisAlignment.CENTER,
-                            ),
-                            alignment=ft.alignment.center,
-                            expand=True,
-                        ),
-                    ],
-                    spacing=0,
-                    expand=True,
-                ),
-                expand=True,
-            )
-        
-        # Create DataTable for history
-        table = ft.DataTable(
-            columns=[
-                ft.DataColumn(Text("Date")),
-                ft.DataColumn(Text("Model")),
-                ft.DataColumn(Text("Total Flows")),
-                ft.DataColumn(Text("Anomalies")),
-                ft.DataColumn(Text("Rate")),
-                ft.DataColumn(Text("Actions")),
-            ],
-            rows=[
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(Text(h["created_at"][:10] if h.get("created_at") else "N/A")),
-                        ft.DataCell(Text(h.get("model_name", "N/A")[:15])),
-                        ft.DataCell(Text(str(h.get("total_flows", 0)))),
-                        ft.DataCell(Text(str(h.get("anomalies_detected", 0)))),
-                        ft.DataCell(
-                            Text(
-                                f"{h['anomalies_detected']/h['total_flows']*100:.1f}%" 
-                                if h.get('total_flows', 0) > 0 else "0%"
-                            )
-                        ),
-                        ft.DataCell(
-                            ft.IconButton(
-                                icon=ft.icon(ft.icons.VISIBILITY),
-                                icon_color=AppTheme.PRIMARY,
-                                tooltip="View Details",
-                                on_click=lambda e, i=h: self.view_detection_details(i),
-                            )
-                        ),
-                    ]
-                )
-                for h in history[:20]
-            ],
-            heading_row_color=AppTheme.SURFACE,
-            heading_row_height=40,
-            data_row_color={ft.ControlState.HOVERED: AppTheme.PRIMARY + "20"},
-            column_spacing=20,
-            divider_thickness=0,
-        )
-        
-        return Container(
-            content=Column(
-                controls=[
-                    Text("Detection History", size=24, weight=ft.FontWeight.BOLD),
-                    Container(height=20),
-                    
-                    Container(
-                        content=Column(
-                            controls=[table],
-                            scroll=ft.ScrollMode.AUTO,
-                            expand=True,
-                        ),
-                        expand=True,
-                    ),
-                ],
-                spacing=0,
-                expand=True,
-            ),
-            expand=True,
-        )
+    # =====================================================================
+    # SETTINGS VIEW
+    # =====================================================================
     
     def create_settings_content(self) -> Container:
         """Create settings interface"""
-        
-        user = self.auth.current_user or {}
-        
         return Container(
             content=Column(
                 controls=[
                     Text("Settings", size=24, weight=ft.FontWeight.BOLD),
                     Container(height=20),
                     
-                    ft.Card(
+                    Card(
                         content=Container(
                             content=Column(
                                 controls=[
-                                    Text("User Settings", size=18, weight=ft.FontWeight.BOLD),
+                                    Text("User Profile", size=18, weight=ft.FontWeight.BOLD),
                                     Container(height=10),
                                     
-                                    ListTile(
-                                        leading=Icon(ft.Icon(ft.icons.PERSON), color=AppTheme.PRIMARY),
-                                        title=Text(f"Username: {user.get('username', 'N/A')}"),
+                                    self.create_list_tile(
+                                        leading=Icon(ft.Icons.PERSON, color=AppTheme.PRIMARY),
+                                        title=Text(f"Username: {self.auth.current_user['username']}"),
                                     ),
                                     
-                                    ListTile(
-                                        leading=Icon(ft.Icon(ft.icons.EMAIL), color=AppTheme.PRIMARY),
-                                        title=Text(f"Email: {user.get('email', 'N/A')}"),
+                                    self.create_list_tile(
+                                        leading=Icon(ft.Icons.EMAIL, color=AppTheme.PRIMARY),
+                                        title=Text(f"Email: {self.auth.current_user['email']}"),
                                     ),
                                     
-                                    ListTile(
-                                        leading=Icon(ft.Icon(ft.icons.ADMIN_PANEL_SETTINGS), color=AppTheme.PRIMARY),
-                                        title=Text(f"Role: {self.auth.current_role or 'N/A'}"),
+                                    self.create_list_tile(
+                                        leading=Icon(ft.Icons.ADMIN_PANEL_SETTINGS, color=AppTheme.PRIMARY),
+                                        title=Text(f"Role: {self.auth.current_role}"),
                                     ),
                                     
                                     Container(height=20),
                                     
-                                    ElevatedButton(
+                                    ft.Button(
                                         "Change Password",
-                                        icon=ft.icon(ft.icons.LOCK_RESET),
-                                        on_click=self.change_password,
-                                        style=ft.ButtonStyle(
+                                        icon=ft.Icons.LOCK_RESET,
+                                        on_click=self.show_change_password_dialog_ui,
+                                        style=ButtonStyle(
                                             color=AppTheme.PRIMARY,
-                                            shape=ft.RoundedRectangleBorder(radius=8),
+                                            shape=RoundedRectangleBorder(radius=8),
                                         ),
                                     ),
                                 ],
                                 spacing=0,
                             ),
-                            padding=padding.all(20),
+                            padding=ft.Padding.all(20),
                         ),
                     ),
                     
                     Container(height=20),
                     
-                    ft.Card(
+                    Card(
                         content=Container(
                             content=Column(
                                 controls=[
                                     Text("System Information", size=18, weight=ft.FontWeight.BOLD),
                                     Container(height=10),
                                     
-                                    ListTile(
-                                        leading=Icon(ft.Icon(ft.icons.COMPUTER), color=AppTheme.PRIMARY),
-                                        title=Text(f"System: {os.name}"),
+                                    self.create_list_tile(
+                                        leading=Icon(ft.Icons.COMPUTER, color=AppTheme.PRIMARY),
+                                        title=Text("System: Vigilante IDS"),
                                     ),
                                     
-                                    ListTile(
-                                        leading=Icon(ft.Icon(ft.icons.DATASET), color=AppTheme.PRIMARY),
-                                        title=Text("Database: Connected"),
+                                    self.create_list_tile(
+                                        leading=Icon(ft.Icons.DATASET, color=AppTheme.PRIMARY),
+                                        title=Text("Database: PostgreSQL (Neon)"),
                                     ),
                                     
-                                    ListTile(
-                                        leading=Icon(ft.Icon(ft.icons.MODEL_TRAINING), color=AppTheme.PRIMARY),
-                                        title=Text(f"Models: {len(self.get_user_models())}"),
+                                    self.create_list_tile(
+                                        leading=Icon(ft.Icons.MODEL_TRAINING, color=AppTheme.PRIMARY),
+                                        title=Text("Model: RNSA + KNN"),
                                     ),
                                 ],
                                 spacing=0,
                             ),
-                            padding=padding.all(20),
+                            padding=ft.Padding.all(20),
                         ),
                     ),
                 ],
@@ -1472,329 +1494,49 @@ class VigilanteGUI:
             expand=True,
         )
     
-    def create_recent_models_table(self) -> Container:
-        """Create table of recent models"""
+    def show_change_password_dialog_ui(self, e):
+        """Show change password dialog from settings"""
+        old_pass = TextField(label="Current Password", password=True, width=300)
+        new_pass = TextField(label="New Password", password=True, width=300)
+        confirm_pass = TextField(label="Confirm Password", password=True, width=300)
         
-        models = self.get_user_models()[:5]
-        
-        if not models:
-            return Container(
-                content=Text("No models trained yet", color=AppTheme.TEXT_SECONDARY),
-                padding=padding.all(20),
-            )
-        
-        table = ft.DataTable(
-            columns=[
-                ft.DataColumn(Text("Model")),
-                ft.DataColumn(Text("Date")),
-                ft.DataColumn(Text("Accuracy")),
-                ft.DataColumn(Text("Detectors")),
-            ],
-            rows=[
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(Text(m["name"][:20])),
-                        ft.DataCell(Text(m["created_at"][:10] if m.get("created_at") else "N/A")),
-                        ft.DataCell(Text(f"{m.get('accuracy', 0):.2%}")),
-                        ft.DataCell(Text(str(m.get("detectors_count", "N/A")))),
-                    ]
-                )
-                for m in models
-            ],
-            heading_row_color=AppTheme.SURFACE,
-            heading_row_height=40,
-            data_row_color={ft.ControlState.HOVERED: AppTheme.PRIMARY + "20"},
-            column_spacing=20,
-            divider_thickness=0,
-        )
-        
-        return Container(
-            content=Column(
-                controls=[table],
-                scroll=ft.ScrollMode.AUTO,
-                height=200,
-            ),
-        )
-    
-    # =====================================================================
-    # EVENT HANDLERS
-    # =====================================================================
-    
-    async def pick_file(self, e):
-        """Open file picker for detection input"""
-        await self.file_picker.pick_files(
-            allow_multiple=False,
-            allowed_extensions=["csv"]
-        )
-    
-    async def pick_training_file(self, e):
-        """Open file picker for training data"""
-        await self.training_file_picker.pick_files(
-            allow_multiple=False,
-            allowed_extensions=["csv"]
-        )
-    
-    async def run_detection(self, e):
-        """Run anomaly detection"""
-        if not self.file_path.value or not self.model_dropdown.value:
-            await self.show_dialog("Error", "Please select input file and model")
-            return
-        
-        self.detection_results.content = Column(
-            controls=[
-                ProgressRing(),
-                Text("Running detection...", color=AppTheme.TEXT_SECONDARY),
-            ],
-            horizontal_alignment=CrossAxisAlignment.CENTER,
-            alignment=MainAxisAlignment.CENTER,
-        )
-        self.page.update()
-        
-        # Run detection in thread
-        result = await self.run_in_thread(
-            self.perform_detection,
-            self.file_path.value,
-            int(self.model_dropdown.value)
-        )
-        
-        if result["success"]:
-            self.detection_results.content = self.create_detection_results_view(result["data"])
-        else:
-            self.detection_results.content = Text(
-                f"Error: {result['message']}",
-                color=AppTheme.ERROR,
-            )
-        
-        self.page.update()
-    
-    def perform_detection(self, file_path: str, model_id: int) -> Dict:
-        """Perform detection (runs in thread)"""
-        try:
-            # Get model
-            model_data = self.db.get_model(model_id, self.auth.current_user['id'])
-            if not model_data:
-                return {"success": False, "message": "Model not found"}
-            
-            # Load model
-            model = IntrusionDetectionModel.load(model_data['model_path'])
-            
-            # Load data
-            df = pd.read_csv(file_path)
-            
-            # Detect anomalies
-            X = model.preprocess_data(df, fit_scaler=False)
-            predictions, confidence_scores = model.predict(X)
-            
-            # Prepare results
-            anomalies = []
-            anomaly_indices = np.where(predictions == 1)[0]
-            
-            for idx in anomaly_indices[:50]:
-                anomalies.append({
-                    "index": int(idx),
-                    "confidence": float(confidence_scores[idx]),
-                    "severity": self.calculate_severity(confidence_scores[idx]),
-                })
-            
-            # Save to database
-            results = {
-                "total_flows": len(df),
-                "anomalies_detected": len(anomalies),
-                "anomalies": anomalies,
-            }
-            
-            detection_id = self.db.save_detection(
-                user_id=self.auth.current_user['id'],
-                model_id=model_id,
-                input_file=file_path,
-                results=results
-            )
-            
-            return {
-                "success": True,
-                "data": {
-                    "detection_id": detection_id,
-                    "total_flows": len(df),
-                    "anomalies": anomalies,
-                }
-            }
-            
-        except Exception as e:
-            return {"success": False, "message": str(e)}
-    
-    def create_detection_results_view(self, data: Dict) -> Container:
-        """Create view for detection results"""
-        
-        # Summary stats
-        stats_row = Row(
-            controls=[
-                self.create_stat_card(
-                    "Total Flows",
-                    str(data["total_flows"]),
-                    ft.icon(ft.icons.DATA_USAGE, size=24)
-                ),
-                self.create_stat_card(
-                    "Anomalies Found",
-                    str(len(data["anomalies"])),
-                    ft.icon(ft.icons.WARNING, size=24),
-                    AppTheme.ERROR
-                ),
-                self.create_stat_card(
-                    "Detection Rate",
-                    f"{len(data['anomalies'])/data['total_flows']*100:.1f}%",
-                    ft.icon(ft.icons.PERCENT, size=24)
-                ),
-            ],
-            spacing=10,
-        )
-        
-        # Anomalies list
-        anomaly_list = Column(
-            controls=[
-                Container(
-                    content=Row(
-                        controls=[
-                            Icon(ft.icon(ft.icons.WARNING), color=AppTheme.get_severity_color(a["severity"])),
-                            Text(f"Flow #{a['index']} - Confidence: {a['confidence']:.2f}"),
-                        ],
-                        spacing=10,
-                    ),
-                    padding=padding.all(10),
-                    border=border.all(1, AppTheme.BORDER),
-                    border_radius=border_radius.all(5),
-                    margin=margin.only(bottom=5),
-                )
-                for a in data["anomalies"][:20]
-            ],
-            scroll=ft.ScrollMode.AUTO,
-            spacing=5,
-        )
-        
-        return Column(
-            controls=[
-                stats_row,
-                Container(height=20),
-                Text(f"Detection ID: {data['detection_id']}", size=12, color=AppTheme.TEXT_SECONDARY),
-                Container(height=10),
-                Text("Detected Anomalies", size=16, weight=ft.FontWeight.BOLD),
-                Container(height=10),
-                Container(
-                    content=anomaly_list,
-                    height=300,
-                ),
-            ],
-            spacing=0,
-        )
-    
-    async def start_training(self, e):
-        """Start model training"""
-        if not self.train_file.value:
-            await self.show_dialog("Error", "Please select training data file")
-            return
-        
-        if not self.model_name.value:
-            await self.show_dialog("Error", "Please enter a model name")
-            return
-        
-        self.training_progress.visible = True
-        self.training_status.value = "Training in progress..."
-        self.training_status.color = AppTheme.INFO
-        self.page.update()
-        
-        # Run training in thread
-        result = await self.run_in_thread(
-            self.perform_training,
-            self.train_file.value,
-            self.model_name.value,
-            float(self.r_s_value.value),
-            int(self.max_detectors.value),
-            int(self.k_value.value)
-        )
-        
-        self.training_progress.visible = False
-        
-        if result["success"]:
-            self.training_status.value = f"Training complete! Model ID: {result['model_id']}"
-            self.training_status.color = AppTheme.SUCCESS
-        else:
-            self.training_status.value = f"Error: {result['message']}"
-            self.training_status.color = AppTheme.ERROR
-        
-        self.page.update()
-    
-    def perform_training(self, file_path: str, model_name: str, 
-                        r_s: float, max_detectors: int, k: int) -> Dict:
-        """Perform training (runs in thread)"""
-        try:
-            # Train model
-            result = self.trainer.train_model(
-                data_path=file_path,
-                model_name=model_name,
-                r_s=r_s,
-                max_detectors=max_detectors,
-                k=k,
-                dataset_name=os.path.basename(file_path)
-            )
-            
-            # Save to database
-            model_id = self.db.save_model(
-                user_id=self.auth.current_user['id'],
-                model_name=result['model_name'],
-                model_path=result['model_path'],
-                dataset_name=os.path.basename(file_path),
-                metrics=result['metrics'],
-                features=None,
-                parameters=result['parameters']
-            )
-            
-            return {
-                "success": True,
-                "model_id": model_id
-            }
-            
-        except Exception as e:
-            return {"success": False, "message": str(e)}
-    
-    async def change_password(self, e):
-        """Show change password dialog"""
-        
-        old_pass = TextField(label="Current Password", password=True)
-        new_pass = TextField(label="New Password", password=True)
-        confirm_pass = TextField(label="Confirm Password", password=True)
-        
-        async def confirm_change(e):
+        def change_password(e):
             if new_pass.value != confirm_pass.value:
-                await self.show_dialog("Error", "Passwords do not match")
+                self.show_dialog("Error", "Passwords do not match")
+                return
+            if len(new_pass.value) < 8:
+                self.show_dialog("Error", "Password must be at least 8 characters")
                 return
             
-            # Change password in thread
-            result = await self.run_in_thread(
-                self.auth.change_password,
+            # Change password
+            result = self.auth.change_password(
                 self.auth.current_user['id'],
                 old_pass.value,
                 new_pass.value
             )
             
-            self.page.dialog.open = False
-            
-            if result["success"]:
-                await self.show_dialog("Success", "Password changed successfully")
+            if result['success']:
+                self.close_dialog()
+                self.show_dialog("Success", "Password changed successfully")
             else:
-                await self.show_dialog("Error", result["message"])
-            
-            self.page.update()
+                self.show_dialog("Error", result['message'])
         
         dialog = AlertDialog(
             title=Text("Change Password"),
             content=Column(
-                controls=[old_pass, new_pass, confirm_pass],
-                tight=True,
-                spacing=10,
-                width=400,
+                controls=[
+                    old_pass,
+                    Container(height=10),
+                    new_pass,
+                    Container(height=10),
+                    confirm_pass,
+                ],
+                width=350,
+                height=250,
             ),
             actions=[
                 TextButton("Cancel", on_click=lambda e: self.close_dialog()),
-                ElevatedButton("Change", on_click=confirm_change),
+                TextButton("Change", on_click=change_password),
             ],
         )
         
@@ -1802,225 +1544,12 @@ class VigilanteGUI:
         dialog.open = True
         self.page.update()
     
-    def close_dialog(self):
-        """Close the current dialog"""
-        self.page.dialog.open = False
-        self.page.update()
-    
-    async def show_dialog(self, title: str, message: str):
-        """Show a dialog"""
-        dialog = AlertDialog(
-            title=Text(title),
-            content=Text(message),
-            actions=[
-                TextButton("OK", on_click=lambda e: self.close_dialog()),
-            ],
-        )
-        
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
-    
-    def view_detection_details(self, detection: Dict):
-        """View detailed detection results"""
-        # TODO: Implement detailed view
-        self.show_dialog("Info", "Detailed view will be implemented")
-    
-    def logout(self):
-        """Logout user"""
-        if self.auth.is_authenticated():
-            self.auth.logout()
-            self.clear_session()
-    
     # =====================================================================
-    # DATA HELPERS
+    # UTILITY METHODS
     # =====================================================================
     
-    def get_all_users(self) -> List[Dict]:
-        """Get all users from database (admin only)"""
-        try:
-            if not self.auth.is_admin():
-                return []
-            
-            # This method doesn't exist in your database.py, you'll need to add it
-            # For now, return empty list
-            return []
-        except Exception as e:
-            print(f"Error getting users: {e}")
-            return []
-    
-    def get_all_models(self) -> List[Dict]:
-        """Get all models from database (admin only)"""
-        try:
-            if not self.auth.is_admin():
-                return []
-            
-            # Use the existing method
-            models = self.db.get_all_models() if hasattr(self.db, 'get_all_models') else []
-            return [dict(m) for m in models]
-        except Exception as e:
-            print(f"Error getting all models: {e}")
-            return []
-    
-    def get_dashboard_stats(self) -> Dict:
-        """Get statistics for dashboard"""
-        try:
-            if not self.auth.is_authenticated():
-                return self.get_empty_stats()
-            
-            # Get detection history for user
-            history = self.db.get_detection_history(self.auth.current_user['id'], limit=100)
-            
-            total_detections = len(history)
-            anomalies_found = sum(h.get('anomalies_detected', 0) for h in history)
-            models = self.db.get_user_models(self.auth.current_user['id'])
-            
-            # Get recent anomalies
-            recent_anomalies = self.db.get_user_anomalies(self.auth.current_user['id'], 7)
-            
-            return {
-                "total_detections": str(total_detections),
-                "anomalies_found": str(anomalies_found),
-                "models_trained": str(len(models)),
-                "uptime": "24h",  # Placeholder
-                "recent_anomalies": recent_anomalies,
-                "detection_history": [],
-            }
-            
-        except Exception as e:
-            print(f"Error getting dashboard stats: {e}")
-            return self.get_empty_stats()
-    
-    def get_empty_stats(self) -> Dict:
-        """Return empty statistics"""
-        return {
-            "total_detections": "0",
-            "anomalies_found": "0",
-            "models_trained": "0",
-            "uptime": "N/A",
-            "recent_anomalies": [],
-            "detection_history": [],
-        }
-    
-    def get_user_models(self) -> List[Dict]:
-        """Get user's models"""
-        try:
-            if not self.auth.is_authenticated():
-                return []
-            
-            models = self.db.get_user_models(self.auth.current_user['id'])
-            return [dict(m) for m in models]
-            
-        except Exception as e:
-            print(f"Error getting models: {e}")
-            return []
-    
-    def get_detection_history(self) -> List[Dict]:
-        """Get detection history"""
-        try:
-            if not self.auth.is_authenticated():
-                return []
-            
-            history = self.db.get_detection_history(self.auth.current_user['id'], limit=100)
-            return [dict(h) for h in history]
-            
-        except Exception as e:
-            print(f"Error getting history: {e}")
-            return []
-    
-    def calculate_severity(self, confidence: float) -> str:
-        """Calculate severity based on confidence"""
-        if confidence >= 0.95:
-            return "Critical"
-        elif confidence >= 0.85:
-            return "High"
-        elif confidence >= 0.70:
-            return "Medium"
-        elif confidence >= 0.50:
-            return "Low"
-        else:
-            return "Minimal"
-    
-    # =====================================================================
-    # SESSION MANAGEMENT
-    # =====================================================================
-    
-    def load_session(self):
-        """Load session from file"""
-        # First check for token from environment/GUI
-        if hasattr(self.page, 'session_token'):
-            session_token = self.page.session_token
-            if session_token and self.auth.validate_session(session_token):
-                print(f"Session loaded for {self.auth.current_user['username']}")
-                return True
-    
-        # Then check session file as fallback
-        if self.session_file.exists():
-            try:
-                with open(self.session_file, 'r') as f:
-                    session_data = json.load(f)
-                
-                session_token = session_data.get('session_token')
-                if session_token and self.auth.validate_session(session_token):
-                    print(f"Session loaded for {self.auth.current_user['username']}")
-                    return True
-            except Exception as e:
-                print(f"Could not load session: {e}")
-    
-        return False
-    
-    def save_session(self):
-        """Save session to file"""
-        if self.auth.current_session:
-            session_data = {
-                'session_token': self.auth.current_session,
-                'username': self.auth.current_user['username'],
-                'saved_at': datetime.now().isoformat()
-            }
-            with open(self.session_file, 'w') as f:
-                json.dump(session_data, f, indent=2)
-    
-    def clear_session(self):
-        """Clear session file"""
-        if self.session_file.exists():
-            self.session_file.unlink()
-    
-    # =====================================================================
-    # ASYNC HELPERS
-    # =====================================================================
-    
-    async def run_in_thread(self, func, *args, **kwargs):
-        """Run a function in a thread pool"""
-        return await asyncio.get_event_loop().run_in_executor(
-            None, lambda: func(*args, **kwargs)
-        )
-    
-    async def process_tasks(self):
-        """Process background tasks"""
-        while True:
-            try:
-                # Check for results
-                while not self.result_queue.empty():
-                    result = self.result_queue.get_nowait()
-                    # Handle result
-                    
-                await asyncio.sleep(0.1)
-                
-            except Exception as e:
-                print(f"Error in task processor: {e}")
-                await asyncio.sleep(1)
-
-
-# =====================================================================
-# UTILITY CLASSES
-# =====================================================================
-
-class ListTile(ft.Row):
-    """Custom list tile"""
-    
-    def __init__(self, leading=None, title=None, subtitle=None, trailing=None, **kwargs):
-        super().__init__(**kwargs)
-        
+    def create_list_tile(self, leading=None, title=None, subtitle=None, trailing=None):
+        """Create a list tile"""
         controls = []
         if leading:
             controls.append(leading)
@@ -2039,9 +1568,75 @@ class ListTile(ft.Row):
         if trailing:
             controls.append(trailing)
         
-        self.controls = controls
-        self.vertical_alignment = CrossAxisAlignment.CENTER
-        self.spacing = 10
+        return Row(
+            controls=controls,
+            vertical_alignment=CrossAxisAlignment.CENTER,
+            spacing=10,
+        )
+    
+    def create_stat_card(self, title: str, value: str, icon_name, color: str = None) -> Container:
+        """Create a statistics card"""
+        return Container(
+            content=Column(
+                controls=[
+                    Icon(icon_name, color=color or AppTheme.PRIMARY, size=30),
+                    Text(value, size=24, weight=ft.FontWeight.BOLD, color=color or AppTheme.PRIMARY),
+                    Text(title, size=14, color=AppTheme.TEXT_SECONDARY),
+                ],
+                horizontal_alignment=CrossAxisAlignment.CENTER,
+                spacing=5,
+            ),
+            expand=True,
+            bgcolor=AppTheme.SECONDARY,
+            padding=ft.Padding.all(20),
+            border_radius=ft.BorderRadius.all(10),
+            border=ft.Border.all(1, AppTheme.BORDER),
+        )
+    
+    def close_dialog(self):
+        """Close the current dialog"""
+        if self.page.dialog:
+            self.page.dialog.open = False
+            self.page.update()
+    
+    def show_dialog(self, title: str, message: str):
+        """Show a dialog"""
+        dialog = AlertDialog(
+            title=Text(title),
+            content=Text(message),
+            actions=[
+                TextButton("OK", on_click=lambda e: self.close_dialog()),
+            ],
+        )
+        
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+    
+    # =====================================================================
+    # ASYNC HELPERS
+    # =====================================================================
+    
+    async def run_in_thread(self, func, *args, **kwargs):
+        """Run a function in a thread pool"""
+        return await asyncio.get_event_loop().run_in_executor(
+            None, lambda: func(*args, **kwargs)
+        )
+    
+    async def process_tasks(self):
+        """Process background tasks"""
+        while True:
+            try:
+                # Check for results
+                while not self.result_queue.empty():
+                    result = self.result_queue.get_nowait()
+                    # Handle result (placeholder)
+                
+                await asyncio.sleep(0.1)
+                
+            except Exception as e:
+                print(f"Error in task processor: {e}")
+                await asyncio.sleep(1)
 
 
 # =====================================================================
@@ -2050,26 +1645,26 @@ class ListTile(ft.Row):
 
 def main(page: Page):
     """Main GUI entry point"""
-    # Check for session token from environment
-    session_token = os.environ.get('VIGILANTE_SESSION_TOKEN')
-    if session_token:
-        # In Flet 0.82, use client_storage or store as page data
-        # Option 1: Store in client_storage (persists across sessions)
-        page.client_storage.set("vigilante.session_token", session_token)
-        
-        # Option 2: Store as a page attribute (only available in current session)
-        page.session_token = session_token
-    
     app = VigilanteGUI(page)
+
 
 if __name__ == "__main__":
     # Check if flet is installed
     try:
         import flet
+        print(f"Flet version: {flet.__version__}")
     except ImportError:
         print("Error: flet is not installed.")
         print("Please install it with: pip install flet")
         sys.exit(1)
+    
+    # Check for session token from CLI
+    session_token = os.environ.get('VIGILANTE_SESSION_TOKEN')
+    if session_token:
+        print("Starting Vigilante GUI with existing session...")
+    else:
+        print("Starting Vigilante GUI...")
+        print("Please login to continue.")
     
     # Run the app
     ft.app(target=main)
