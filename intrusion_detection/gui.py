@@ -86,6 +86,7 @@ class AppTheme:
 class VigilanteGUI:
     """Main GUI Application Class"""
     
+    # In VigilanteGUI.__init__ method, replace the FilePicker initialization:
     def __init__(self, page: Page):
         self.page = page
         self.db = DatabaseManager()
@@ -93,27 +94,40 @@ class VigilanteGUI:
         self.trainer = ModelTrainer()
         self.current_model = None
         self.session_file = Path.home() / ".vigilante_session"
-        
-        # File pickers
-        self.file_picker = FilePicker()
-        self.page.overlay.append(self.file_picker)
-        
+    
+        # File pickers - Flet 0.82 uses FilePicker without overlay
+        self.file_picker = ft.FilePicker(on_result=self.on_file_picked)
+        self.training_file_picker = ft.FilePicker(on_result=self.on_training_file_picked)
+        self.page.overlay.extend([self.file_picker, self.training_file_picker])
+    
         # Queue for background tasks
         self.task_queue = queue.Queue()
         self.result_queue = queue.Queue()
-        
+    
         # Setup page
         self.setup_page()
-        
+    
         # Load session if exists
         self.load_session()
-        
+    
         # Setup UI
         self.setup_ui()
-        
+    
         # Start background task processor
         self.page.run_task(self.process_tasks)
         
+    def on_file_picked(self, e: ft.FilePickerResultEvent):
+        """Handle file picker result for detection"""
+        if e.files:
+            self.file_path.value = e.files[0].path
+            self.page.update()
+
+    def on_training_file_picked(self, e: ft.FilePickerResultEvent):
+        """Handle file picker result for training"""
+        if e.files:
+            self.train_file.value = e.files[0].path
+            self.page.update()
+
     def setup_page(self):
         """Configure page settings"""
         self.page.title = "Vigilante - Intrusion Detection System"
@@ -226,6 +240,31 @@ class VigilanteGUI:
         
     def create_navigation_rail(self) -> Container:
         """Create navigation rail with round buttons"""
+        nav_buttons = [
+            self.create_nav_button(ft.Icon(ft.Icons.DASHBOARD, size=24), "Dashboard", "dashboard", True),
+            self.create_nav_button(ft.Icon(ft.Icons.ANALYTICS, size=24), "Detection & Training", "detection"),
+            self.create_nav_button(ft.Icon(ft.Icons.HISTORY, size=24), "System Report", "system_report"),
+        ]
+    
+        # Add admin-only buttons if user is admin
+        if self.auth.is_admin():
+            nav_buttons.extend([
+                self.create_nav_button(ft.Icon(ft.Icons.PEOPLE, size=24), "Manage Users", "manage_users"),
+                self.create_nav_button(ft.Icon(ft.Icons.MODEL_TRAINING, size=24), "Manage Models", "manage_models"),
+            ])
+    
+        nav_buttons.append(self.create_nav_button(ft.Icon(ft.Icons.SETTINGS, size=24), "Edit Profile", "settings"))
+    
+        # Add all buttons to column
+        buttons_column = Column(
+            controls=nav_buttons,
+            horizontal_alignment=CrossAxisAlignment.CENTER,
+            spacing=5,
+        )
+    
+        # Add logout button separately
+        logout_button = self.create_nav_button(ft.Icon(ft.Icons.LOGOUT, size=24), "Logout", "logout", False, AppTheme.ERROR)
+    
         return Container(
             width=80,
             bgcolor=AppTheme.SECONDARY,
@@ -237,44 +276,36 @@ class VigilanteGUI:
                     # Logo/Icon at top
                     Container(
                         content=Icon(
-                            ft.Icon(ft.Icons.SECURITY, size=24),
+                            ft.Icon(ft.Icons.SECURITY, size=40),
                             color=AppTheme.PRIMARY,
-                            size=40,
                         ),
                         padding=padding.all(15),
                     ),
-                    
                     # Navigation buttons
-                    self.create_nav_button(ft.Icon(ft.Icons.DASHBOARD, size=24), "Dashboard", "dashboard", True),
-                    self.create_nav_button(ft.Icon(ft.Icons.ANALYTICS, size=24), "Detection", "detection"),
-                    self.create_nav_button(ft.Icon(ft.Icons.MODEL_TRAINING, size=24), "Training", "training"),
-                    self.create_nav_button(ft.Icon(ft.Icons.HISTORY, size=24), "History", "history"),
-                    self.create_nav_button(ft.Icon(ft.Icons.SETTINGS, size=24), "Settings", "settings"),
-                    
-                    # Spacer to push logout to bottom
-                    Container(expand=True),
-                    
-                    # Logout button at bottom
-                    self.create_nav_button(icon=ft.Icon(ft.Icons.LOGOUT, size=24), tooltip="Logout", view="logout", selected=False, color=AppTheme.ERROR),
+                    Container(content=buttons_column, expand=True),
+                    # Logout at bottom
+                    logout_button,
+                    Container(height=10),
                 ],
                 horizontal_alignment=CrossAxisAlignment.CENTER,
-                spacing=5,
+                spacing=0,
+                expand=True,
             ),
         )
-        
-    def create_nav_button(self, icon: str, tooltip: str, view: str, 
+
+    def create_nav_button(self, icon_name, tooltip: str, view: str, 
                           selected: bool = False, color: str = None) -> Container:
-        """Create a round navigation button"""
+        """Create a round navigation button - Flet 0.82 compatible"""
         return Container(
             content=ft.IconButton(
-                icon=icon,
+                icon=icon_name,
                 icon_size=24,
                 icon_color=color or (AppTheme.PRIMARY if selected else AppTheme.TEXT_SECONDARY),
                 tooltip=tooltip,
                 on_click=lambda e, v=view: self.navigate_to(v),
                 style=ft.ButtonStyle(
                     shape=ft.RoundedRectangleBorder(radius=25),
-                    bgcolor=AppTheme.SURFACE if selected else AppTheme.SECONDARY,
+                    bgcolor={ft.ControlState.DEFAULT: AppTheme.SURFACE if selected else AppTheme.SECONDARY},
                 ),
             ),
             padding=padding.all(10),
@@ -437,7 +468,259 @@ class VigilanteGUI:
                 return self.auth.login(username, password)
         except Exception as e:
             return {"success": False, "message": str(e)}
-            
+
+    # handle admin pages
+    def navigate_to(self, view: str):
+        """Handle navigation between views"""
+        # Load appropriate view
+        if view == "dashboard":
+            content = self.create_dashboard_content()
+        elif view == "detection":
+            content = self.create_detection_content()
+        elif view == "system_report":
+            content = self.create_system_report_content()
+        elif view == "manage_users":
+            # Check if user is admin
+            if not self.auth.is_admin():
+                self.show_dialog("Access Denied", "This page is only available to administrators")
+                return
+            content = self.create_manage_users_content()
+        elif view == "manage_models":
+            # Check if user is admin
+            if not self.auth.is_admin():
+                self.show_dialog("Access Denied", "This page is only available to administrators")
+                return
+            content = self.create_manage_models_content()
+        elif view == "settings":
+            content = self.create_settings_content()
+        elif view == "logout":
+            self.logout()
+            content = self.create_login_content()
+        else:
+            content = self.create_dashboard_content()
+        
+        self.content_container.content = content
+        self.page.update()
+
+    def create_system_report_content(self) -> Container:
+        """Create system report view for analysts"""
+        return Container(
+            content=Column(
+                controls=[
+                    Text("System Report", size=24, weight=ft.FontWeight.BOLD),
+                    Container(height=20),
+                
+                    # Period selection
+                    Row(
+                        controls=[
+                            ft.Dropdown(
+                                label="Report Period",
+                                value="7d",
+                                options=[
+                                    ft.dropdown.Option("1d", "Last 24 Hours"),
+                                    ft.dropdown.Option("7d", "Last 7 Days"),
+                                    ft.dropdown.Option("30d", "Last 30 Days"),
+                                    ft.dropdown.Option("90d", "Last 90 Days"),
+                                ],
+                                width=200,
+                            ),
+                            ElevatedButton(
+                                "Generate Summary",
+                                icon=ft.Icon(ft.Icons.FILE_DOWNLOAD, size=24),
+                                on_click=self.generate_summary,
+                                style=ft.ButtonStyle(
+                                    color=AppTheme.SECONDARY,
+                                    bgcolor=AppTheme.PRIMARY,
+                                ),
+                            ),
+                        ],
+                        spacing=10,
+                    ),
+                    Container(height=20),
+                
+                    # Summary results area
+                    Container(
+                        content=Column(
+                            controls=[
+                                Text("Detection Summary", size=18, weight=ft.FontWeight.BOLD),
+                                Container(height=10),
+                                # Summary stats will be populated here
+                                self.create_summary_stats_placeholder(),
+                            ],
+                            spacing=0,
+                        ),
+                        bgcolor=AppTheme.SECONDARY,
+                        padding=padding.all(20),
+                        border_radius=border_radius.all(10),
+                        expand=True,
+                    ),
+                ],
+                spacing=0,
+                expand=True,
+            ),
+            expand=True,
+        )
+
+    def create_manage_users_content(self) -> Container:
+        """Create user management view (admin only)"""
+        # Fetch users from database
+        users = self.db.get_all_users() if hasattr(self.db, 'get_all_users') else []
+    
+        # Create users table
+        users_table = ft.DataTable(
+            columns=[
+                ft.DataColumn(Text("Username")),
+                ft.DataColumn(Text("Email")),
+                ft.DataColumn(Text("Role")),
+                ft.DataColumn(Text("Status")),
+                ft.DataColumn(Text("Actions")),
+            ],
+            rows=[
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(Text(user.get('username', ''))),
+                        ft.DataCell(Text(user.get('email', ''))),
+                        ft.DataCell(Text(user.get('role_name', 'Analyst'))),
+                        ft.DataCell(
+                            Container(
+                                content=Text("Active" if user.get('is_active', True) else "Inactive"),
+                                bgcolor=AppTheme.SUCCESS if user.get('is_active', True) else AppTheme.ERROR,
+                                padding=padding.all(5),
+                                border_radius=border_radius.all(5),
+                            )
+                        ),
+                        ft.DataCell(
+                            Row(
+                                controls=[
+                                    ft.IconButton(
+                                        icon=ft.Icon(ft.Icons.EDIT, size=24),
+                                        icon_color=AppTheme.PRIMARY,
+                                        tooltip="Edit User",
+                                        on_click=lambda e, u=user: self.edit_user(u),
+                                    ),
+                                    ft.IconButton(
+                                        icon=ft.Icon(ft.Icons.DELETE, size=24),
+                                        icon_color=AppTheme.ERROR,
+                                        tooltip="Deactivate User",
+                                        on_click=lambda e, u=user: self.deactivate_user(u),
+                                    ),
+                                ],
+                                spacing=5,
+                            )
+                        ),
+                    ]
+                )
+                for user in users
+            ],
+            heading_row_color=AppTheme.SURFACE,
+            heading_row_height=40,
+            data_row_color={ft.ControlState.HOVERED: AppTheme.PRIMARY + "20"},
+            column_spacing=20,
+            divider_thickness=0,
+        )
+    
+        return Container(
+            content=Column(
+                controls=[
+                    Row(
+                        controls=[
+                            Text("Manage Users", size=24, weight=ft.FontWeight.BOLD),
+                            ElevatedButton(
+                                "Create New User",
+                                icon=ft.Icon(ft.Icons.PERSON_ADD, size=24),
+                                on_click=self.create_user,
+                                style=ft.ButtonStyle(
+                                    color=AppTheme.SECONDARY,
+                                    bgcolor=AppTheme.PRIMARY,
+                                ),
+                            ),
+                        ],
+                        alignment=MainAxisAlignment.SPACE_BETWEEN,
+                    ),
+                    Container(height=20),
+                
+                    Container(
+                        content=Column(
+                            controls=[users_table],
+                            scroll=ft.ScrollMode.AUTO,
+                            expand=True,
+                        ),
+                        expand=True,
+                    ),
+                ],
+                spacing=0,
+                expand=True,
+            ),
+            expand=True,
+        )
+
+    def create_manage_models_content(self) -> Container:
+        """Create model management view (admin only)"""
+        # Get all models from database
+        models = self.db.get_all_models() if hasattr(self.db, 'get_all_models') else []
+    
+        # Create models table
+        models_table = ft.DataTable(
+            columns=[
+                ft.DataColumn(Text("ID")),
+                ft.DataColumn(Text("Model Name")),
+                ft.DataColumn(Text("Owner")),
+                ft.DataColumn(Text("Type")),
+                ft.DataColumn(Text("Accuracy")),
+                ft.DataColumn(Text("Detectors")),
+                ft.DataColumn(Text("Created")),
+                ft.DataColumn(Text("Actions")),
+            ],
+            rows=[
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(Text(str(m.get('id', '')))),
+                        ft.DataCell(Text(m.get('name', '')[:20])),
+                        ft.DataCell(Text(m.get('username', 'N/A'))),
+                        ft.DataCell(Text(m.get('model_type', 'rnsa_knn'))),
+                        ft.DataCell(Text(f"{m.get('accuracy', 0):.2%}" if m.get('accuracy') else "N/A")),
+                        ft.DataCell(Text(str(m.get('detectors_count', 'N/A')))),
+                        ft.DataCell(Text(m.get('created_at', '')[:10] if m.get('created_at') else 'N/A')),
+                        ft.DataCell(
+                            ft.IconButton(
+                                icon=ft.Icon(ft.Icons.INFO, size=24),
+                                icon_color=AppTheme.PRIMARY,
+                                tooltip="View Details",
+                                on_click=lambda e, model=m: self.view_model_details(model),
+                            )
+                        ),
+                    ]
+                )
+                for m in models
+            ],
+            heading_row_color=AppTheme.SURFACE,
+            heading_row_height=40,
+            data_row_color={ft.ControlState.HOVERED: AppTheme.PRIMARY + "20"},
+            column_spacing=20,
+            divider_thickness=0,
+        )
+    
+        return Container(
+            content=Column(
+                controls=[
+                    Text("Manage Models", size=24, weight=ft.FontWeight.BOLD),
+                    Container(height=20),
+                
+                    Container(
+                        content=Column(
+                            controls=[models_table],
+                            scroll=ft.ScrollMode.AUTO,
+                            expand=True,
+                        ),
+                        expand=True,
+                    ),
+                ],
+                spacing=0,
+                expand=True,
+            ),
+            expand=True,
+        )
+        
     def create_dashboard_content(self) -> Container:
         """Create dashboard with statistics"""
         
@@ -512,7 +795,161 @@ class VigilanteGUI:
             ),
             expand=True,
         )
-        
+    
+    def generate_summary(self, e):
+        """Generate detection summary (handle_summary functionality)"""
+        # Implementation from handle_summary in cli.py
+        pass
+
+    def create_user(self, e):
+        """Create new user dialog"""
+        username_field = TextField(label="Username")
+        email_field = TextField(label="Email")
+        role_dropdown = ft.Dropdown(
+            label="Role",
+            options=[
+                ft.dropdown.Option("Analyst"),
+                ft.dropdown.Option("Administrator"),
+            ],
+            value="Analyst",
+        )
+    
+        async def confirm_create(e):
+            # Call handle_admin_user_create functionality
+            result = await self.run_in_thread(
+                self.db.create_user,
+                username_field.value,
+                "temp123",  # temporary password
+                email_field.value,
+                role_dropdown.value,
+                self.auth.current_user['id']
+            )
+            self.page.dialog.open = False
+            await self.show_dialog("Success", f"User created with temporary password: temp123")
+            self.navigate_to("manage_users")  # Refresh
+            self.page.update()
+    
+        dialog = ft.AlertDialog(
+            title=Text("Create New User"),
+            content=Column(
+                controls=[username_field, email_field, role_dropdown],
+                tight=True,
+                spacing=10,
+            ),
+            actions=[
+                ft.TextButton("Cancel", on_click=lambda e: self.close_dialog()),
+                ft.ElevatedButton("Create", on_click=confirm_create),
+            ],
+        )
+    
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+
+    def edit_user(self, user):
+        """Edit user dialog"""
+        role_dropdown = ft.Dropdown(
+            label="Role",
+            options=[
+                ft.dropdown.Option("Analyst"),
+                ft.dropdown.Option("Administrator"),
+            ],
+            value=user.get('role_name', 'Analyst'),
+        )
+    
+        async def confirm_edit(e):
+            # Call handle_admin_user_modify functionality
+            result = await self.run_in_thread(
+                self.db.update_user_role,
+                user['id'],
+                role_dropdown.value,
+                self.auth.current_user['id']
+            )
+            self.page.dialog.open = False
+            await self.show_dialog("Success", "User role updated")
+            self.navigate_to("manage_users")  # Refresh
+            self.page.update()
+    
+        dialog = ft.AlertDialog(
+            title=Text(f"Edit User: {user.get('username')}"),
+            content=Column(
+                controls=[
+                    Text(f"Email: {user.get('email')}"),
+                    role_dropdown,
+                ],
+                tight=True,
+                spacing=10,
+            ),
+            actions=[
+                ft.TextButton("Cancel", on_click=lambda e: self.close_dialog()),
+                ft.ElevatedButton("Save", on_click=confirm_edit),
+            ],
+        )
+    
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+
+    def deactivate_user(self, user):
+        """Deactivate user confirmation"""
+        async def confirm_deactivate(e):
+            # Call handle_admin_user_deactivate functionality
+            result = await self.run_in_thread(
+                self.db.deactivate_user,
+                user['id'],
+                self.auth.current_user['id']
+            )
+            self.page.dialog.open = False
+            await self.show_dialog("Success", f"User {user.get('username')} deactivated")
+            self.navigate_to("manage_users")  # Refresh
+            self.page.update()
+    
+        dialog = ft.AlertDialog(
+            title=Text("Deactivate User"),
+            content=Text(f"Are you sure you want to deactivate {user.get('username')}?"),
+            actions=[
+                ft.TextButton("Cancel", on_click=lambda e: self.close_dialog()),
+                ft.ElevatedButton("Deactivate", on_click=confirm_deactivate, style=ft.ButtonStyle(bgcolor=AppTheme.ERROR)),
+            ],
+        )
+    
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+
+    def view_model_details(self, model):
+        """View model details dialog"""
+        dialog = ft.AlertDialog(
+            title=Text(f"Model Details: {model.get('name')}"),
+            content=Column(
+                controls=[
+                    Text(f"ID: {model.get('id')}"),
+                    Text(f"Owner: {model.get('username')}"),
+                    Text(f"Type: {model.get('model_type', 'rnsa_knn')}"),
+                    Text(f"Accuracy: {model.get('accuracy', 'N/A'):.2%}" if model.get('accuracy') else "Accuracy: N/A"),
+                    Text(f"Precision: {model.get('precision', 'N/A'):.2%}" if model.get('precision') else "Precision: N/A"),
+                    Text(f"Recall: {model.get('recall', 'N/A'):.2%}" if model.get('recall') else "Recall: N/A"),
+                    Text(f"F1 Score: {model.get('f1_score', 'N/A'):.2%}" if model.get('f1_score') else "F1 Score: N/A"),
+                    Text(f"Training Samples: {model.get('training_samples', 'N/A')}"),
+                    Text(f"Detectors: {model.get('detectors_count', 'N/A')}"),
+                    Text(f"Created: {model.get('created_at')}"),
+                    Text(f"Path: {model.get('model_path')}"),
+                ],
+                tight=True,
+                spacing=5,
+                scroll=ft.ScrollMode.AUTO,
+                width=400,
+                height=400,
+            ),
+            actions=[
+                ft.TextButton("Close", on_click=lambda e: self.close_dialog()),
+            ],
+        )
+    
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+
     def create_stat_card(self, title: str, value: str, icon: str, color: str = None) -> Container:
         """Create a statistics card"""
         return Container(
@@ -1579,10 +2016,16 @@ class ListTile(ft.Row):
 # MAIN ENTRY POINT
 # =====================================================================
 
+# Update the main function at the end of gui.py:
 def main(page: Page):
     """Main GUI entry point"""
+    # Check for session token from environment
+    session_token = os.environ.get('VIGILANTE_SESSION_TOKEN')
+    if session_token:
+        # Store in page data for the app to use
+        page.session.set("token", session_token)
+    
     app = VigilanteGUI(page)
-
 
 if __name__ == "__main__":
     # Check if flet is installed

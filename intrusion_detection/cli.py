@@ -228,12 +228,16 @@ Examples:
             # Set environment variables for flet
             os.environ['FLET_SERVER_PORT'] = str(args.port)
         
+            # Pass session token to GUI if authenticated
+            if self.auth.is_authenticated():
+                os.environ['VIGILANTE_SESSION_TOKEN'] = self.auth.current_session
+        
             if args.web:
                 os.environ['FLET_WEB'] = 'true'
                 console.print(f"[green]✓ GUI will open in your browser at http://localhost:{args.port}[/green]")
             else:
                 console.print(f"[green]✓ GUI window opening on port {args.port}...[/green]")
-            
+        
             # Run the GUI
             ft.app(target=gui_main)
         
