@@ -83,12 +83,12 @@ class AuthManager:
                         <p>Hello {username},</p>
                         <p>You are attempting to log in to the Vigilante Intrusion Detection System.</p>
                         <p>Please use the following One-Time Password (OTP) to complete your login:</p>
-                        
+                    
                         <div class="otp-code">{otp_code}</div>
-                        
+                    
                         <p class="warning">⚠️ This OTP is valid for 10 minutes only.</p>
                         <p>If you did not request this login, please ignore this email and contact your system administrator immediately.</p>
-                        
+                    
                         <p>Best regards,<br>The Vigilante Security Team</p>
                     </div>
                     <div class="footer">
@@ -99,17 +99,19 @@ class AuthManager:
             </body>
             </html>
             """
-            
+        
+            from_address = f"Vigilante Security <{self.from_email}>"
+        
             r = resend.Emails.send({
-                "from": "Vigilante Security <{self.from_email}>",
+                "from": from_address,
                 "to": email,
                 "subject": "Vigilante Security - OTP Verification Code",
                 "html": html_content
             })
-            
+        
             print(f"✅ OTP email sent to {email}")
             return True
-            
+        
         except Exception as e:
             print(f"❌ Failed to send OTP email: {e}")
             return False
