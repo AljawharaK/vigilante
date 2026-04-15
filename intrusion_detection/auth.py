@@ -21,9 +21,16 @@ class AuthManager:
         self.current_role = None
         self.permissions = {}
         
-        # Initialize Resend
-        resend.api_key = os.getenv("RESEND_API_KEY", "re_K6L2ohfP_EN3BDtPaKCQ9yS9mco6hX6QQ")
+        # Initialize Resend - FIX: Remove hardcoded fallback
+        resend.api_key = os.getenv("RESEND_API_KEY")
+        if not resend.api_key:
+            raise ValueError("RESEND_API_KEY not found in environment variables")
     
+        # Store email configuration
+        self.from_email = os.getenv("RESEND_FROM_EMAIL")
+        if not self.from_email:
+            raise ValueError("RESEND_FROM_EMAIL not found in environment variables")
+
     def hash_password(self, password: str) -> str:
         """Hash a password using bcrypt"""
         salt = bcrypt.gensalt()
@@ -94,7 +101,7 @@ class AuthManager:
             """
             
             r = resend.Emails.send({
-                "from": "Vigilante Security <noreply@updates.vigilanteapps.com>",
+                "from": "Vigilante Security <{self.from_email}>",
                 "to": email,
                 "subject": "Vigilante Security - OTP Verification Code",
                 "html": html_content

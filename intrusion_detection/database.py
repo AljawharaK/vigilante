@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 import urllib.parse
+import bcrypt
 
 load_dotenv()
 
@@ -23,12 +24,9 @@ class DatabaseManager:
     def connect(self):
         """Connect to Neon PostgreSQL database"""
         try:
-            connection_string = os.getenv(
-                "DATABASE_URL",
-                "postgresql://neondb_owner:npg_xwSq6emIHk2v@"
-                "ep-jolly-hall-abac7zg7-pooler.eu-west-2.aws.neon.tech/"
-                "neondb?sslmode=require&channel_binding=require"
-            )
+            connection_string = os.getenv("DATABASE_URL")
+            if not connection_string:
+                raise ValueError("DATABASE_URL not found in environment variables")
             
             self.conn = psycopg2.connect(
                 connection_string,
@@ -194,12 +192,18 @@ class DatabaseManager:
                 """)
                 
                 # Create admin user if not exists - FIXED: Set must_change_password = TRUE
+                admin_password_hash = os.getenv("ADMIN_PASSWORD_HASH")
+                if not admin_password_hash:
+                    # Generate a secure default or raise error
+                    admin_password_hash = bcrypt.hashpw(b"changeme123", bcrypt.gensalt()).decode('utf-8')
+                    print("⚠️ No ADMIN_PASSWORD_HASH in .env, using default 'changeme123'")
+            
                 cursor.execute("""
                     INSERT INTO users (username, password_hash, email, role_id, must_change_password)
-                    SELECT 'admin1', '$2a$12$9tjqutyvxOG5HXBcWRJpmeoY.xdl38L1eqZri3Ahu0ppfcic1B7JW', 'example@gmail.com', 1, FALSE
+                    SELECT 'admin1', %s, %s, 1, FALSE
                     WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin1');
-                """)
-                
+                """, (admin_password_hash, os.getenv("ADMIN_EMAIL", "admin@vigilante.com")))
+            
                 self.conn.commit()
                 print("✅ Database tables initialized successfully")
                 
