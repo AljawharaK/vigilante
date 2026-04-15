@@ -24,11 +24,27 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 import traceback
+from importlib import resources
 from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+def _resolve_logo_path() -> str:
+    local_path = Path(__file__).parent / 'assets' / 'Vigilante_logo.png'
+    if local_path.exists():
+        return str(local_path)
 
+    try:
+        package_asset = resources.files(__package__).joinpath('assets', 'Vigilante_logo.png')
+        with resources.as_file(package_asset) as resource_path:
+            if resource_path.exists():
+                return str(resource_path)
+    except Exception:
+        pass
+
+    return str(local_path)
+
+logo_path = _resolve_logo_path()
 # Import real modules
 from intrusion_detection.database import DatabaseManager
 from intrusion_detection.auth import AuthManager
@@ -206,7 +222,11 @@ class VigilanteGUI:
         login_container = Container(
             content=Column(
                 controls=[
-                    Icon(ft.Icons.SECURITY, size=60, color=AppTheme.PRIMARY),
+                    ft.Image(
+                        src=logo_path,
+                        width=80,
+                        height=80,
+                    ),
                     Text("VIGILANTE", size=32, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
                     Text("Intrusion Detection System", size=16, color=AppTheme.TEXT_SECONDARY),
                     Container(height=30),
@@ -439,7 +459,7 @@ class VigilanteGUI:
         """Create application header with role badge"""
         
         # Determine role badge color
-        role_color = AppTheme.PRIMARY if self.auth.is_admin() else AppTheme.INFO
+        # role_color = AppTheme.PRIMARY if self.auth.is_admin() else AppTheme.INFO # تعديل بشاير
         role_icon = ft.Icons.ADMIN_PANEL_SETTINGS if self.auth.is_admin() else ft.Icons.VISIBILITY
         
         # Safely get username
@@ -450,10 +470,10 @@ class VigilanteGUI:
                 controls=[
                     Row(
                         controls=[
-                            Icon(
-                                ft.Icons.SECURITY,
-                                size=24,
-                                color=AppTheme.PRIMARY,
+                            ft.Image(
+                                src=logo_path,
+                                width=70,
+                                height=70,
                             ),
                             Text(
                                 "VIGILANTE",
@@ -474,26 +494,27 @@ class VigilanteGUI:
                             Container(
                                 content=Row(
                                     controls=[
-                                        Icon(role_icon, size=16, color=role_color),
+                                        Icon(role_icon, size=16, color="#000000"),
                                         Text(
                                             self.auth.current_role or "Analyst",
                                             size=14,
-                                            color=role_color,
+                                            color= AppTheme.BACKGROUND,
                                             weight=ft.FontWeight.BOLD,
                                         ),
                                         Text(
                                             f"({username})",
-                                            size=12,
-                                            color=AppTheme.TEXT_SECONDARY,
+                                            size=14,
+                                            color=AppTheme.BACKGROUND,
+                                            weight=ft.FontWeight.BOLD,
                                         ),
                                     ],
                                     spacing=5,
                                 ),
-                                bgcolor=role_color + "20",
+                                bgcolor=AppTheme.SUCCESS,
                                 padding=ft.Padding.all(8),
                                 border_radius=ft.BorderRadius.all(5),
-                                border=ft.Border.all(1, role_color + "40"),
-                            ),
+                                border=ft.Border.all(1, AppTheme.SUCCESS ),
+                            ), 
                             self.create_status_indicator(),
                         ],
                         spacing=10,
@@ -563,11 +584,11 @@ class VigilanteGUI:
                 controls=[
                     # Logo/Icon at top
                     Container(
-                        content=Icon(
-                            ft.Icons.SECURITY,
-                            color=AppTheme.PRIMARY,
-                            size=40,
-                        ),
+                        # content=Icon( # تعديل بشاير
+                        #     ft.Icons.SECURITY,
+                        #     color=AppTheme.PRIMARY,
+                        #     size=40,
+                        # ),
                         padding=ft.Padding.all(15),
                     ),
                     # Navigation buttons
