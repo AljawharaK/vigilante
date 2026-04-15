@@ -360,8 +360,8 @@ class RNSA_KNN_Model:
         roc_auc = auc(fpr, tpr)
         
         # Find optimal threshold (Youden's J statistic)
-        youden_j = tpr - fpr
-        optimal_idx = np.argmax(youden_j)
+        threshold = tpr - fpr
+        optimal_idx = np.argmax(threshold)
         optimal_threshold = thresholds[optimal_idx]
         
         # Calculate metrics at optimal threshold
@@ -399,53 +399,70 @@ class RNSA_KNN_Model:
             'detectors_count': len(self.detectors)
         }
 
-    def save(self, path: str):
-        """Save model to file"""
+    def save(self, model_name: str):
+        """Save complete model to disk - exactly like RNSA_KNN_training code"""
+        # Ensure .joblib extension
+        if not model_name.endswith('.joblib'):
+            model_name = f"{model_name}.joblib"
+    
+        model_path = os.path.join(self.model_dir, model_name)
+    
+        # Save all model data in one file - MATCHING RNSA_KNN_training format
         model_data = {
-            'r_s': self.r_s,
-            'max_detectors': self.max_detectors,
-            'k': self.k,
-            'detectors': [(det.center.tolist(), det.radius) for det in self.detectors],
-            'scaler': self.scaler,
-            'knn': self.knn,
+            'model': self.model,
             'feature_names': self.feature_names,
             'metrics': self.metrics,
-            'threshold': self.threshold,
-            'datasets_trained_on': self.datasets_trained_on,
-            'all_training_data': self.all_training_data,
-            'all_training_labels': self.all_training_labels,
-            'expected_n_features': self.expected_n_features
+            'threshold': float(self.threshold),
+            'model_type': 'rnsa_knn',
+            'scaler': self.scaler if hasattr(self, 'scaler') else None,
+            'feature_mapping': self.feature_mapping,
+            'core_features': self.CORE_FEATURES,
+            'feature_stats': getattr(self.model, 'feature_stats', {})  # Match training code
         }
-        joblib.dump(model_data, path)
-        print(f"Model saved to: {path}")
-        return path
+    
+        joblib.dump(model_data, model_path)
+    
+        print(f"Model saved to: {model_path}")
+        return model_path
 
     @classmethod
-    def load(cls, path: str):
-        """Load model from file"""
-        model_data = joblib.load(path)
-        model = cls(
-            r_s=model_data['r_s'],
-            max_detectors=model_data['max_detectors'],
-            k=model_data['k'],
-            estimated_coverage=model_data['estimated_coverage']
-        )
-        
-        model.detectors = [
-            Detector(np.array(center), radius) 
-            for center, radius in model_data['detectors']
-        ]
-        
-        model.scaler = model_data['scaler']
-        model.knn = model_data['knn']
+    def load(cls, model_path: str):
+        """Load complete model from disk - exactly like RNSA_KNN_training code"""
+        # Check if path exists
+        if not os.path.exists(model_path):
+            # Try adding .joblib extension
+            if not model_path.endswith('.joblib'):
+                model_path = f"{model_path}.joblib"
+            if not os.path.exists(model_path):
+                raise FileNotFoundError(f"Model file not found: {model_path}")
+    
+        # Load the model data
+        model_data = joblib.load(model_path)
+    
+        # Create model instance
+        model = cls(model_dir=os.path.dirname(model_path))
+    
+        # Restore components - matching training code structure
+        model.model = model_data['model']
         model.feature_names = model_data['feature_names']
         model.metrics = model_data['metrics']
         model.threshold = model_data['threshold']
-        model.datasets_trained_on = model_data.get('datasets_trained_on', [])
-        model.all_training_data = model_data.get('all_training_data')
-        model.all_training_labels = model_data.get('all_training_labels')
-        model.expected_n_features = model_data.get('expected_n_features')
-        
+        model.feature_mapping = model_data.get('feature_mapping', {})
+    
+        # Restore scaler - match training code
+        if 'scaler' in model_data and model_data['scaler'] is not None:
+            model.scaler = model_data['scaler']
+        elif hasattr(model.model, 'scaler'):
+            model.scaler = model.model.scaler
+    
+        # Set core features - match training code
+        if 'core_features' in model_data:
+            model.CORE_FEATURES = model_data['core_features']
+    
+        # Restore feature stats if present
+        if hasattr(model.model, 'feature_stats'):
+            model.model.feature_stats = model_data.get('feature_stats', {})
+    
         return model
 
 

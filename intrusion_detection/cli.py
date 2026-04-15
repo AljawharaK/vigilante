@@ -753,17 +753,16 @@ Examples:
                     json.dump(report_data, f, indent=2, default=str)
                 console.print(f"[yellow]JSON report saved to: {json_output}[/yellow]")
 
-    # Detection Commands
     def handle_detect(self, args):
-        """Handle anomaly detection with feature alignment"""
-    
+        """Handle anomaly detection with feature alignment - exactly like RNSA_KNN_training"""
+        
         if not self.check_permission('run_detection'):
             return
 
         if not os.path.exists(args.input):
             console.print(f"[red]Input file not found: {args.input}[/red]")
             return
-    
+        
         # Load model
         model = None
         if args.model_id:
@@ -774,26 +773,26 @@ Examples:
                 return
 
             model_path = model_data['model_path']
-    
+        
             # Check if path exists
             if not os.path.exists(model_path):
                 console.print(f"[red]Model file not found: {model_path}[/red]")
-        
+            
                 # Try alternative paths
                 possible_paths = [
-                model_path,
+                    model_path,
                     os.path.join("saved_models", os.path.basename(model_path)),
                     os.path.basename(model_path),
                     os.path.join("models", os.path.basename(model_path))
                 ]
-        
+            
                 found = False
                 for path in possible_paths:
                     if os.path.exists(path):
                         model_path = path
                         found = True
                         break
-        
+            
                 if not found:
                     console.print("[red]Could not locate model file[/red]")
                     return
@@ -825,10 +824,10 @@ Examples:
         feature_info = model.get_feature_summary()
         console.print(f"[cyan]Model expects {feature_info['features_count']} core features[/cyan]")
 
-        # Perform detection with timing
+        # Perform detection
         import time
         start_time = time.time()
-    
+        
         self.db.set_long_timeout()
 
         try:
@@ -842,47 +841,44 @@ Examples:
                 # Load data
                 df = pd.read_csv(args.input)
                 console.print(f"[cyan]Loaded {len(df)} records from {args.input}[/cyan]")
-        
+            
                 # Check if data has labels
                 has_labels = False
                 y_true = None
-                label_col = None
-                label_column_name = None  # Store the actual column name
+                label_column_name = None
 
                 # Look for label columns (case-insensitive)
                 possible_label_cols = ['label', 'Label', ' Label', 'attack_type', 'class', 'Label.1', 'LABEL', 'attack', 'Attack']
                 for col in possible_label_cols:
                     if col in df.columns:
                         has_labels = True
-                        label_col = col
-                        label_column_name = col  # Store for later use
-        
+                        label_column_name = col
+            
                         # Get original labels first
                         original_labels = df[col].values
-        
+            
                         console.print(f"[green]✓ Found label column: '{col}'[/green]")
                         console.print(f"  Original labels: {np.unique(original_labels)}")
 
                         # Convert string labels to binary (0 for normal/benign, 1 for attack/malicious)
                         if original_labels.dtype == 'object' or isinstance(original_labels[0], str):
-                            # Define what counts as normal/benign (case-insensitive)
+                            # Define what counts as normal/benign (case-insensitive) - MATCHES training code
                             normal_terms = ['benign', 'Benign', 'BENIGN', 'normal', 'Normal', '0', 'false', 'no', 'legitimate']
-            
+                
                             y_true_binary = []
                             for val in original_labels:
                                 val_str = str(val).lower().strip()
-                                # Check if this is a normal/benign label
                                 is_normal = False
                                 for term in normal_terms:
                                     if term in val_str:
                                         is_normal = True
                                         break
-                
+                    
                                 if is_normal:
                                     y_true_binary.append(0)  # Normal
                                 else:
                                     y_true_binary.append(1)  # Attack/Malicious
-            
+                
                             y_true = np.array(y_true_binary)
                             console.print(f"  Converted to binary: 0=normal, 1=attack")
                             console.print(f"  Class distribution: Normal={np.sum(y_true==0)}, Attack={np.sum(y_true==1)}")
@@ -890,8 +886,6 @@ Examples:
                             # Already numeric, just convert to int
                             y_true = original_labels.astype(np.int32)
 
-                        # Don't drop the label column yet - we need it for preprocessing alignment
-                        # We'll use a copy for features but keep original for labels
                         break
 
                 if not has_labels:
@@ -899,101 +893,73 @@ Examples:
                     df_features = df.copy()
                     y_true = None
                 else:
-                    # Create features dataframe WITHOUT the label column for preprocessing
+                    # Create features dataframe WITHOUT the label column
                     df_features = df.drop(columns=[label_column_name])
-        
-                # Show feature analysis
-                available_features, feature_mapping = model._find_features_in_data(df_features)
-    
-                if len(available_features) < 5:  # Less than half of features
-                    console.print(f"[yellow]Warning: Only {len(available_features)} of {len(model.CORE_FEATURES)} features found[/yellow]")
-                    console.print("[yellow]Missing features will be filled with zeros[/yellow]")
-
-                # Preprocess data (this will automatically align features)
+            
+                # Use model's preprocessing
+                # Clean data first
+                df_features.replace([np.inf, -np.inf], np.nan, inplace=True)
+                df_features.dropna(inplace=True)
+            
+                # Preprocess data using model's method (this will align features)
                 X = model.preprocess_data(df_features, fit_scaler=False)
-    
+        
                 # Detect anomalies
                 predictions, confidence_scores = model.predict(X)
-    
+        
+                # Apply threshold
+                threshold = args.threshold if hasattr(args, 'threshold') and args.threshold else model.threshold
+                thresholded_predictions = (confidence_scores >= threshold).astype(int)
+        
                 # Calculate execution time
                 execution_time = time.time() - start_time
-    
-                # Prepare results with metrics
+        
+                # Prepare results using the appropriate function
                 if has_labels and y_true is not None:
-                    # Ensure y_true is numpy array and properly formatted
-                    if isinstance(y_true, list):
-                        y_true = np.array(y_true)
-    
-                    # Ensure y_true is binary (0/1)
-                    if len(np.unique(y_true)) > 2:
-                        console.print(f"[yellow]Warning: Found {len(np.unique(y_true))} unique labels. Converting to binary...[/yellow]")
-                        normal_terms = ['benign', 'Benign', 'BENIGN', 'normal', 'Normal', '0', 'false', 'no', 'legitimate']
-                        y_true_binary = []
-                        for val in y_true:
-                            val_str = str(val).lower().strip()
-                            if any(term in val_str for term in normal_terms):
-                                y_true_binary.append(0)
-                            else:
-                                y_true_binary.append(1)
-                        y_true = np.array(y_true_binary)
-    
-                    # Ensure predictions are binary
-                    predictions = (predictions > 0.5).astype(int) if predictions.dtype != int else predictions
-    
-                    # Ensure same length
-                    if len(y_true) != len(X):
-                        console.print(f"[yellow]Warning: Label length ({len(y_true)}) doesn't match features ({len(X)}). Truncating...[/yellow]")
-                        min_len = min(len(y_true), len(X))
+                    # Ensure y_true and predictions align
+                    if len(y_true) != len(predictions):
+                        console.print(f"[yellow]Warning: Label length ({len(y_true)}) doesn't match features ({len(predictions)}). Truncating...[/yellow]")
+                        min_len = min(len(y_true), len(predictions))
                         y_true = y_true[:min_len]
-                        predictions = predictions[:min_len]
+                        thresholded_predictions = thresholded_predictions[:min_len]
                         confidence_scores = confidence_scores[:min_len]
-    
-                    # Double-check types
-                    console.print(f"[dim]Final types - y_true: {y_true.dtype}, predictions: {predictions.dtype}[/dim]")
-                    console.print(f"[dim]Final values - y_true unique: {np.unique(y_true)}, predictions unique: {np.unique(predictions)}[/dim]")
-    
-                    # Calculate all metrics using ground truth labels
+                    
+                    # Use prepare_detection_results_with_labels for labeled data
                     results = self.prepare_detection_results_with_labels(
-                        df_features, predictions, confidence_scores, y_true, model, execution_time
+                        df_features, thresholded_predictions, confidence_scores, y_true, model, execution_time
                     )
                 else:
-                    # Unlabeled detection - basic results only
+                    # Use prepare_detection_results for unlabeled data
                     results = self.prepare_detection_results(
-                        df_features, predictions, confidence_scores, model, execution_time
+                        df_features, thresholded_predictions, confidence_scores, model, execution_time
                     )
         
                 # Add feature alignment info
                 results['feature_alignment'] = {
                     'core_features': model.CORE_FEATURES,
-                    'features_found': len(available_features),
-                    'feature_mapping': feature_mapping
+                    'features_found': len([f for f in model.CORE_FEATURES if model.feature_mapping.get(f)]),
+                    'feature_mapping': model.feature_mapping
                 }
 
                 # Convert to JSON serializable
                 serializable_results = self.make_json_serializable(results)
-    
-                # Save to database - use a fresh connection for saving
+        
+                # Save to database
                 try:
-                    # Create a new database manager instance for saving results
-                    # This ensures we have a fresh connection
                     save_db = DatabaseManager()
-    
                     detection_id = save_db.save_detection(
                         user_id=self.auth.current_user['id'],
                         model_id=args.model_id if args.model_id else None,
                         input_file=args.input,
                         results=serializable_results
                     )
-    
-                    # Close the temporary connection
                     save_db.close()
-    
                 except Exception as e:
                     console.print(f"[yellow]Warning: Could not save detection to database: {e}[/yellow]")
                     detection_id = None
-    
-                progress.update(task, completed=100)
         
+                progress.update(task, completed=100)
+            
         except Exception as e:
             console.print(f"[red]Detection failed: {e}[/red]")
             if hasattr(self.args, 'verbose') and self.args.verbose:
@@ -1002,27 +968,97 @@ Examples:
 
         # Display results
         console.print(f"[green]✓ Detection analysis completed[/green]")
-        console.print(f"[yellow]⚠️ Anomalies detected: {results['anomalies_detected']}[/yellow]")
+        console.print(f"[yellow]⚠️ Anomalies detected: {results['anomalies_detected']} / {results['total_flows']}[/yellow]")
 
-        # Show summary table
-        self.display_detection_summary(results)
+        # Show detection summary in a table
+        if results['anomalies']:
+            console.print(f"\n[bold cyan]DETECTED ANOMALIES (First 50)[/bold cyan]")
+            
+            # Create a Rich table for anomalies
+            anomaly_table = Table(title="Detected Anomalies", box=ROUNDED, show_header=True, header_style="bold magenta")
+            anomaly_table.add_column("Index", style="cyan", width=8)
+            anomaly_table.add_column("Confidence", style="yellow", width=12, justify="right")
+            anomaly_table.add_column("Severity", style="red", width=10)
+            anomaly_table.add_column("Top Features", style="green", width=50)
+            
+            for anomaly in results['anomalies'][:50]:
+                # Get feature values as string
+                feature_str = ""
+                if 'top_features' in anomaly:
+                    features = anomaly['top_features']
+                    feature_items = []
+                    for feat_name, feat_val in list(features.items())[:5]:  # Show top 5 features
+                        # Format feature name nicely
+                        nice_name = {
+                            'dur': 'Duration', 'spkts': 'Src Pkts', 'dpkts': 'Dst Pkts',
+                            'sbytes': 'Src Bytes', 'dbytes': 'Dst Bytes', 'rate': 'Flow Rate',
+                            'smean': 'Src Pkt Mean', 'dmean': 'Dst Pkt Mean',
+                            'swin': 'Src Window', 'dwin': 'Dst Window'
+                        }.get(feat_name, feat_name)
+                        if isinstance(feat_val, (int, float)):
+                            feature_items.append(f"{nice_name}: {feat_val:.2f}")
+                        else:
+                            feature_items.append(f"{nice_name}: {feat_val}")
+                    feature_str = ", ".join(feature_items)
+                
+                # Color code severity
+                severity_color = "red" if anomaly['severity'] in ['Critical', 'High'] else "yellow" if anomaly['severity'] == 'Medium' else "green"
+                
+                anomaly_table.add_row(
+                    str(anomaly['index']),
+                    f"{anomaly['confidence']:.4f}",
+                    f"[{severity_color}]{anomaly['severity']}[/{severity_color}]",
+                    feature_str
+                )
+            
+            console.print(anomaly_table)
+            
+            if len(results['anomalies']) > 50:
+                console.print(f"[dim]... and {len(results['anomalies']) - 50} more anomalies[/dim]")
+        else:
+            console.print("[green]✓ No anomalies detected![/green]")
 
-        # Show feature alignment info
-        if 'feature_alignment' in results:
-            alignment = results['feature_alignment']
-            console.print(f"\n[cyan]Feature Alignment:[/cyan]")
-            console.print(f"  Core features: {len(alignment['core_features'])}")
-            console.print(f"  Features found: {alignment['features_found']}")
-            if alignment.get('feature_mapping'):
-                console.print(f"  Mapped {len(alignment['feature_mapping'])} features")
+        # Show metrics if available in a table
+        if 'accuracy' in results:
+            console.print(f"\n[bold cyan]Performance Metrics[/bold cyan]")
+            
+            metrics_table = Table(title="Model Performance", box=ROUNDED, show_header=True, header_style="bold blue")
+            metrics_table.add_column("Metric", style="cyan", width=25)
+            metrics_table.add_column("Value", style="green", width=20, justify="right")
+            
+            metrics_table.add_row("Accuracy", f"{results['accuracy']:.2%}")
+            metrics_table.add_row("Precision", f"{results['precision']:.2%}")
+            metrics_table.add_row("Recall (Detection Rate)", f"{results['recall']:.2%}")
+            metrics_table.add_row("F1 Score", f"{results['f1_score']:.2%}")
+            metrics_table.add_row("False Positive Rate", f"{results['false_positive_rate']:.2%}")
+            
+            console.print(metrics_table)
+            
+            if 'true_positives' in results:
+                console.print(f"\n[bold cyan]Confusion Matrix[/bold cyan]")
+                
+                # Create confusion matrix table
+                cm_table = Table(title="Confusion Matrix", box=ROUNDED, show_header=True, header_style="bold blue")
+                cm_table.add_column("", style="cyan", width=15)
+                cm_table.add_column("Predicted Normal", style="green", width=18, justify="center")
+                cm_table.add_column("Predicted Attack", style="red", width=18, justify="center")
+                
+                cm_table.add_row(
+                    "[bold]Actual Normal[/bold]",
+                    f"[green]{results['true_negatives']:,}[/green] (TN)",
+                    f"[red]{results['false_positives']:,}[/red] (FP)"
+                )
+                cm_table.add_row(
+                    "[bold]Actual Attack[/bold]",
+                    f"[green]{results['false_negatives']:,}[/green] (FN)",
+                    f"[red]{results['true_positives']:,}[/red] (TP)"
+                )
+                
+                console.print(cm_table)
 
-        # Show anomalies if any
-        if results['anomalies_detected'] > 0:
-            console.print("\n[bold]Detected Anomalies:[/bold]")
-            for anomaly in results['anomalies'][:10]:  # Show first 10
-                console.print(f"  Flow {anomaly.get('index', 'N/A')} - "
-                            f"Confidence: {anomaly.get('confidence', 0):.2f} - "
-                            f"Severity: {anomaly.get('severity', 'Medium')}")
+        # Show execution time if available
+        if 'execution_time' in results:
+            console.print(f"\n[dim]Execution time: {results['execution_time']}[/dim]")
 
         # Save results if requested
         if args.output:
@@ -1035,37 +1071,32 @@ Examples:
                 console.print(f"[red]Failed to save results to file: {e}[/red]")
 
         # Tell user how to get explanations
-        console.print(f"\n[yellow]For full explanations, use:[/yellow]")
-        console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
-
+        if detection_id:
+            console.print(f"\n[yellow]For full explanations, use:[/yellow]")
+            console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
+    
     def prepare_detection_results(self, df, predictions, confidence_scores, model, execution_time=None):
-        """Prepare detection results in structured format with JSON serializable types"""
+        """Prepare detection results in structured format with JSON serializable types - NO reconstruction errors"""
         anomalies = []
         anomaly_indices = np.where(predictions == 1)[0]
-    
-        # Calculate mean reconstruction error (using inverse of confidence as proxy)
-        # For RNSA+KNN, lower confidence = higher "reconstruction error" (more anomalous)
-        reconstruction_errors = 1.0 - confidence_scores
-        mean_reconstruction_error = float(np.mean(reconstruction_errors))
-
+        
         for idx in anomaly_indices:
             confidence = float(confidence_scores[idx]) if idx < len(confidence_scores) else 0.5
-            reconstruction_error = float(reconstruction_errors[idx]) if idx < len(reconstruction_errors) else 0.5
         
             anomaly = {
                 'index': int(idx),
                 'confidence': confidence,
-                'reconstruction_error': reconstruction_error,
                 'severity': self.calculate_severity(confidence),
             }
         
-            # Add some feature values for context (limit to first few to avoid huge results)
+            # Add feature values for context
             if idx < len(df):
                 row = df.iloc[idx]
                 top_features = {}
                 feature_names = model.feature_names if model.feature_names else []
             
-                for i, feat in enumerate(feature_names[:5]):  # First 5 features
+                # Get all core features
+                for i, feat in enumerate(feature_names[:10]):  # Show all 10 core features
                     if i < len(row):
                         val = row.iloc[i] if hasattr(row, 'iloc') else row[i]
                         if isinstance(val, (int, float)):
@@ -1079,19 +1110,18 @@ Examples:
         # Calculate metrics
         total_flows = int(len(predictions))
         anomalies_detected = int(len(anomalies))
-    
-        # Calculate detection rate (True Positive Rate) - Note: We don't have ground truth labels here
-        # For detection results without labels, we can only report the raw detection rate
-        # The formula e = TP / (TP + FP) requires actual labels to calculate
         detection_rate = float(anomalies_detected / total_flows) if total_flows > 0 else 0.0
 
         result = {
             'total_flows': total_flows,
             'anomalies_detected': anomalies_detected,
-            'detection_rate': detection_rate,  # Add explicit detection_rate field
-            'mean_reconstruction_error': mean_reconstruction_error,
-            'anomalies': anomalies[:100],  # Limit to first 100 for performance
+            'detection_rate': detection_rate,
+            'anomalies': anomalies[:100],
             'mean_confidence': float(np.mean(confidence_scores)) if len(confidence_scores) > 0 else 0,
+            'std_confidence': float(np.std(confidence_scores)) if len(confidence_scores) > 0 else 0,
+            'threshold': float(model.threshold),
+            'detectors_used': len(model.model.detectors) if hasattr(model.model, 'detectors') else 0,
+            'features_used': model.feature_names,
             'metrics': model.metrics if hasattr(model, 'metrics') else {}
         }
 
@@ -1103,14 +1133,14 @@ Examples:
         return result
 
     def prepare_detection_results_with_labels(self, df, predictions, confidence_scores, y_true, model, execution_time=None):
-        """Prepare detection results with full metrics using ground truth labels"""
+        """Prepare detection results with full metrics using ground truth labels - CASE-INSENSITIVE like RNSA_KNN_training"""
         from sklearn.metrics import (accuracy_score, precision_score, recall_score, 
                                     f1_score, confusion_matrix)
-    
+        
         # Ensure y_true is numpy array and properly formatted
         if isinstance(y_true, list):
             y_true = np.array(y_true)
-    
+        
         # Ensure y_true is binary (0/1) and int type
         if y_true.dtype not in [np.int32, np.int64, int]:
             try:
@@ -1118,19 +1148,24 @@ Examples:
                 y_true = y_true.astype(np.int32)
             except:
                 # If conversion fails, map string labels to binary
-                normal_terms = ['benign', 'normal', 'legitimate', '0']
+                normal_terms = ['benign', 'Benign', 'BENIGN', 'normal', 'Normal', '0', 'false', 'no', 'legitimate']
                 y_true_binary = []
                 for val in y_true:
                     val_str = str(val).lower().strip()
-                    if any(term in val_str for term in normal_terms):
+                    is_normal = False
+                    for term in normal_terms:
+                        if term in val_str:
+                            is_normal = True
+                            break
+                    if is_normal:
                         y_true_binary.append(0)
                     else:
                         y_true_binary.append(1)
                 y_true = np.array(y_true_binary, dtype=np.int32)
-    
+        
         # Ensure predictions are int type
         predictions = predictions.astype(np.int32)
-    
+        
         # Ensure predictions and y_true have the same length
         min_len = min(len(predictions), len(y_true))
         if len(predictions) != len(y_true):
@@ -1141,29 +1176,24 @@ Examples:
         
         anomalies = []
         anomaly_indices = np.where(predictions == 1)[0]
-    
-        # Calculate reconstruction errors (proxy)
-        reconstruction_errors = 1.0 - confidence_scores
-        mean_reconstruction_error = float(np.mean(reconstruction_errors))
 
         for idx in anomaly_indices:
             confidence = float(confidence_scores[idx]) if idx < len(confidence_scores) else 0.5
-            reconstruction_error = float(reconstruction_errors[idx]) if idx < len(reconstruction_errors) else 0.5
-    
+        
             anomaly = {
                 'index': int(idx),
                 'confidence': confidence,
-                'reconstruction_error': reconstruction_error,
                 'severity': self.calculate_severity(confidence),
             }
-    
-            # Add some feature values for context
+        
+            # Add feature values for context
             if idx < len(df):
                 row = df.iloc[idx] if hasattr(df, 'iloc') else df[idx]
                 top_features = {}
                 feature_names = model.feature_names if model.feature_names else []
-        
-                for i, feat in enumerate(feature_names[:5]):
+            
+                # Get all core features
+                for i, feat in enumerate(feature_names[:10]):  # Show all 10 core features
                     if i < len(row):
                         val = row.iloc[i] if hasattr(row, 'iloc') else row[i]
                         if isinstance(val, (int, float)):
@@ -1171,7 +1201,7 @@ Examples:
                         else:
                             top_features[feat] = str(val)
                 anomaly['top_features'] = top_features
-    
+        
             anomalies.append(anomaly)
 
         # Calculate confusion matrix
@@ -1179,19 +1209,19 @@ Examples:
 
         if cm.shape == (2, 2):
             TN, FP, FN, TP = cm.ravel()
-    
+        
             # Calculate all metrics
             accuracy = accuracy_score(y_true, predictions)
             precision = precision_score(y_true, predictions, zero_division=0)
             recall = recall_score(y_true, predictions, zero_division=0)
             f1 = f1_score(y_true, predictions, zero_division=0)
-    
+        
             # Detection rate = TP / (TP + FN) = recall
             detection_rate = recall
-    
+        
             # False positive rate = FP / (FP + TN)
             false_positive_rate = FP / (FP + TN) if (FP + TN) > 0 else 0
-    
+        
         else:
             # Handle case where confusion matrix isn't 2x2
             accuracy = precision = recall = f1 = detection_rate = false_positive_rate = 0
@@ -1205,22 +1235,21 @@ Examples:
             'anomalies_detected': anomalies_detected,
             'detection_rate': float(detection_rate),
             'false_positive_rate': float(false_positive_rate),
-            'mean_reconstruction_error': mean_reconstruction_error,
             'anomalies': anomalies[:100],
             'mean_confidence': float(np.mean(confidence_scores)) if len(confidence_scores) > 0 else 0,
-    
+        
             # Classification metrics
             'accuracy': float(accuracy),
             'precision': float(precision),
             'recall': float(recall),
             'f1_score': float(f1),
-    
+        
             # Confusion matrix values
             'true_positives': int(TP),
             'false_positives': int(FP),
             'true_negatives': int(TN),
             'false_negatives': int(FN),
-    
+        
             # Model metrics
             'metrics': model.metrics if hasattr(model, 'metrics') else {}
         }
@@ -1245,8 +1274,8 @@ Examples:
         roc_auc = auc(fpr, tpr)
 
         # Find optimal threshold (Youden's J statistic)
-        youden_j = tpr - fpr
-        optimal_idx = np.argmax(youden_j)
+        threshold = tpr - fpr
+        optimal_idx = np.argmax(threshold)
         optimal_threshold = thresholds[optimal_idx]
 
         # Calculate metrics at optimal threshold
@@ -1331,41 +1360,6 @@ Examples:
             console.print("[yellow]Matplotlib not available for plotting ROC curve[/yellow]")
         except Exception as e:
             console.print(f"[yellow]Could not plot ROC curve: {e}[/yellow]")
-
-    # Update display_detection_summary to show all metrics:
-
-    def display_detection_summary(self, results):
-        """Display detection summary table with all available metrics"""
-        table = Table(title="Detection Summary", box=ROUNDED)
-        table.add_column("Metric", style="cyan")
-        table.add_column("Value", style="green", justify="right")
-    
-        table.add_row("Total Flows Analyzed", f"{results['total_flows']:,}")
-        table.add_row("Anomalies Detected", str(results['anomalies_detected']))
-    
-        # Show classification metrics if available
-        if 'accuracy' in results and results['accuracy'] > 0:
-            table.add_row("Accuracy", f"{results['accuracy']:.2%}")
-            table.add_row("Precision (TP/(TP+FP))", f"{results['precision']:.2%}")
-            table.add_row("Recall (Detection Rate)", f"{results['recall']:.2%}")
-            table.add_row("F1 Score", f"{results['f1_score']:.2%}")
-            table.add_row("Detection Rate", f"{results['detection_rate']:.2%}")
-            table.add_row("False Positive Rate", f"{results['false_positive_rate']:.2%}")
-    
-        # Show confusion matrix if available
-        if 'true_positives' in results:
-            table.add_row("True Positives", str(results['true_positives']))
-            table.add_row("False Positives", str(results['false_positives']))
-            table.add_row("True Negatives", str(results['true_negatives']))
-            table.add_row("False Negatives", str(results['false_negatives']))
-    
-        table.add_row("Mean Reconstruction Error", f"{results.get('mean_reconstruction_error', 0):.6f}")
-        table.add_row("Mean Confidence", f"{results.get('mean_confidence', 0):.6f}")
-    
-        if 'execution_time' in results:
-            table.add_row("Execution Time", results['execution_time'])
-    
-        console.print(table)
 
     def alternative_preprocessing(self, df: pd.DataFrame, model) -> np.ndarray:
         """Alternative preprocessing when standard preprocessing fails"""
@@ -1837,8 +1831,6 @@ Examples:
                         }
                 
                     console.print(f"[green]✓ Loaded original data with {len(self.original_features.columns)} core features[/green]")
-                    if self.feature_mapping:
-                        console.print(f"[green]✓ Found IP columns in data[/green]")
                 
                 except Exception as e:
                     console.print(f"[yellow]Warning: Could not load original data: {e}[/yellow]")
@@ -1880,324 +1872,120 @@ Examples:
             self.explain_anomaly(anomaly, i+1)
     
     def explain_anomaly(self, anomaly, index):
-        """Explain a single anomaly with contributing features from core features"""
-    
+        """Explain a single anomaly - Display Confidence Score, Severity, Available Features"""
+        
         # Get confidence score
         confidence = anomaly.get('confidence', anomaly.get('confidence_score', 0))
-        if confidence == 0 and 'reconstruction_error' in anomaly:
-            # Convert reconstruction error to confidence (inverse)
-            confidence = 1.0 - anomaly.get('reconstruction_error', 0)
-    
         severity = anomaly.get('severity', self.calculate_severity(confidence))
-    
+        
         panel_content = [
             f"[bold]Anomaly #{index}[/bold]",
+            f"Confidence Score: {confidence:.2f}",
+            f"Severity: {severity}",
         ]
-    
+        
         # Try to get IP information from original data if available
         src_ip = None
         dst_ip = None
-        flow_id = None
-    
+        
         if hasattr(self, 'original_data') and self.original_data is not None:
             idx = anomaly.get('index')
             if idx is not None and idx < len(self.original_data):
                 row = self.original_data.iloc[idx]
-            
+                
                 # Check for source IP columns (common variations)
                 src_ip_cols = ['srcip', 'src_ip', 'source_ip', 'Source IP', 'Src IP', 'src-ip', 
-                              'SourceIP', 'SrcIP', 'source address', 'Source Address']
+                            'SourceIP', 'SrcIP', 'source address', 'Source Address']
                 for col in src_ip_cols:
                     if col in row.index or col.lower() in [c.lower() for c in row.index]:
-                        # Find the actual column name
                         actual_col = next((c for c in row.index if c.lower() == col.lower()), None)
                         if actual_col:
                             src_ip = str(row[actual_col])
                             break
-            
+                
                 # Check for destination IP columns
                 dst_ip_cols = ['dstip', 'dst_ip', 'destination_ip', 'Destination IP', 'Dst IP', 'dst-ip',
-                              'DestIP', 'DstIP', 'destination address', 'Destination Address']
+                            'DestIP', 'DstIP', 'destination address', 'Destination Address']
                 for col in dst_ip_cols:
                     if col in row.index or col.lower() in [c.lower() for c in row.index]:
                         actual_col = next((c for c in row.index if c.lower() == col.lower()), None)
                         if actual_col:
                             dst_ip = str(row[actual_col])
                             break
-    
+        
         # Add IP information only if found
         if src_ip:
             panel_content.append(f"Source IP: {src_ip}")
         if dst_ip:
             panel_content.append(f"Destination IP: {dst_ip}")
-    
-        # Add confidence and severity
-        panel_content.extend([
-            f"Confidence Score: {confidence:.2f}",
-            f"Severity: {severity}",
-            f"Reconstruction Error: {anomaly.get('reconstruction_error', 0):.6f}"
-        ])
-    
-        # Get feature values for this anomaly
-        feature_values = {}
-        idx = anomaly.get('index')
-    
-        if hasattr(self, 'original_features') and self.original_features is not None and idx is not None:
-            if idx < len(self.original_features):
-                row = self.original_features.iloc[idx]
-                feature_variations = {
-                    'dur': ['dur', 'Flow Duration', ' Flow Duration', 'flow_duration', 'Duration', 'Dur', ' duration', 'Flow Duration'],
-                    'spkts': ['spkts', 'Tot Fwd Pkts', ' Total Fwd Packets', 'Total Fwd Packets', 'fwd_pkts', 'Fwd Packets', 'Fwd Pkts'],
-                    'dpkts': ['dpkts', 'Tot Bwd Pkts', ' Total Backward Packets', 'Total Bwd Packets', 'bwd_pkts', 'Bwd Packets', 'Bwd Pkts'],
-                    'sbytes': ['sbytes', 'TotLen Fwd Pkts', 'Total Length of Fwd Packets', 'fwd_bytes', 'Fwd Bytes'],
-                    'dbytes': ['dbytes', 'TotLen Bwd Pkts', ' Total Length of Bwd Packets' ,'Total Length of Bwd Packets', 'bwd_bytes', 'Bwd Bytes'],
-                    'rate': ['rate', 'Flow Byts/s', 'Flow Bytes/s', 'flow_bytes_per_sec', 'Bytes/s'],
-                    'smean': ['smean', 'Fwd Pkt Len Mean', ' Fwd Packet Length Mean', 'Fwd Packet Length Mean', 'fwd_pkt_len_mean'],
-                    'dmean': ['dmean', 'Bwd Pkt Len Mean', ' Bwd Packet Length Mean', 'Bwd Packet Length Mean', 'bwd_pkt_len_mean'],
-                    'swin': ['swin', 'Init Fwd Win Byts', 'Init_Win_bytes_forward', 'Init Fwd Window Bytes', 'fwd_win'],
-                    'dwin': ['dwin', 'Init Bwd Win Byts', ' Init_Win_bytes_backward', 'Init Bwd Window Bytes', 'bwd_win']
-                }
-            
-                # For each core feature, try to find a match in the row
-                for core_feature, variations in feature_variations.items():
-                    for var in variations:
-                        if var in row.index:
-                            feature_values[core_feature] = row[var]
-                            break
-    
-        # Calculate z-scores to find which features are most anomalous
-        z_scores = {}
-        if feature_values and hasattr(self, 'feature_stats'):
-            for feature, value in feature_values.items():
-                if feature in self.feature_stats:
-                    mean = self.feature_stats[feature]['mean']
-                    std = self.feature_stats[feature]['std']
-                    if std > 0:
-                        z_score = abs((value - mean) / std)
-                        z_scores[feature] = z_score
-    
-        # Show contributing features
-        if z_scores:
-            # Sort features by how anomalous they are (highest z-score first)
-            sorted_features = sorted(z_scores.items(), key=lambda x: x[1], reverse=True)
         
-            panel_content.append("\n[bold]Contributing Features (most anomalous first):[/bold]")
-            for feature, z_score in sorted_features[:5]:  # Show top 5
-                value = feature_values[feature]
-                mean = self.feature_stats[feature]['mean']
-            
-                # Determine deviation direction
-                if value > mean:
-                    direction = "↑ higher"
-                else:
-                    direction = "↓ lower"
-            
-                # Better description of feature names
-                feature_names = {
-                    'dur': 'Duration',
-                    'spkts': 'Src Packets',
-                    'dpkts': 'Dst Packets',
-                    'sbytes': 'Src Bytes',
-                    'dbytes': 'Dst Bytes',
-                    'rate': 'Flow Rate',
-                    'smean': 'Avg Src Pkt Size',
-                    'dmean': 'Avg Dst Pkt Size',
-                    'swin': 'Src Window',
-                    'dwin': 'Dst Window'
-                }
-            
-                display_name = feature_names.get(feature, feature)
-            
-                # Format based on z-score magnitude
-                if z_score > 3:
-                    marker = "🔴"  # Critical
-                elif z_score > 2:
-                    marker = "🟠"  # High
-                elif z_score > 1:
-                    marker = "🟡"  # Medium
-                else:
-                    marker = "🔵"  # Low
-            
-                panel_content.append(f"  {marker} {display_name}: {value:.2f} ({direction}, {z_score:.1f}σ)")
-    
-        # Add feature importance if available from model
-        elif 'top_features' in anomaly and anomaly['top_features']:
-            panel_content.append("\n[bold]Model's Top Contributing Features:[/bold]")
+        # Add available feature values (like training code)
+        if 'top_features' in anomaly and anomaly['top_features']:
+            panel_content.append("\n[bold]Available Features Data:[/bold]")
             features = anomaly['top_features']
-            sorted_features = sorted(features.items(), 
-                                   key=lambda x: abs(x[1] if isinstance(x[1], (int, float)) else 0), 
-                                   reverse=True)[:5]
-            for feature, value in sorted_features:
-                panel_content.append(f"  • {feature}: {value:.4f}")
-    
+            
+            # Nice display names for features
+            nice_names = {
+                'dur': 'Duration', 'spkts': 'Src Packets', 'dpkts': 'Dst Packets',
+                'sbytes': 'Src Bytes', 'dbytes': 'Dst Bytes', 'rate': 'Flow Rate',
+                'smean': 'Avg Src Pkt Size', 'dmean': 'Avg Dst Pkt Size',
+                'swin': 'Src Window', 'dwin': 'Dst Window'
+            }
+            
+            for feat_name, feat_val in features.items():
+                display_name = nice_names.get(feat_name, feat_name)
+                if isinstance(feat_val, (int, float)):
+                    # Format based on feature type
+                    if feat_name in ['sbytes', 'dbytes']:
+                        panel_content.append(f"  • {display_name}: {feat_val:,.2f} bytes")
+                    elif feat_name in ['dur']:
+                        panel_content.append(f"  • {display_name}: {feat_val:.2f} seconds")
+                    elif feat_name in ['rate']:
+                        panel_content.append(f"  • {display_name}: {feat_val:.2f} bytes/sec")
+                    else:
+                        panel_content.append(f"  • {display_name}: {feat_val:.2f}")
+                else:
+                    panel_content.append(f"  • {display_name}: {feat_val}")
+        
         # Generate AI decision explanation
-        explanation = self.generate_ai_explanation(anomaly, confidence, severity, feature_values, z_scores if z_scores else {})
+        explanation = self.generate_explanation(anomaly, confidence, severity)
         if explanation:
             panel_content.append(f"\n[bold]AI Decision Explanation:[/bold]")
             panel_content.append(explanation)
-    
+        
         console.print(Panel(
             "\n".join(panel_content),
             title=f"Anomaly Explanation",
             border_style="yellow" if severity in ['High', 'Critical'] else "cyan"
         ))
-    
-    def generate_ai_explanation(self, anomaly, confidence, severity, feature_values=None, z_scores=None):
-        """Generate detailed AI explanation for the detection like other security apps"""
-    
+
+    def generate_explanation(self, confidence, severity):
+        """Generate explanation"""
+        
         explanation_parts = []
-    
-        # 1. What was detected (like other SIEM tools)
+        
+        # 1. What was detected
         if severity == "Critical":
-            explanation_parts.append("⚠️ CRITICAL ALERT: The model detected a highly anomalous traffic pattern that strongly deviates from normal behavior. This requires immediate investigation.")
+            explanation_parts.append("[CRITICAL ALERT] The model detected a highly anomalous traffic pattern that strongly deviates from normal behavior. This requires immediate investigation.")
         elif severity == "High":
-            explanation_parts.append("🔴 HIGH SEVERITY: Significant deviation detected in network traffic pattern. Investigate promptly.")
+            explanation_parts.append("[HIGH SEVERITY] Significant deviation detected in network traffic pattern. Investigate promptly.")
         elif severity == "Medium":
-            explanation_parts.append("🟠 MEDIUM SEVERITY: Moderate deviation detected. Review the contributing factors below.")
+            explanation_parts.append("[MEDIUM SEVERITY] Moderate deviation detected. Review the contributing factors below.")
         elif severity == "Low":
-            explanation_parts.append("🟡 LOW SEVERITY: Minor deviation detected. Monitor for any changes.")
+            explanation_parts.append("[LOW SEVERITY] Minor deviation detected. Monitor for any changes.")
         else:
-            explanation_parts.append("🔵 MINIMAL: Slight deviation within acceptable range.")
-    
-        # 2. Confidence level (like other ML-based detectors)
+            explanation_parts.append("[MINIMAL] Slight deviation within acceptable range.")
+        
+        # 2. Confidence level
         if confidence >= 0.9:
-            explanation_parts.append(f"✅ High confidence ({confidence:.1%}) - The model is very certain this is anomalous.")
+            explanation_parts.append(f"High confidence ({confidence:.1%}) - The model is very certain this is anomalous.")
         elif confidence >= 0.7:
-            explanation_parts.append(f"📊 Moderate confidence ({confidence:.1%}) - Multiple indicators suggest anomalous behavior.")
+            explanation_parts.append(f"Moderate confidence ({confidence:.1%}) - Multiple indicators suggest anomalous behavior.")
         elif confidence >= 0.5:
-            explanation_parts.append(f"📉 Low confidence ({confidence:.1%}) - Some deviation detected but pattern is mostly normal.")
+            explanation_parts.append(f"Low confidence ({confidence:.1%}) - Some deviation detected but pattern is mostly normal.")
         else:
-            explanation_parts.append(f"ℹ️ Minimal confidence ({confidence:.1%}) - Mostly normal with slight variations.")
-    
-        # 3. Feature analysis - what made this anomalous (like feature importance in ML)
-        if feature_values and z_scores:
-            # Find top 3 most anomalous features
-            top_features = sorted(z_scores.items(), key=lambda x: x[1], reverse=True)[:3]
+            explanation_parts.append(f"ℹMinimal confidence ({confidence:.1%}) - Mostly normal with slight variations.")
         
-            if top_features:
-                explanation_parts.append("\n🔍 Primary Indicators (features deviating most from normal):")
-            
-                for feature, z_score in top_features:
-                    value = feature_values.get(feature, 0)
-                
-                    # Map technical feature names to human-readable descriptions
-                    feature_descriptions = {
-                        'dur': 'Flow Duration',
-                        'spkts': 'Source Packets',
-                        'dpkts': 'Destination Packets',
-                        'sbytes': 'Source Bytes',
-                        'dbytes': 'Destination Bytes',
-                        'rate': 'Flow Rate',
-                        'smean': 'Average Source Packet Size',
-                        'dmean': 'Average Destination Packet Size',
-                        'swin': 'Source TCP Window Size',
-                        'dwin': 'Destination TCP Window Size'
-                    }
-                
-                    readable_name = feature_descriptions.get(feature, feature)
-                
-                    # Determine severity of deviation
-                    if z_score > 3:
-                        deviation = "EXTREME"
-                        severity_symbol = "🔴"
-                    elif z_score > 2:
-                        deviation = "HIGH"
-                        severity_symbol = "🟠"
-                    elif z_score > 1:
-                        deviation = "MODERATE"
-                        severity_symbol = "🟡"
-                    else:
-                        deviation = "LOW"
-                        severity_symbol = "🔵"
-                
-                    # Add context about the value based on feature type
-                    if feature in ['dur', 'rate']:
-                        if value > 1000:
-                            context = f"(unusually high: {value:.2f})"
-                        elif value < 0.1:
-                            context = f"(unusually low: {value:.2f})"
-                        else:
-                            context = f"(value: {value:.2f})"
-                    elif feature in ['sbytes', 'dbytes']:
-                        if value > 10000:
-                            context = f"(large data transfer: {value:.2f} bytes)"
-                        elif value > 1000:
-                            context = f"(medium transfer: {value:.2f} bytes)"
-                        else:
-                            context = f"(value: {value:.2f} bytes)"
-                    else:
-                        context = f"(value: {value:.2f})"
-                
-                    explanation_parts.append(f"  {severity_symbol} {readable_name}: {deviation} deviation {context}")
-    
-        # 4. Attack type inference based on feature patterns
-        if feature_values:
-            attack_hints = []
-        
-            # Check for DoS/DDoS patterns (high rate, many packets)
-            if feature_values.get('rate', 0) > 10000:
-                attack_hints.append("Extremely high flow rate (>10K) - Possible DoS/DDoS attack")
-            elif feature_values.get('rate', 0) > 1000:
-                attack_hints.append("High flow rate - May indicate network scanning or DoS")
-        
-            if feature_values.get('spkts', 0) > 1000:
-                attack_hints.append("High source packet count - Possible flooding")
-        
-            # Check for data exfiltration (large outbound data)
-            if feature_values.get('sbytes', 0) > 100000:
-                attack_hints.append("Very large outbound data transfer - Possible data exfiltration")
-            elif feature_values.get('sbytes', 0) > 10000:
-                attack_hints.append("Large outbound data - Investigate for data theft")
-        
-            # Check for unusual packet sizes
-            smean = feature_values.get('smean', 0)
-            dmean = feature_values.get('dmean', 0)
-            if smean > 1400 and dmean < 100:
-                attack_hints.append("Large source packets but small destination packets - Possible command & control traffic")
-            elif smean < 100 and dmean > 1400:
-                attack_hints.append("Small source packets but large destination packets - Possible data download")
-        
-            # Check for port scanning indicators (zero window sizes)
-            if feature_values.get('dwin', 0) == 0 and feature_values.get('swin', 0) == 0:
-                attack_hints.append("Zero TCP window sizes - May indicate port scanning activity")
-        
-            # Check for unusual duration
-            if feature_values.get('dur', 0) > 300:
-                attack_hints.append("Very long flow duration (>5 min) - Possible persistent connection")
-        
-            if attack_hints:
-                explanation_parts.append("\n💡 Possible Attack Indicators:")
-                for hint in attack_hints[:3]:  # Limit to 3 hints
-                    explanation_parts.append(f"  • {hint}")
-    
-        # 5. Context about the anomaly
-        if 'reconstruction_error' in anomaly:
-            rec_error = anomaly.get('reconstruction_error', 0)
-            if rec_error > 0.9:
-                explanation_parts.append(f"\n📊 Model Analysis: Very high reconstruction error ({rec_error:.2f}) - Pattern completely different from normal")
-            elif rec_error > 0.7:
-                explanation_parts.append(f"\n📊 Model Analysis: High reconstruction error ({rec_error:.2f}) - Significant deviation from normal patterns")
-            elif rec_error > 0.5:
-                explanation_parts.append(f"\n📊 Model Analysis: Moderate reconstruction error ({rec_error:.2f}) - Partial deviation from normal")
-    
-        # 6. Recommended action (like other security tools)
-        explanation_parts.append("\n📋 Recommended Action:")
-        if severity in ['Critical', 'High']:
-            explanation_parts.append("  • 🚨 IMMEDIATE ACTION REQUIRED")
-            explanation_parts.append("  • Isolate affected host from network")
-            explanation_parts.append("  • Capture full packet capture for forensics")
-            explanation_parts.append("  • Review firewall and IDS logs for related events")
-            explanation_parts.append("  • Escalate to security operations team")
-        elif severity == 'Medium':
-            explanation_parts.append("  • Monitor the connection for 10-15 minutes")
-            explanation_parts.append("  • Check if pattern repeats with same source/destination")
-            explanation_parts.append("  • Review recent alerts for related activity")
-            explanation_parts.append("  • Update firewall rules if pattern persists")
-        else:
-            explanation_parts.append("  • Log for baseline reference")
-            explanation_parts.append("  • No immediate action required")
-            explanation_parts.append("  • Monitor for pattern frequency")
-    
         return "\n".join(explanation_parts)
 
     # Utility Methods

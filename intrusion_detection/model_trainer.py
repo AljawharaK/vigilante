@@ -205,55 +205,130 @@ class ModelTrainer:
         print(f"AUC: {result['metrics']['auc']:.4f}")
         
         return result
-    
+
     def detect_anomalies(self, model_path: str, data_path: str, 
                         threshold: float = None) -> Dict[str, Any]:
-        """Detect anomalies in new data using trained model with feature alignment"""
+        """Detect anomalies in new data - exactly like RNSA_KNN_training code"""
         print("\n" + "="*80)
-        print("ANOMALY DETECTION")
+        print("ANOMALY DETECTION ON UNSEEN DATA")
         print("="*80)
         
-        print(f"Loading model from {model_path}")
+        print(f"Loading model from: {model_path}")
         
         # Load model
         model = IntrusionDetectionModel.load(model_path)
         
-        # Load data
-        df, _ = self.load_data(data_path, has_labels=False)
+        # Load data - like training code
+        print(f"Loading data from: {data_path}")
+        df = pd.read_csv(data_path)
+        print(f"Data loaded: {len(df)} samples, {len(df.columns)} features")
         
-        # Analyze dataset features
-        feature_analysis = self.analyze_dataset_features(df)
+        # Use provided threshold or default
+        if threshold is not None:
+            original_threshold = model.threshold
+            model.threshold = threshold
+            print(f"Using custom threshold: {threshold:.4f}")
+        else:
+            print(f"Using default threshold: {model.threshold:.4f}")
         
-        print(f"\nData loaded: {len(df)} samples, {len(df.columns)} features")
+        # Preprocess data to align features (like training code)
+        print("\n" + "="*60)
+        print("PREPROCESSING DATA TO ALIGN FEATURES")
+        print("="*60)
         
-        # Preprocess data (this will align features automatically)
+        # Clean data
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        df.dropna(inplace=True)
+        
+        # Use model's preprocessing (this handles feature alignment)
         X = model.preprocess_data(df, fit_scaler=False)
         
-        # Make predictions
+        print(f"\nAligned data shape: {X.shape}")
+        print(f"Features used: {model.feature_names}")
+        
+        # Make predictions (like training code)
+        print("\n" + "="*60)
+        print("RUNNING ANOMALY DETECTION")
+        print("="*60)
+        
         predictions, confidence_scores = model.predict(X)
         
-        # Apply threshold if specified
-        if threshold is not None:
-            model.threshold = threshold
-            predictions = (confidence_scores >= threshold).astype(int)
+        # Apply threshold
+        thresholded_predictions = (confidence_scores >= model.threshold).astype(int)
         
-        # Prepare results
-        anomaly_indices = np.where(predictions == 1)[0]
+        # Get anomaly indices
+        anomaly_indices = np.where(thresholded_predictions == 1)[0]
         
-        # Create detailed anomaly list
+        # Print anomaly summary (like training code)
+        print(f"\n{'='*60}")
+        print("ANOMALY DETECTION SUMMARY")
+        print(f"{'='*60}")
+        print(f"Total samples analyzed: {len(predictions)}")
+        print(f"Anomalies detected: {len(anomaly_indices)}")
+        print(f"Anomaly rate: {len(anomaly_indices)/len(predictions):.2%}")
+        print(f"Mean confidence score: {np.mean(confidence_scores):.4f}")
+        print(f"Std confidence score: {np.std(confidence_scores):.4f}")
+        print(f"Detection threshold: {model.threshold:.4f}")
+        print(f"Detectors used: {len(model.model.detectors) if hasattr(model.model, 'detectors') else 0}")
+        
+        # Print detailed anomaly list (like training code)
+        print(f"\n{'='*80}")
+        print("DETECTED ANOMALIES (First 50)")
+        print(f"{'='*80}")
+        print(f"{'Index':<10} {'Confidence':<15} {'Severity':<10} {'Top Features'}")
+        print(f"{'-'*80}")
+        
+        # Get the original aligned data for feature values
+        X_aligned_df = None
+        if hasattr(model, 'feature_names') and model.feature_names:
+            # Create a DataFrame with the aligned features
+            X_aligned_df = pd.DataFrame(X, columns=model.feature_names)
+        
+        for idx in anomaly_indices[:50]:
+            confidence = confidence_scores[idx]
+            severity = self._calculate_severity(confidence)
+            
+            # Get top feature values (like training code)
+            feature_str = ""
+            if X_aligned_df is not None and idx < len(X_aligned_df):
+                row = X_aligned_df.iloc[idx]
+                top_features = []
+                # Nice display names
+                nice_names = {
+                    'dur': 'Duration', 'spkts': 'Src Pkts', 'dpkts': 'Dst Pkts',
+                    'sbytes': 'Src Bytes', 'dbytes': 'Dst Bytes', 'rate': 'Flow Rate',
+                    'smean': 'Src Pkt Mean', 'dmean': 'Dst Pkt Mean',
+                    'swin': 'Src Window', 'dwin': 'Dst Window'
+                }
+                for i, feat in enumerate(model.feature_names[:5]):
+                    if i < len(row):
+                        val = row.iloc[i] if hasattr(row, 'iloc') else row[i]
+                        display_name = nice_names.get(feat, feat)
+                        if isinstance(val, (int, float)):
+                            top_features.append(f"{display_name}={val:.2f}")
+                        else:
+                            top_features.append(f"{display_name}={val}")
+                feature_str = ", ".join(top_features)
+            
+            print(f"{idx:<10} {confidence:<15.6f} {severity:<10} {feature_str}")
+        
+        if len(anomaly_indices) > 50:
+            print(f"\n... and {len(anomaly_indices) - 50} more anomalies")
+        
+        # Create detailed anomaly list for JSON
         anomalies = []
-        for idx in anomaly_indices[:100]:  # Limit to first 100 for performance
+        for idx in anomaly_indices[:100]:
             anomaly = {
                 'index': int(idx),
                 'confidence': float(confidence_scores[idx]),
                 'severity': self._calculate_severity(confidence_scores[idx])
             }
             
-            # Add some feature values if available (limit to avoid huge JSON)
-            if idx < len(df):
-                row = df.iloc[idx]
+            # Add feature values if available
+            if X_aligned_df is not None and idx < len(X_aligned_df):
+                row = X_aligned_df.iloc[idx]
                 top_features = {}
-                for i, feat in enumerate(model.feature_names[:5]):  # First 5 features
+                for i, feat in enumerate(model.feature_names[:10]):
                     if i < len(row):
                         val = row.iloc[i] if hasattr(row, 'iloc') else row[i]
                         top_features[feat] = float(val) if isinstance(val, (int, float)) else str(val)
@@ -263,23 +338,23 @@ class ModelTrainer:
         
         results = {
             'total_samples': int(len(predictions)),
-            'anomalies_detected': int(np.sum(predictions)),
-            'anomaly_rate': float(np.mean(predictions)),
-            'anomaly_indices': anomaly_indices.tolist()[:1000],  # Limit indices
+            'anomalies_detected': int(np.sum(thresholded_predictions)),
+            'anomaly_rate': float(np.mean(thresholded_predictions)),
+            'anomaly_indices': anomaly_indices.tolist()[:1000],
             'anomalies': anomalies,
             'mean_confidence': float(np.mean(confidence_scores)),
             'std_confidence': float(np.std(confidence_scores)),
             'threshold': float(model.threshold),
             'detectors_used': len(model.model.detectors) if hasattr(model.model, 'detectors') else 0,
             'features_used': model.feature_names,
-            'feature_mapping': model.feature_mapping,
-            'feature_analysis': feature_analysis
+            'feature_mapping': model.feature_mapping
         }
         
         # Save detection results
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        results_path = os.path.join("detections", f"detection_{timestamp}.json")
-        os.makedirs(os.path.dirname(results_path), exist_ok=True)
+        detections_dir = os.path.join("detections")
+        os.makedirs(detections_dir, exist_ok=True)
+        results_path = os.path.join(detections_dir, f"detection_{timestamp}.json")
         
         # Convert numpy types to Python types for JSON serialization
         def convert_to_serializable(obj):
@@ -301,14 +376,14 @@ class ModelTrainer:
         with open(results_path, 'w') as f:
             json.dump(serializable_results, f, indent=2)
         
-        print("\n" + "="*60)
+        print(f"\n{'='*60}")
         print("DETECTION COMPLETE")
-        print("="*60)
-        print(f"Total samples: {results['total_samples']}")
-        print(f"Anomalies detected: {results['anomalies_detected']}")
-        print(f"Anomaly rate: {results['anomaly_rate']:.2%}")
-        print(f"Mean confidence: {results['mean_confidence']:.4f}")
-        print(f"Results saved: {results_path}")
+        print(f"{'='*60}")
+        print(f"Results saved to: {results_path}")
+        
+        # Restore original threshold if changed
+        if threshold is not None:
+            model.threshold = original_threshold
         
         return results
     
@@ -360,9 +435,9 @@ class ModelTrainer:
         fpr, tpr, thresholds = roc_curve(y_true, confidence_scores)
         roc_auc = auc(fpr, tpr)
         
-        # Find optimal threshold (Youden's J statistic)
-        youden_j = tpr - fpr
-        optimal_idx = np.argmax(youden_j)
+        # Find optimal threshold
+        threshold = tpr - fpr
+        optimal_idx = np.argmax(threshold)
         optimal_threshold = thresholds[optimal_idx]
         
         # Calculate metrics at optimal threshold
