@@ -212,8 +212,11 @@ class DatabaseManager:
             print(f"❌ Database initialization failed: {e}")
             raise
     
+    # intrusion_detection/database.py
+
     def create_user(self, username: str, password_hash: str, email: str, 
-                   role: str = 'Analyst', created_by: int = None) -> int:
+                    role: str = 'Analyst', created_by: int = None, 
+                    must_change_password: bool = True) -> int:
         """Create a new user with simplified roles"""
         try:
             # Map role name to role_id
@@ -229,13 +232,25 @@ class DatabaseManager:
             
             with self.conn.cursor() as cursor:
                 cursor.execute("""
-                    INSERT INTO users (username, password_hash, email, role_id, created_at)
-                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    INSERT INTO users (username, password_hash, email, role_id, 
+                                    must_change_password, created_at)
+                    VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                     RETURNING id
-                """, (username, password_hash, email, role_id))
+                """, (username, password_hash, email, role_id, must_change_password))
                 
                 user_id = cursor.fetchone()[0]
                 self.conn.commit()
+                
+                # Log user creation in audit
+                self.log_audit_event(
+                    user_id=created_by if created_by else user_id,
+                    username=username,
+                    action="user_create",
+                    resource=username,
+                    status="success",
+                    details={"role": role, "must_change_password": must_change_password}
+                )
+                
                 return user_id
         except Exception as e:
             self.conn.rollback()

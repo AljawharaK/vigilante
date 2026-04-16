@@ -356,16 +356,73 @@ Examples:
             console.print(f"[red]✗ {result['message']}[/red]")
     
     # Admin Commands
+    # intrusion_detection/cli.py
+
     def handle_admin_user_create(self, args):
         """Create new user (Administrator only)"""
         if not self.check_admin():
             return
         
-        # Use a standard temporary password
-        temp_password = "temp123"
-    
-        # Hash the password for storage
-        password_hash = self.auth.hash_password(temp_password)
+        # Get password choice from admin
+        console.print("\n[bold cyan]Create New User - Password Options:[/bold cyan]")
+        console.print("1. Auto-generate random password (user must change on first login)")
+        console.print("2. Set password manually now")
+        console.print("3. User will set password on first login (no temporary password)")
+        
+        choice = input("\nSelect option (1-3): ").strip()
+        
+        temp_password = None
+        password_hash = None
+        
+        if choice == "1":
+            # Auto-generate random password
+            import secrets
+            import string
+            # Generate a strong random password
+            alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+            temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+            password_hash = self.auth.hash_password(temp_password)
+            must_change = True
+            console.print(f"[yellow]Generated password: {temp_password}[/yellow]")
+            
+        elif choice == "2":
+            # Admin sets password manually
+            console.print("\n[cyan]Enter password for new user:[/cyan]")
+            while True:
+                password = getpass("Password: ")
+                confirm = getpass("Confirm password: ")
+                
+                if password != confirm:
+                    console.print("[red]Passwords do not match. Please try again.[/red]")
+                    continue
+                
+                if len(password) < 8:
+                    console.print("[red]Password must be at least 8 characters.[/red]")
+                    continue
+                
+                # Optional: Add password strength check
+                if not self.is_password_strong(password):
+                    console.print("[yellow]Warning: Password is weak.[/yellow]")
+                    proceed = input("Create user anyway? (y/n): ").strip().lower()
+                    if proceed != 'y':
+                        continue
+                
+                temp_password = password
+                password_hash = self.auth.hash_password(password)
+                must_change = False  # Admin set password, so user doesn't need to change
+                break
+                
+        elif choice == "3":
+            # No password - user must set on first login
+            # Create a placeholder that forces password change
+            placeholder = "force_change_on_login"
+            password_hash = self.auth.hash_password(placeholder)
+            must_change = True
+            console.print("[green]User will set password on first login[/green]")
+            
+        else:
+            console.print("[red]Invalid option. User creation cancelled.[/red]")
+            return
         
         try:
             # Create user with simplified role
@@ -374,7 +431,8 @@ Examples:
                 password_hash=password_hash,
                 email=args.email,
                 role=args.role,
-                created_by=self.auth.current_user['id']
+                created_by=self.auth.current_user['id'],
+                must_change_password=must_change 
             )
             
             # Log audit event
@@ -384,18 +442,96 @@ Examples:
                 action="user_create",
                 resource=args.username,
                 status="success",
-                details={"role": args.role, "email": args.email}
+                details={
+                    "role": args.role, 
+                    "email": args.email,
+                    "password_set_by": "admin" if choice == "2" else "auto" if choice == "1" else "user"
+                }
             )
             
-            console.print(f"[green]✓ User '{args.username}' created successfully[/green]")
-            console.print(f"Temporary password: [yellow]{temp_password}[/yellow]")
+            console.print(f"\n[green]✓ User '{args.username}' created successfully[/green]")
             console.print(f"Role: [cyan]{args.role}[/cyan]")
             console.print(f"Email: [cyan]{args.email}[/cyan]")
             console.print(f"Status: [green]Active[/green]")
-            console.print("\n[bold yellow]⚠️ User must change password on first login[/bold yellow]")
+            
+            if temp_password:
+                console.print(f"\n[bold yellow]Password Information:[/bold yellow]")
+                console.print(f"Password: [yellow]{temp_password}[/yellow]")
+                if must_change:
+                    console.print("[bold yellow]⚠️ User must change password on first login[/bold yellow]")
+                else:
+                    console.print("[green]✓ Password set by admin - user can use immediately[/green]")
+            else:
+                console.print("\n[green]✓ User will set password during first login[/green]")
             
         except Exception as e:
             console.print(f"[red]✗ Failed to create user: {e}[/red]")
+
+    def is_password_strong(self, password: str) -> bool:
+        """Check if password meets strength requirements"""
+        import re
+        
+        checks = []
+        
+        # Length check
+        if len(password) >= 12:
+            checks.append("✓ Length (12+ chars)")
+        elif len(password) >= 8:
+            checks.append("⚠️ Length (8-11 chars)")
+        else:
+            checks.append("✗ Length (<8 chars)")
+        
+        # Uppercase check
+        if re.search(r'[A-Z]', password):
+            checks.append("✓ Uppercase letter")
+        else:
+            checks.append("✗ Missing uppercase")
+        
+        # Lowercase check
+        if re.search(r'[a-z]', password):
+            checks.append("✓ Lowercase letter")
+        else:
+            checks.append("✗ Missing lowercase")
+        
+        # Digit check
+        if re.search(r'\d', password):
+            checks.append("✓ Number")
+        else:
+            checks.append("✗ Missing number")
+        
+        # Special character check
+        if re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+            checks.append("✓ Special character")
+        else:
+            checks.append("✗ Missing special character")
+        
+        # Calculate strength score
+        score = sum([
+            len(password) >= 8,
+            bool(re.search(r'[A-Z]', password)),
+            bool(re.search(r'[a-z]', password)),
+            bool(re.search(r'\d', password)),
+            bool(re.search(r'[!@#$%^&*(),.?":{}|<>]', password))
+        ])
+        
+        console.print("\n[cyan]Password Strength Check:[/cyan]")
+        for check in checks:
+            if check.startswith("✓"):
+                console.print(f"  [green]{check}[/green]")
+            elif check.startswith("⚠️"):
+                console.print(f"  [yellow]{check}[/yellow]")
+            else:
+                console.print(f"  [red]{check}[/red]")
+        
+        if score >= 4:
+            console.print("[green]✓ Password is strong[/green]")
+            return True
+        elif score >= 3:
+            console.print("[yellow]⚠️ Password is moderate[/yellow]")
+            return True  # Still allow, but warn
+        else:
+            console.print("[red]✗ Password is weak[/red]")
+            return False
     
     def handle_admin_user_deactivate(self, args):
         """Deactivate user (Administrator only)"""
@@ -2235,7 +2371,7 @@ Examples:
         """Display version information"""
         console.print("[bold cyan]Vigilante Intrusion Detection System[/bold cyan]")
         console.print("Version: 1.0.0")
-        console.print("Model: Deterministic DCA + Denoising Autoencoder")
+        console.print("Model: Real-Valued Negative Selection (RNSA) + K-Nearest Neighbors (KNN)")
         console.print("Database: PostgreSQL (Neon)")
         console.print("Roles: Administrator, Analyst")
         console.print("Author: Vigilante Team")

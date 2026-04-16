@@ -1,6 +1,6 @@
 # Intrusion Detection CLI Tool
 
-A command-line tool for intrusion detection using RNSA + KNN.
+A command-line tool for intrusion detection using Real-Valued Negative Selection (RNSA) + K-Nearest Neighbors (KNN).
 
 ## Features
 - User authentication and management
