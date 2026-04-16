@@ -20,28 +20,47 @@ console = Console()
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 def _resolve_logo_path() -> str:
-    local_path = Path(__file__).parent / 'assets' / 'Vigilante_logo.png'
+    """Resolve the path to Vigilante_logo.png"""
+    # Method 1: Check in the same directory as this file
+    current_dir = Path(__file__).parent
+    local_path = current_dir / 'assets' / 'Vigilante_logo.png'
+    print(f"Checking logo path 1: {local_path} - Exists: {local_path.exists()}")
     if local_path.exists():
         return str(local_path)
-
+    
+    # Method 2: Check in the parent directory's assets
+    parent_dir = current_dir.parent
+    parent_assets_path = parent_dir / 'assets' / 'Vigilante_logo.png'
+    print(f"Checking logo path 2: {parent_assets_path} - Exists: {parent_assets_path.exists()}")
+    if parent_assets_path.exists():
+        return str(parent_assets_path)
+    
+    # Method 3: Check in current working directory
+    cwd_path = Path.cwd() / 'assets' / 'Vigilante_logo.png'
+    print(f"Checking logo path 3: {cwd_path} - Exists: {cwd_path.exists()}")
+    if cwd_path.exists():
+        return str(cwd_path)
+    
+    # Method 4: Try to find using package resources
     try:
+        from importlib import resources
         package_asset = resources.files(__package__).joinpath('assets', 'Vigilante_logo.png')
-        with resources.as_file(package_asset) as resource_path:
-            if resource_path.exists():
-                return str(resource_path)
-    except Exception:
-        pass
-
-    return str(local_path)
+        print(f"Checking package resource: {package_asset}")
+        if package_asset and hasattr(package_asset, 'exists') and package_asset.exists():
+            return str(package_asset)
+    except Exception as e:
+        print(f"Package resource lookup failed: {e}")
+    
+    print(f"Logo not found in any location. Logo will not be displayed.")
+    return None
 
 def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     """Generate PDF report for system statistics with logo, models, and anomalies"""
     
     from reportlab.lib.utils import ImageReader
     from PIL import Image
-    import os
-    from pathlib import Path
     
     doc = SimpleDocTemplate(
         output_path,
@@ -62,15 +81,19 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     
     # Try to load and add logo
     logo_path = _resolve_logo_path()
+    print(f"Logo path resolved to: {logo_path}")
     
     # Create header with logo and title in navy box
     header_content = []
     
     # Add logo if available
+    logo_obj = None
     if logo_path and os.path.exists(logo_path):
         try:
+            from reportlab.platypus import Image
             img = Image.open(logo_path)
             img_width, img_height = img.size
+            print(f"Logo loaded: {img_width}x{img_height}")
             
             # Target logo height of 50 points
             target_height = 50
@@ -84,11 +107,14 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                 scaled_width = img_width * scale
                 scaled_height = img_height * scale
             
-            from reportlab.platypus import Image
-            logo = Image(logo_path, width=scaled_width, height=scaled_height)
-            header_content.append(logo)
+            logo_obj = Image(logo_path, width=scaled_width, height=scaled_height)
+            print(f"Logo scaled to: {scaled_width}x{scaled_height}")
         except Exception as e:
             print(f"Warning: Could not load logo: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print(f"Logo not found at: {logo_path}")
     
     # Title with navy background box (smaller font)
     title_style = ParagraphStyle(
@@ -97,7 +123,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         fontSize=16,
         spaceAfter=3,
         textColor=WHITE,
-        alignment=1,
+        alignment=1,  # Center alignment
         fontName='Helvetica-Bold'
     )
     
@@ -109,33 +135,35 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         Paragraph(title_text, title_style),
     ]]
     
-    title_box = Table(title_cell_data, colWidths=[280])
+    title_box = Table(title_cell_data, colWidths=[380])
     title_box.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), NAVY_BLUE),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 15),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+        ('TOPPADDING', (0, 0), (-1, -1), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
         ('LEFTPADDING', (0, 0), (-1, -1), 20),
         ('RIGHTPADDING', (0, 0), (-1, -1), 20),
-        ('BOX', (0, 0), (-1, -1), 1, NAVY_BLUE),
     ]))
     
     # If logo exists, create a header with logo on left and title box on right
-    if logo_path and os.path.exists(logo_path):
-        header_table = Table([[logo, title_box]], colWidths=[60, 390])
+    if logo_obj:
+        # Create a table with logo and title side by side
+        header_table = Table([[logo_obj, title_box]], colWidths=[80, 370])
         header_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('LEFTPADDING', (0, 0), (0, 0), 0),
+            ('RIGHTPADDING', (0, 0), (0, 0), 10),
+            ('BACKGROUND', (1, 0), (1, 0), NAVY_BLUE),  # Ensure title box background
         ]))
         story.append(header_table)
     else:
         # Just the title box if no logo
         story.append(title_box)
+        print("No logo found - displaying title only")
     
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 15))
     
     # Report period
     period = report_data.get('report_period', {})
@@ -157,14 +185,17 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     
     detection_table = Table(detection_data, colWidths=[200, 200])
     detection_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),  # Navy header
+        ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
         ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),  # Lilac data rows (changed from LIGHT_GRAY)
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ('FONTSIZE', (0, 0), (-1, 0), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('TOPPADDING', (0, 0), (-1, 0), 10),
+        ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),
+        ('TEXTCOLOR', (0, 1), (-1, -1), WHITE),
+        ('FONTSIZE', (0, 1), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
     ]))
     story.append(detection_table)
     story.append(Spacer(1, 20))
@@ -197,17 +228,32 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                 ])
         
         model_table = Table(model_data, colWidths=[40, 120, 80, 60, 60, 60, 80])
-        model_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),  # Navy header
+        
+        # Build style with alternating row colors
+        table_style = [
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
             ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),  # Lilac data rows (changed from LIGHT_GRAY)
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTSIZE', (0, 1), (-1, -1), 8)
-        ]))
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ]
+        
+        # Add alternating row colors for data rows
+        for i in range(1, len(model_data)):
+            if i % 2 == 1:
+                table_style.append(('BACKGROUND', (0, i), (-1, i), LILAC_PURPLE))
+                table_style.append(('TEXTCOLOR', (0, i), (-1, i), WHITE))
+            else:
+                table_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#D4C4F0")))  # Slightly lighter lilac
+                table_style.append(('TEXTCOLOR', (0, i), (-1, i), NAVY_BLUE))
+            table_style.append(('FONTSIZE', (0, i), (-1, i), 8))
+            table_style.append(('TOPPADDING', (0, i), (-1, i), 6))
+            table_style.append(('BOTTOMPADDING', (0, i), (-1, i), 6))
+        
+        model_table.setStyle(TableStyle(table_style))
         story.append(model_table)
     else:
         story.append(Paragraph("No models found in the system.", styles['Normal']))
@@ -244,19 +290,31 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                     status
                 ])
         
-        log_table = Table(log_data, colWidths=[40, 100, 80, 80, 100, 50])
+        log_table = Table(log_data, colWidths=[40, 110, 80, 80, 100, 50])
         
+        # Build style with alternating row colors
         table_style = [
-            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),  # Navy header
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
             ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),  # Lilac data rows (changed from LIGHT_GRAY)
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
         ]
+        
+        # Add alternating row colors for data rows
+        for i in range(1, len(log_data)):
+            if i % 2 == 1:
+                table_style.append(('BACKGROUND', (0, i), (-1, i), LILAC_PURPLE))
+                table_style.append(('TEXTCOLOR', (0, i), (-1, i), WHITE))
+            else:
+                table_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#D4C4F0")))
+                table_style.append(('TEXTCOLOR', (0, i), (-1, i), NAVY_BLUE))
+            table_style.append(('FONTSIZE', (0, i), (-1, i), 8))
+            table_style.append(('TOPPADDING', (0, i), (-1, i), 6))
+            table_style.append(('BOTTOMPADDING', (0, i), (-1, i), 6))
         
         log_table.setStyle(TableStyle(table_style))
         story.append(log_table)
@@ -294,17 +352,32 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                 ])
         
         anomaly_table = Table(anomaly_data, colWidths=[120, 80, 80, 80])
-        anomaly_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),  # Navy header
+        
+        # Build style with alternating row colors
+        table_style = [
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
             ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),  # Lilac data rows (changed from LIGHT_GRAY)
-            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-            ('FONTSIZE', (0, 1), (-1, -1), 9)
-        ]))
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('TOPPADDING', (0, 0), (-1, 0), 10),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ]
+        
+        # Add alternating row colors for data rows
+        for i in range(1, len(anomaly_data)):
+            if i % 2 == 1:
+                table_style.append(('BACKGROUND', (0, i), (-1, i), LILAC_PURPLE))
+                table_style.append(('TEXTCOLOR', (0, i), (-1, i), WHITE))
+            else:
+                table_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#D4C4F0")))
+                table_style.append(('TEXTCOLOR', (0, i), (-1, i), NAVY_BLUE))
+            table_style.append(('FONTSIZE', (0, i), (-1, i), 9))
+            table_style.append(('TOPPADDING', (0, i), (-1, i), 8))
+            table_style.append(('BOTTOMPADDING', (0, i), (-1, i), 8))
+        
+        anomaly_table.setStyle(TableStyle(table_style))
         story.append(anomaly_table)
     else:
         story.append(Paragraph("No anomalies detected in the period.", styles['Normal']))
