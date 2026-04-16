@@ -11,8 +11,29 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from rich.table import Table as RichTable
 from rich.console import Console
+import os
+import sys
+from importlib import resources
+from pathlib import Path
 
 console = Console()
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+def _resolve_logo_path() -> str:
+    local_path = Path(__file__).parent / 'assets' / 'Vigilante_logo.png'
+    if local_path.exists():
+        return str(local_path)
+
+    try:
+        package_asset = resources.files(__package__).joinpath('assets', 'Vigilante_logo.png')
+        with resources.as_file(package_asset) as resource_path:
+            if resource_path.exists():
+                return str(resource_path)
+    except Exception:
+        pass
+
+    return str(local_path)
 
 def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     """Generate PDF report for system statistics with logo, models, and anomalies"""
@@ -40,10 +61,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     WHITE = colors.white
     
     # Try to load and add logo
-    logo_path = None
-    local_logo = Path(__file__).parent / 'assets' / 'Vigilante_logo.png'
-    if local_logo.exists():
-        logo_path = str(local_logo)
+    logo_path = _resolve_logo_path()
     
     # Create header with logo and title in navy box
     header_content = []
@@ -53,9 +71,18 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         try:
             img = Image.open(logo_path)
             img_width, img_height = img.size
-            scale = min(40 / img_width, 40 / img_height)  # Slightly smaller logo
+            
+            # Target logo height of 50 points
+            target_height = 50
+            scale = target_height / img_height
             scaled_width = img_width * scale
             scaled_height = img_height * scale
+            
+            # Ensure width doesn't exceed 80 points
+            if scaled_width > 80:
+                scale = 80 / img_width
+                scaled_width = img_width * scale
+                scaled_height = img_height * scale
             
             from reportlab.platypus import Image
             logo = Image(logo_path, width=scaled_width, height=scaled_height)
@@ -67,34 +94,22 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     title_style = ParagraphStyle(
         'TitleInBox', 
         parent=styles['Heading1'], 
-        fontSize=18,  # Reduced from 28
+        fontSize=16,
         spaceAfter=3,
         textColor=WHITE,
         alignment=1,
         fontName='Helvetica-Bold'
     )
     
-    # Subtitle style
-    subtitle_style = ParagraphStyle(
-        'SubtitleInBox', 
-        parent=styles['Heading3'], 
-        fontSize=12,  # Reduced from 14
-        textColor=colors.lightgrey,
-        alignment=1,
-        fontName='Helvetica'
-    )
-    
     # Create title text
     title_text = "Vigilante - Administrator System Report"
-    subtitle_text = "Role-Based Access Control System"
     
     # Create a single cell table with navy background for the title section
     title_cell_data = [[
         Paragraph(title_text, title_style),
-        Paragraph(subtitle_text, subtitle_style)
     ]]
     
-    title_box = Table(title_cell_data, colWidths=[450])
+    title_box = Table(title_cell_data, colWidths=[280])
     title_box.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), NAVY_BLUE),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
