@@ -31,30 +31,24 @@ def _resolve_logo_path() -> str:
     
     # Method 1: Check in project root (simplest and most reliable)
     logo = project_root / 'Vigilante_logo.png'
-    print(f"Checking root logo path: {logo} - Exists: {logo.exists()}")
     if logo.exists():
         return str(logo)
     
     # Method 2: Check in intrusion_detection/assets/
     assets_logo = current_dir / 'assets' / 'Vigilante_logo.png'
-    print(f"Checking assets logo path: {assets_logo} - Exists: {assets_logo.exists()}")
     if assets_logo.exists():
         return str(assets_logo)
     
     # Method 3: Check in current working directory
     cwd_logo = Path.cwd() / 'Vigilante_logo.png'
-    print(f"Checking CWD logo path: {cwd_logo} - Exists: {cwd_logo.exists()}")
     if cwd_logo.exists():
         return str(cwd_logo)
-    
-    print(f"Logo not found. Tried: {logo}, {assets_logo}, {cwd_logo}")
     return None
 
 def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     """Generate PDF report for system statistics with logo, models, and anomalies"""
-    
-    from reportlab.lib.utils import ImageReader
-    from PIL import Image
+
+    from PIL import Image as PILImage  # Import PIL Image with alias to avoid conflict
     
     doc = SimpleDocTemplate(
         output_path,
@@ -83,9 +77,10 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     logo_obj = None
     if logo_path and os.path.exists(logo_path):
         try:
-            from reportlab.platypus import Image
-            # Open with PIL to get dimensions
-            img = Image.open(logo_path)
+            from reportlab.platypus import Image as ReportLabImage  # Import ReportLab Image with alias
+            
+            # Open with PIL to get dimensions (using the correctly imported PIL Image)
+            img = PILImage.open(logo_path)
             img_width, img_height = img.size
             print(f"Logo loaded successfully: {img_width}x{img_height}")
             
@@ -101,14 +96,16 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                 scaled_width = img_width * scale
                 scaled_height = img_height * scale
             
-            logo_obj = Image(logo_path, width=scaled_width, height=scaled_height)
-            print(f"Logo scaled to: {scaled_width:.2f}x{scaled_height:.2f}")
+            # Use ReportLab Image for the PDF
+            logo_obj = ReportLabImage(logo_path, width=scaled_width, height=scaled_height)
         except Exception as e:
             print(f"Warning: Could not load logo: {e}")
+            import traceback
+            traceback.print_exc()
             logo_obj = None
     else:
         print(f"Logo file not found at: {logo_path}")
-         
+
     # Title with navy background box (smaller font)
     title_style = ParagraphStyle(
         'TitleInBox', 
