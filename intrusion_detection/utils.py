@@ -96,7 +96,6 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
             # Add logo centered
             story.append(Spacer(1, 20))
             story.append(CenterFlowable(logo_obj))
-            story.append(Spacer(1, 10))
             
         except Exception as e:
             print(f"Warning: Could not load logo: {e}")
@@ -106,30 +105,37 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         print(f"Logo file not found at: {logo_path}")
         story.append(Spacer(1, 30))
     
-    # Title style for centered text without box
+    # Title with navy background box
     title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=24,
-        textColor=NAVY_BLUE,
+        'TitleInBox', 
+        parent=styles['Heading1'], 
+        fontSize=16,
+        spaceAfter=3,
+        textColor=WHITE,
         alignment=1,  # Center alignment
-        fontName='Helvetica-Bold',
-        spaceAfter=10,
+        fontName='Helvetica-Bold'
     )
     
-    # Add title
-    title_text = "Vigilante-Administrator System Report"
-    story.append(Paragraph(title_text, title_style))
+    # Create title text
+    title_text = "Vigilante - Administrator System Report"
     
-    # Add a decorative line
-    line_style = ParagraphStyle(
-        'LineStyle',
-        parent=styles['Normal'],
-        fontSize=1,
-        textColor=NAVY_BLUE,
-        alignment=1,
-    )
-    story.append(Paragraph("_" * 80, line_style))
+    # Create a single cell table with navy background for the title section
+    title_cell_data = [[
+        Paragraph(title_text, title_style),
+    ]]
+    
+    title_box = Table(title_cell_data, colWidths=[380])
+    title_box.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), NAVY_BLUE),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ('LEFTPADDING', (0, 0), (-1, -1), 20),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 20),
+    ]))
+    
+    story.append(title_box)
     story.append(Spacer(1, 20))
     
     # Report period
