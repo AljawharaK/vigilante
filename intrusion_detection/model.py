@@ -12,37 +12,6 @@ import sys
 import types
 
 # ========================
-# joblib saves class references, not just data
-# Ensure classes are defined at the top level of the module for loading to work correctly
-# GLOBAL REGISTRATION FOR CUSTOM CLASSES
-# ========================
-def register_custom_classes():
-    """Register custom classes in __main__ module to fix joblib loading"""
-    # Get the __main__ module
-    main_module = sys.modules.get('__main__')
-    if main_module is None:
-        # Create __main__ module if it doesn't exist
-        main_module = types.ModuleType('__main__')
-        sys.modules['__main__'] = main_module
-    
-    # Register Detector class in __main__
-    if not hasattr(main_module, 'Detector'):
-        main_module.Detector = Detector
-    
-    # Register ProposedRNSA_KNN class in __main__
-    if not hasattr(main_module, 'ProposedRNSA_KNN'):
-        main_module.ProposedRNSA_KNN = ProposedRNSA_KNN
-    
-    # Also register in the current module for good measure
-    if not hasattr(sys.modules[__name__], 'Detector'):
-        sys.modules[__name__].Detector = Detector
-    if not hasattr(sys.modules[__name__], 'ProposedRNSA_KNN'):
-        sys.modules[__name__].ProposedRNSA_KNN = ProposedRNSA_KNN
-
-# Call registration at module load
-register_custom_classes()
-
-# ========================
 # Feature alignment mapping for different datasets
 # ========================
 FEATURE_ALIGNMENT_MAP = {
@@ -505,6 +474,37 @@ def analyze_dataset_compatibility(df: pd.DataFrame) -> Dict[str, Any]:
         'total_columns': len(df.columns),
         'recommendations': _get_feature_recommendations(missing_features)
     }
+
+# ========================
+# joblib saves class references, not just data
+# Ensure classes are defined at the top level of the module for loading to work correctly
+# GLOBAL REGISTRATION FOR CUSTOM CLASSES
+# ========================
+def register_custom_classes():
+    """Register custom classes in __main__ module to fix joblib loading"""
+    # Get the __main__ module
+    main_module = sys.modules.get('__main__')
+    if main_module is None:
+        # Create __main__ module if it doesn't exist
+        main_module = types.ModuleType('__main__')
+        sys.modules['__main__'] = main_module
+    
+    # Register Detector class in __main__
+    if not hasattr(main_module, 'Detector'):
+        main_module.Detector = Detector
+    
+    # Register ProposedRNSA_KNN class in __main__
+    if not hasattr(main_module, 'ProposedRNSA_KNN'):
+        main_module.ProposedRNSA_KNN = ProposedRNSA_KNN
+    
+    # Also register in the current module for good measure
+    if not hasattr(sys.modules[__name__], 'Detector'):
+        sys.modules[__name__].Detector = Detector
+    if not hasattr(sys.modules[__name__], 'ProposedRNSA_KNN'):
+        sys.modules[__name__].ProposedRNSA_KNN = ProposedRNSA_KNN
+
+# Call registration at module load
+register_custom_classes()
 
 # ========================
 # Complete Model Class
