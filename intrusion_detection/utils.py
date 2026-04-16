@@ -49,7 +49,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     """Generate PDF report for system statistics with logo, models, and anomalies"""
     
     from PIL import Image as PILImage
-    from reportlab.platypus import Image as ReportLabImage, CenterFlowable
+    from reportlab.platypus import Image as ReportLabImage
     
     doc = SimpleDocTemplate(
         output_path,
@@ -71,14 +71,14 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     # Try to load and add logo
     logo_path = _resolve_logo_path()
     
-    # Create centered header with logo on top and title below
+    # Add logo centered (without using tables)
     if logo_path and os.path.exists(logo_path):
         try:
             # Open with PIL to get dimensions
             img = PILImage.open(logo_path)
             img_width, img_height = img.size
             
-            # Target logo height of 60 points (slightly larger for better visibility)
+            # Target logo height of 60 points
             target_height = 60
             scale = target_height / img_height
             scaled_width = img_width * scale
@@ -90,12 +90,19 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                 scaled_width = img_width * scale
                 scaled_height = img_height * scale
             
-            # Create centered logo
+            # Create logo
             logo_obj = ReportLabImage(logo_path, width=scaled_width, height=scaled_height)
             
-            # Add logo centered
-            story.append(Spacer(1, 20))
-            story.append(CenterFlowable(logo_obj))
+            # Center the logo by using a 1-row, 3-column table with empty cells on sides
+            logo_table = Table([[Spacer(1, 1), logo_obj, Spacer(1, 1)]], colWidths=[doc.width/2 - scaled_width/2, scaled_width, doc.width/2 - scaled_width/2])
+            logo_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (0, 0), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+                ('ALIGN', (2, 0), (2, 0), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            story.append(logo_table)
+            story.append(Spacer(1, 10))
             
         except Exception as e:
             print(f"Warning: Could not load logo: {e}")
@@ -105,7 +112,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         print(f"Logo file not found at: {logo_path}")
         story.append(Spacer(1, 30))
     
-    # Title with navy background box
+    # Title with navy background box (smaller font)
     title_style = ParagraphStyle(
         'TitleInBox', 
         parent=styles['Heading1'], 

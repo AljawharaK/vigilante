@@ -1,0 +1,6257 @@
+{
+  "report_period": {
+    "start": "2026-03-18",
+    "end": "2026-04-17",
+    "days": 30
+  },
+  "detection_summary": {
+    "total_flows_analyzed": 334814,
+    "total_anomalies_detected": 174361,
+    "detection_rate": 0.5207697408113161
+  },
+  "user_logs": [
+    {
+      "id": 131,
+      "user_id": 1,
+      "username": "admin1",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-16 16:56:38.512806+00:00"
+    },
+    {
+      "id": 130,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-16 14:02:51.848158+00:00"
+    },
+    {
+      "id": 129,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-16 13:56:25.724880+00:00"
+    },
+    {
+      "id": 128,
+      "user_id": 2,
+      "username": "analyst1",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-16 12:59:59.837691+00:00"
+    },
+    {
+      "id": 127,
+      "user_id": 4,
+      "username": "admin3",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-16 12:30:05.779581+00:00"
+    },
+    {
+      "id": 126,
+      "user_id": 4,
+      "username": "admin3",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-16 12:09:06.384932+00:00"
+    },
+    {
+      "id": 125,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-16 09:47:48.377376+00:00"
+    },
+    {
+      "id": 124,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-16 09:45:23.736507+00:00"
+    },
+    {
+      "id": 123,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-16 09:39:54.809536+00:00"
+    },
+    {
+      "id": 122,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-16 09:09:06.084289+00:00"
+    },
+    {
+      "id": 121,
+      "user_id": 1,
+      "username": "admin1",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-16 01:02:52.166519+00:00"
+    },
+    {
+      "id": 120,
+      "user_id": 1,
+      "username": "admin1",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-16 00:17:07.783510+00:00"
+    },
+    {
+      "id": 119,
+      "user_id": 1,
+      "username": "admin1",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-15 21:35:50.966251+00:00"
+    },
+    {
+      "id": 118,
+      "user_id": 4,
+      "username": "admin3",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-15 15:48:16.148980+00:00"
+    },
+    {
+      "id": 117,
+      "user_id": 4,
+      "username": "admin3",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-15 07:12:50.922486+00:00"
+    },
+    {
+      "id": 116,
+      "user_id": 4,
+      "username": "admin3",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-15 06:52:56.492657+00:00"
+    },
+    {
+      "id": 115,
+      "user_id": 4,
+      "username": "admin3",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-15 06:17:45.199772+00:00"
+    },
+    {
+      "id": 114,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-13 16:59:37.616685+00:00"
+    },
+    {
+      "id": 113,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-13 15:28:10.454552+00:00"
+    },
+    {
+      "id": 112,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-12 11:10:12.767468+00:00"
+    },
+    {
+      "id": 111,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-12 10:49:43.496247+00:00"
+    },
+    {
+      "id": 110,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-12 10:29:30.822562+00:00"
+    },
+    {
+      "id": 109,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-12 10:05:37.924948+00:00"
+    },
+    {
+      "id": 108,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-12 09:57:49.689176+00:00"
+    },
+    {
+      "id": 107,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-12 05:22:23.733525+00:00"
+    },
+    {
+      "id": 106,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-12 05:13:55.736825+00:00"
+    },
+    {
+      "id": 105,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-12 04:47:35.844180+00:00"
+    },
+    {
+      "id": 104,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-12 03:28:14.954805+00:00"
+    },
+    {
+      "id": 103,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-12 01:05:53.947912+00:00"
+    },
+    {
+      "id": 102,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-11 02:52:23.705751+00:00"
+    },
+    {
+      "id": 101,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-11 02:03:41.768206+00:00"
+    },
+    {
+      "id": 100,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-11 01:57:44.445564+00:00"
+    },
+    {
+      "id": 99,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-11 01:56:41.248470+00:00"
+    },
+    {
+      "id": 98,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-11 01:45:15.827351+00:00"
+    },
+    {
+      "id": 97,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-11 01:43:49.904133+00:00"
+    },
+    {
+      "id": 96,
+      "user_id": 13,
+      "username": "tester",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-11 01:42:07.706455+00:00"
+    },
+    {
+      "id": 95,
+      "user_id": 13,
+      "username": "tester",
+      "action": "password_change",
+      "resource": null,
+      "status": "success",
+      "details": null,
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-11 01:41:04.703316+00:00"
+    },
+    {
+      "id": 94,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "user_create",
+      "resource": "tester",
+      "status": "success",
+      "details": {
+        "role": "Analyst",
+        "email": "vigilante.test.2026@mailinator.com"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-11 01:39:03.411705+00:00"
+    },
+    {
+      "id": 93,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-11 01:38:24.175509+00:00"
+    },
+    {
+      "id": 92,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-11 01:36:49.662122+00:00"
+    },
+    {
+      "id": 91,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-11 01:31:28.100773+00:00"
+    },
+    {
+      "id": 90,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-09 09:35:40.204957+00:00"
+    },
+    {
+      "id": 89,
+      "user_id": 8,
+      "username": "analyst2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-09 00:57:22.600846+00:00"
+    },
+    {
+      "id": 88,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-09 00:55:18.753294+00:00"
+    },
+    {
+      "id": 87,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 10:43:56.945338+00:00"
+    },
+    {
+      "id": 86,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 10:37:11.647649+00:00"
+    },
+    {
+      "id": 85,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 10:32:23.322618+00:00"
+    },
+    {
+      "id": 84,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 10:26:31.239510+00:00"
+    },
+    {
+      "id": 83,
+      "user_id": 8,
+      "username": "analyst2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 10:19:35.712256+00:00"
+    },
+    {
+      "id": 82,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "user_deactivate",
+      "resource": "admin4",
+      "status": "success",
+      "details": null,
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 09:04:02.535397+00:00"
+    },
+    {
+      "id": 81,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "user_create",
+      "resource": "admin4",
+      "status": "success",
+      "details": {
+        "role": "Administrator",
+        "email": "bashayerbamarhul@gmail.com"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 08:57:30.911559+00:00"
+    },
+    {
+      "id": 80,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "user_deactivate",
+      "resource": "analyst4",
+      "status": "success",
+      "details": null,
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 08:18:06.842665+00:00"
+    },
+    {
+      "id": 79,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "user_create",
+      "resource": "analyst4",
+      "status": "success",
+      "details": {
+        "role": "Analyst",
+        "email": "dawaty369@gmail.com"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 08:16:47.251332+00:00"
+    },
+    {
+      "id": 78,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 08:15:44.584042+00:00"
+    },
+    {
+      "id": 77,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 07:54:09.175552+00:00"
+    },
+    {
+      "id": 76,
+      "user_id": 9,
+      "username": "analyst3",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 07:27:34.226372+00:00"
+    },
+    {
+      "id": 75,
+      "user_id": 9,
+      "username": "analyst3",
+      "action": "password_change",
+      "resource": null,
+      "status": "success",
+      "details": null,
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 07:26:28.914687+00:00"
+    },
+    {
+      "id": 74,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "user_create",
+      "resource": "analyst3",
+      "status": "success",
+      "details": {
+        "role": "Analyst",
+        "email": "bashayerrifan@gmail.com"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 07:24:51.820976+00:00"
+    },
+    {
+      "id": 73,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-04-07 07:24:14.547990+00:00"
+    },
+    {
+      "id": 72,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-29 02:57:07.475099+00:00"
+    },
+    {
+      "id": 71,
+      "user_id": 8,
+      "username": "analyst2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 18:41:40.589195+00:00"
+    },
+    {
+      "id": 70,
+      "user_id": 8,
+      "username": "analyst2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 18:27:00.823758+00:00"
+    },
+    {
+      "id": 69,
+      "user_id": 8,
+      "username": "analyst2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 18:17:27.321465+00:00"
+    },
+    {
+      "id": 68,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 17:49:59.681625+00:00"
+    },
+    {
+      "id": 67,
+      "user_id": 8,
+      "username": "analyst2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 17:18:47.464728+00:00"
+    },
+    {
+      "id": 66,
+      "user_id": 2,
+      "username": "analyst1",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 17:11:53.083320+00:00"
+    },
+    {
+      "id": 65,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 17:11:08.178514+00:00"
+    },
+    {
+      "id": 64,
+      "user_id": 1,
+      "username": "admin1",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 17:08:12.608445+00:00"
+    },
+    {
+      "id": 63,
+      "user_id": 8,
+      "username": "analyst2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 17:00:49.933255+00:00"
+    },
+    {
+      "id": 62,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 16:48:25.048030+00:00"
+    },
+    {
+      "id": 61,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 15:39:01.068986+00:00"
+    },
+    {
+      "id": 60,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 15:02:03.702862+00:00"
+    },
+    {
+      "id": 59,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 05:27:05.663516+00:00"
+    },
+    {
+      "id": 58,
+      "user_id": 8,
+      "username": "analyst2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 05:23:21.872380+00:00"
+    },
+    {
+      "id": 57,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 05:20:01.111130+00:00"
+    },
+    {
+      "id": 56,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 05:16:49.993185+00:00"
+    },
+    {
+      "id": 55,
+      "user_id": 8,
+      "username": "analyst2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 02:55:41.322091+00:00"
+    },
+    {
+      "id": 54,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 02:53:39.697065+00:00"
+    },
+    {
+      "id": 53,
+      "user_id": 8,
+      "username": "analyst2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 02:38:19.691548+00:00"
+    },
+    {
+      "id": 52,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 02:37:20.636111+00:00"
+    },
+    {
+      "id": 51,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-27 02:05:57.580580+00:00"
+    },
+    {
+      "id": 50,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-19 00:06:18.355691+00:00"
+    },
+    {
+      "id": 49,
+      "user_id": 3,
+      "username": "admin2",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-18 23:24:14.805872+00:00"
+    },
+    {
+      "id": 48,
+      "user_id": 4,
+      "username": "admin3",
+      "action": "login",
+      "resource": null,
+      "status": "success",
+      "details": {
+        "method": "otp"
+      },
+      "ip_address": null,
+      "user_agent": null,
+      "created_at": "2026-03-18 02:24:41.245333+00:00"
+    }
+  ],
+  "recent_anomalies": [
+    {
+      "index": 25,
+      "severity": "Low",
+      "confidence": 0.5492664313620885,
+      "top_features": {
+        "dur": 13792.0,
+        "dwin": 0.0,
+        "rate": 6.0,
+        "swin": 6.0,
+        "dmean": 6.0,
+        "dpkts": 1.0,
+        "smean": 6.0,
+        "spkts": 29.0,
+        "dbytes": 6.0,
+        "sbytes": 1.0
+      },
+      "detected_at": "2026-04-16 01:59:44.618762+00:00"
+    },
+    {
+      "index": 27,
+      "severity": "Low",
+      "confidence": 0.6009556386553166,
+      "top_features": {
+        "dur": 13791.0,
+        "dwin": 0.0,
+        "rate": 18.0,
+        "swin": 6.0,
+        "dmean": 6.0,
+        "dpkts": 1.0,
+        "smean": 6.0,
+        "spkts": 54.0,
+        "dbytes": 6.0,
+        "sbytes": 3.0
+      },
+      "detected_at": "2026-04-16 01:59:44.618762+00:00"
+    },
+    {
+      "index": 43,
+      "severity": "Medium",
+      "confidence": 0.7,
+      "top_features": {
+        "dur": 45392.0,
+        "dwin": 9.899494937,
+        "rate": 0.0,
+        "swin": 7.0,
+        "dmean": 0.0,
+        "dpkts": 2.0,
+        "smean": 14.0,
+        "spkts": 1.0,
+        "dbytes": 14.0,
+        "sbytes": 0.0
+      },
+      "detected_at": "2026-04-16 01:59:44.618762+00:00"
+    },
+    {
+      "index": 48,
+      "severity": "Low",
+      "confidence": 0.5711352372048816,
+      "top_features": {
+        "dur": 22.0,
+        "dwin": 0.0,
+        "rate": 0.0,
+        "swin": 0.0,
+        "dmean": 0.0,
+        "dpkts": 1.0,
+        "smean": 0.0,
+        "spkts": 50.0,
+        "dbytes": 0.0,
+        "sbytes": 1.0
+      },
+      "detected_at": "2026-04-16 01:59:44.618762+00:00"
+    },
+    {
+      "index": 85,
+      "severity": "Low",
+      "confidence": 0.5902151559357207,
+      "top_features": {
+        "dur": 80.0,
+        "dwin": 0.0,
+        "rate": 0.0,
+        "swin": 6.0,
+        "dmean": 6.0,
+        "dpkts": 2.0,
+        "smean": 6.0,
+        "spkts": 52.0,
+        "dbytes": 12.0,
+        "sbytes": 0.0
+      },
+      "detected_at": "2026-04-16 01:59:44.618762+00:00"
+    },
+    {
+      "index": 0,
+      "severity": "Medium",
+      "confidence": 0.7,
+      "top_features": {
+        "dur": "1",
+        "dpkts": "udp",
+        "spkts": 1.1e-05,
+        "dbytes": "INT",
+        "sbytes": "-"
+      },
+      "reconstruction_error": 0.30000000000000004,
+      "detected_at": "2026-04-12 16:48:45.768813+00:00"
+    },
+    {
+      "index": 3,
+      "severity": "Medium",
+      "confidence": 0.7,
+      "top_features": {
+        "dur": "4",
+        "dpkts": "udp",
+        "spkts": 6e-06,
+        "dbytes": "INT",
+        "sbytes": "-"
+      },
+      "reconstruction_error": 0.30000000000000004,
+      "detected_at": "2026-04-12 16:48:45.768813+00:00"
+    },
+    {
+      "index": 4,
+      "severity": "Medium",
+      "confidence": 0.7,
+      "top_features": {
+        "dur": "5",
+        "dpkts": "udp",
+        "spkts": 1e-05,
+        "dbytes": "INT",
+        "sbytes": "-"
+      },
+      "reconstruction_error": 0.30000000000000004,
+      "detected_at": "2026-04-12 16:48:45.768813+00:00"
+    },
+    {
+      "index": 5,
+      "severity": "Minimal",
+      "confidence": 0.3975911021232605,
+      "top_features": {
+        "dur": "6",
+        "dpkts": "udp",
+        "spkts": 3e-06,
+        "dbytes": "INT",
+        "sbytes": "-"
+      },
+      "reconstruction_error": 0.6024088978767395,
+      "detected_at": "2026-04-12 16:48:45.768813+00:00"
+    },
+    {
+      "index": 6,
+      "severity": "Medium",
+      "confidence": 0.7,
+      "top_features": {
+        "dur": "7",
+        "dpkts": "udp",
+        "spkts": 6e-06,
+        "dbytes": "INT",
+        "sbytes": "-"
+      },
+      "reconstruction_error": 0.30000000000000004,
+      "detected_at": "2026-04-12 16:48:45.768813+00:00"
+    }
+  ],
+  "all_models": [
+    {
+      "id": 6,
+      "user_id": 2,
+      "name": "UnifiedDatasetNIDS Model_20260416_172612",
+      "model_path": "saved_models\\UnifiedDatasetNIDS Model_20260416_172612.joblib",
+      "model_type": "proposed_algorithm",
+      "dataset_name": "uds_ids_dataset.csv",
+      "accuracy": "0.9947",
+      "precision": "0.9955",
+      "recall": "0.9982",
+      "f1_score": "0.9969",
+      "training_samples": null,
+      "features": [
+        "dur",
+        "spkts",
+        "dpkts",
+        "sbytes",
+        "dbytes",
+        "rate",
+        "smean",
+        "dmean",
+        "swin",
+        "dwin"
+      ],
+      "features_count": null,
+      "parameters": {
+        "k": 5,
+        "r_s": 0.05,
+        "model_type": "rnsa_knn",
+        "core_features": [
+          "dur",
+          "spkts",
+          "dpkts",
+          "sbytes",
+          "dbytes",
+          "rate",
+          "smean",
+          "dmean",
+          "swin",
+          "dwin"
+        ],
+        "max_detectors": 1000
+      },
+      "metrics": {
+        "auc": 0.9949225613704813,
+        "recall": 0.998171289241085,
+        "f1_score": 0.9968508177337595,
+        "detectors": 1000,
+        "precision": 0.9955338352897162,
+        "optimal_dr": 0.998171289241085,
+        "optimal_far": 0.023045366795366794,
+        "test_accuracy": 0.9947193812449697,
+        "detection_rate": 0.998171289241085,
+        "train_accuracy": 0.9959806048232742,
+        "false_alarm_rate": 0.023045366795366794
+      },
+      "created_at": "2026-04-16 14:26:15.816170+00:00",
+      "updated_at": "2026-04-16 14:26:15.816170+00:00",
+      "is_active": true,
+      "version": 1,
+      "username": "analyst1"
+    },
+    {
+      "id": 5,
+      "user_id": 13,
+      "name": "UNSWNB15 Model_20260412_073808",
+      "model_path": "saved_models\\UNSWNB15 Model_20260412_073808.joblib",
+      "model_type": "proposed_algorithm",
+      "dataset_name": "UNSW_NB15_testing-set.csv",
+      "accuracy": "0.9311",
+      "precision": "0.9535",
+      "recall": "0.9448",
+      "f1_score": "0.9491",
+      "training_samples": null,
+      "features": [
+        "dur",
+        "spkts",
+        "dpkts",
+        "sbytes",
+        "dbytes",
+        "rate",
+        "smean",
+        "dmean",
+        "swin",
+        "dwin"
+      ],
+      "features_count": null,
+      "parameters": {
+        "k": 1,
+        "r_s": 0.01,
+        "model_type": "rnsa_knn",
+        "core_features": [
+          "dur",
+          "spkts",
+          "dpkts",
+          "sbytes",
+          "dbytes",
+          "rate",
+          "smean",
+          "dmean",
+          "swin",
+          "dwin"
+        ],
+        "max_detectors": 1000
+      },
+      "metrics": {
+        "auc": 0.9226521287324263,
+        "recall": 0.9447819347270519,
+        "f1_score": 0.9491161616161616,
+        "detectors": 1000,
+        "precision": 0.9534903386748975,
+        "optimal_dr": 0.9447819347270519,
+        "optimal_far": 0.09821428571428571,
+        "test_accuracy": 0.9310502152898571,
+        "detection_rate": 0.9447819347270519,
+        "train_accuracy": 0.9858417930877152,
+        "false_alarm_rate": 0.09821428571428571
+      },
+      "created_at": "2026-04-12 04:38:10.647511+00:00",
+      "updated_at": "2026-04-12 04:38:10.647511+00:00",
+      "is_active": true,
+      "version": 1,
+      "username": "tester"
+    },
+    {
+      "id": 4,
+      "user_id": 4,
+      "name": "Test Model_20260318_061610",
+      "model_path": "saved_models\\Test Model_20260318_061610.joblib",
+      "model_type": "proposed_algorithm",
+      "dataset_name": "UNSW_NB15_training-set.json",
+      "accuracy": "0.9150",
+      "precision": "0.9288",
+      "recall": "0.9158",
+      "f1_score": "0.9223",
+      "training_samples": null,
+      "features": [
+        "dur",
+        "spkts",
+        "dpkts",
+        "sbytes",
+        "dbytes",
+        "rate",
+        "smean",
+        "dmean",
+        "swin",
+        "dwin"
+      ],
+      "features_count": null,
+      "parameters": {
+        "k": 1,
+        "r_s": 0.01,
+        "model_type": "rnsa_knn",
+        "core_features": [
+          "dur",
+          "spkts",
+          "dpkts",
+          "sbytes",
+          "dbytes",
+          "rate",
+          "smean",
+          "dmean",
+          "swin",
+          "dwin"
+        ],
+        "max_detectors": 1000
+      },
+      "metrics": {
+        "auc": 0.914304099511445,
+        "recall": 0.9158486820337488,
+        "f1_score": 0.9222567747667704,
+        "detectors": 1000,
+        "precision": 0.9287551727994632,
+        "optimal_dr": 0.9158486820337488,
+        "optimal_far": 0.08608108108108108,
+        "test_accuracy": 0.9149814781077306,
+        "detection_rate": 0.9158486820337488,
+        "train_accuracy": 0.9911485614514537,
+        "false_alarm_rate": 0.08608108108108108
+      },
+      "created_at": "2026-03-18 03:16:14.121745+00:00",
+      "updated_at": "2026-03-18 03:16:14.121745+00:00",
+      "is_active": true,
+      "version": 1,
+      "username": "admin3"
+    },
+    {
+      "id": 3,
+      "user_id": 4,
+      "name": "Test Model_20260312_084456",
+      "model_path": "saved_models\\Test Model_20260312_084456.joblib",
+      "model_type": "proposed_algorithm",
+      "dataset_name": "UNSW_NB15_training-set.json",
+      "accuracy": "0.9150",
+      "precision": "0.9288",
+      "recall": "0.9158",
+      "f1_score": "0.9223",
+      "training_samples": null,
+      "features": [
+        "dur",
+        "spkts",
+        "dpkts",
+        "sbytes",
+        "dbytes",
+        "rate",
+        "smean",
+        "dmean",
+        "swin",
+        "dwin"
+      ],
+      "features_count": null,
+      "parameters": {
+        "k": 1,
+        "r_s": 0.01,
+        "model_type": "rnsa_knn",
+        "core_features": [
+          "dur",
+          "spkts",
+          "dpkts",
+          "sbytes",
+          "dbytes",
+          "rate",
+          "smean",
+          "dmean",
+          "swin",
+          "dwin"
+        ],
+        "max_detectors": 1000
+      },
+      "metrics": {
+        "auc": 0.914304099511445,
+        "recall": 0.9158486820337488,
+        "f1_score": 0.9222567747667704,
+        "detectors": 1000,
+        "precision": 0.9287551727994632,
+        "optimal_dr": 0.9158486820337488,
+        "optimal_far": 0.08608108108108108,
+        "test_accuracy": 0.9149814781077306,
+        "detection_rate": 0.9158486820337488,
+        "train_accuracy": 0.9911485614514537,
+        "false_alarm_rate": 0.08608108108108108
+      },
+      "created_at": "2026-03-12 05:44:59.988159+00:00",
+      "updated_at": "2026-03-12 05:44:59.988159+00:00",
+      "is_active": true,
+      "version": 1,
+      "username": "admin3"
+    },
+    {
+      "id": 2,
+      "user_id": 1,
+      "name": "UNSWNB15 Model_20260308_034234",
+      "model_path": "saved_models\\UNSWNB15 Model_20260308_034234.joblib",
+      "model_type": "proposed_algorithm",
+      "dataset_name": "UNSW_NB15_testing-set.csv",
+      "accuracy": "0.9311",
+      "precision": "0.9535",
+      "recall": "0.9448",
+      "f1_score": "0.9491",
+      "training_samples": null,
+      "features": [
+        "dur",
+        "spkts",
+        "dpkts",
+        "sbytes",
+        "dbytes",
+        "rate",
+        "smean",
+        "dmean",
+        "swin",
+        "dwin"
+      ],
+      "features_count": null,
+      "parameters": {
+        "k": 1,
+        "r_s": 0.01,
+        "model_type": "rnsa_knn",
+        "core_features": [
+          "dur",
+          "spkts",
+          "dpkts",
+          "sbytes",
+          "dbytes",
+          "rate",
+          "smean",
+          "dmean",
+          "swin",
+          "dwin"
+        ],
+        "max_detectors": 1000
+      },
+      "metrics": {
+        "auc": 0.9226521287324263,
+        "recall": 0.9447819347270519,
+        "f1_score": 0.9491161616161616,
+        "detectors": 1000,
+        "precision": 0.9534903386748975,
+        "optimal_dr": 0.9447819347270519,
+        "optimal_far": 0.09821428571428571,
+        "test_accuracy": 0.9310502152898571,
+        "detection_rate": 0.9447819347270519,
+        "train_accuracy": 0.9858417930877152,
+        "false_alarm_rate": 0.09821428571428571
+      },
+      "created_at": "2026-03-08 00:42:36.783941+00:00",
+      "updated_at": "2026-03-08 00:42:36.783941+00:00",
+      "is_active": true,
+      "version": 1,
+      "username": "admin1"
+    },
+    {
+      "id": 1,
+      "user_id": 1,
+      "name": "RNSA_KNN_ALIGNED_20260304_210524",
+      "model_path": "saved_models\\rnsa_knn_model.joblib",
+      "model_type": "proposed_algorithm",
+      "dataset_name": "UNSW-NB15 + CIC-IDS-2018 (Aligned 10 Features)",
+      "accuracy": "0.9985",
+      "precision": "0.9985",
+      "recall": "0.9985",
+      "f1_score": "0.9985",
+      "training_samples": 683508,
+      "features": [
+        "dur",
+        "spkts",
+        "dpkts",
+        "sbytes",
+        "dbytes",
+        "rate",
+        "smean",
+        "dmean",
+        "swin",
+        "dwin"
+      ],
+      "features_count": null,
+      "parameters": {
+        "k": 5,
+        "r_s": 0.05,
+        "datasets": [
+          "UNSW-NB15",
+          "CIC-IDS-2018"
+        ],
+        "algorithm": "RNSA + KNN",
+        "threshold": 0.5,
+        "model_type": "rnsa_knn",
+        "core_features": [
+          "dur",
+          "spkts",
+          "dpkts",
+          "sbytes",
+          "dbytes",
+          "rate",
+          "smean",
+          "dmean",
+          "swin",
+          "dwin"
+        ],
+        "max_detectors": 1000,
+        "normalization": "StandardScaler",
+        "distance_metric": "euclidean",
+        "training_method": "sequential",
+        "feature_alignment": "10 core features extracted from both datasets",
+        "cic_training_samples": 609508,
+        "unsw_training_samples": 74000
+      },
+      "metrics": {
+        "auc": 0.9995,
+        "recall": 0.9994,
+        "accuracy": 0.9985,
+        "f1_score": 0.9985,
+        "precision": 0.9976,
+        "cic_accuracy": 0.9985,
+        "test_accuracy": 0.9985,
+        "unsw_accuracy": 0.9215,
+        "detection_rate": 0.9001,
+        "detectors_count": 1000,
+        "false_alarm_rate": 0.0024,
+        "training_samples": 683508
+      },
+      "created_at": "2026-03-04 18:05:29.653121+00:00",
+      "updated_at": "2026-03-04 18:05:29.653121+00:00",
+      "is_active": true,
+      "version": 1,
+      "username": "admin1"
+    }
+  ],
+  "all_detections": [
+    {
+      "id": 5,
+      "user_id": 1,
+      "model_id": 1,
+      "input_file": "C:\\Users\\USER\\Downloads\\Wednesday-workingHours.pcap_ISCX_reduced.csv",
+      "total_flows": 77141,
+      "anomalies_detected": 2372,
+      "false_positives": null,
+      "false_negatives": null,
+      "execution_time_seconds": null,
+      "metrics": {},
+      "results": {
+        "recall": 0.04157452454666077,
+        "metrics": {},
+        "accuracy": 0.8080138966308448,
+        "f1_score": 0.07077425021960096,
+        "anomalies": [
+          {
+            "index": 25,
+            "severity": "Low",
+            "confidence": 0.5492664313620885,
+            "top_features": {
+              "dur": 13792.0,
+              "dwin": 0.0,
+              "rate": 6.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 1.0,
+              "smean": 6.0,
+              "spkts": 29.0,
+              "dbytes": 6.0,
+              "sbytes": 1.0
+            }
+          },
+          {
+            "index": 27,
+            "severity": "Low",
+            "confidence": 0.6009556386553166,
+            "top_features": {
+              "dur": 13791.0,
+              "dwin": 0.0,
+              "rate": 18.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 1.0,
+              "smean": 6.0,
+              "spkts": 54.0,
+              "dbytes": 6.0,
+              "sbytes": 3.0
+            }
+          },
+          {
+            "index": 43,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 45392.0,
+              "dwin": 9.899494937,
+              "rate": 0.0,
+              "swin": 7.0,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 14.0,
+              "spkts": 1.0,
+              "dbytes": 14.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 48,
+            "severity": "Low",
+            "confidence": 0.5711352372048816,
+            "top_features": {
+              "dur": 22.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 0.0,
+              "dmean": 0.0,
+              "dpkts": 1.0,
+              "smean": 0.0,
+              "spkts": 50.0,
+              "dbytes": 0.0,
+              "sbytes": 1.0
+            }
+          },
+          {
+            "index": 85,
+            "severity": "Low",
+            "confidence": 0.5902151559357207,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 52.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 89,
+            "severity": "Low",
+            "confidence": 0.5644590381748142,
+            "top_features": {
+              "dur": 135.0,
+              "dwin": 0.0,
+              "rate": 18.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 1.0,
+              "smean": 6.0,
+              "spkts": 50.0,
+              "dbytes": 6.0,
+              "sbytes": 3.0
+            }
+          },
+          {
+            "index": 131,
+            "severity": "Low",
+            "confidence": 0.5533496563385052,
+            "top_features": {
+              "dur": 49666.0,
+              "dwin": 0.0,
+              "rate": 18.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 1.0,
+              "smean": 6.0,
+              "spkts": 49.0,
+              "dbytes": 6.0,
+              "sbytes": 3.0
+            }
+          },
+          {
+            "index": 239,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49194.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 268,
+            "severity": "Low",
+            "confidence": 0.5644517595067706,
+            "top_features": {
+              "dur": 49666.0,
+              "dwin": 0.0,
+              "rate": 18.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 1.0,
+              "smean": 6.0,
+              "spkts": 50.0,
+              "dbytes": 6.0,
+              "sbytes": 3.0
+            }
+          },
+          {
+            "index": 332,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 13837.0,
+              "dwin": 14.43375673,
+              "rate": 0.0,
+              "swin": 14.33333333,
+              "dmean": 6.0,
+              "dpkts": 3.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 43.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 429,
+            "severity": "Low",
+            "confidence": 0.5321111078492305,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 63.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 456,
+            "severity": "Low",
+            "confidence": 0.5595468553824041,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 49.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 501,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 41922.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 0.0,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 0.0,
+              "spkts": 1.0,
+              "dbytes": 0.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 517,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 59970.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 0.0,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 0.0,
+              "spkts": 2.0,
+              "dbytes": 0.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 542,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49206.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 574,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 579,
+            "severity": "Low",
+            "confidence": 0.5815274521203789,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 51.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 632,
+            "severity": "Low",
+            "confidence": 0.5336669413948394,
+            "top_features": {
+              "dur": 443.0,
+              "dwin": 55.86143571,
+              "rate": 0.0,
+              "swin": 45.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 85.0,
+              "spkts": 47.0,
+              "dbytes": 91.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 647,
+            "severity": "Low",
+            "confidence": 0.5468791471557473,
+            "top_features": {
+              "dur": 0.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 0.0,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 0.0,
+              "spkts": 48.0,
+              "dbytes": 0.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 664,
+            "severity": "Low",
+            "confidence": 0.5968352662641688,
+            "top_features": {
+              "dur": 14030.0,
+              "dwin": 0.0,
+              "rate": 18.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 1.0,
+              "smean": 6.0,
+              "spkts": 53.0,
+              "dbytes": 6.0,
+              "sbytes": 3.0
+            }
+          },
+          {
+            "index": 699,
+            "severity": "Low",
+            "confidence": 0.528274314475924,
+            "top_features": {
+              "dur": 49671.0,
+              "dwin": 0.0,
+              "rate": 18.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 1.0,
+              "smean": 6.0,
+              "spkts": 47.0,
+              "dbytes": 6.0,
+              "sbytes": 3.0
+            }
+          },
+          {
+            "index": 725,
+            "severity": "Low",
+            "confidence": 0.5161015556869347,
+            "top_features": {
+              "dur": 33408.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 0.0,
+              "dmean": 0.0,
+              "dpkts": 1.0,
+              "smean": 0.0,
+              "spkts": 27.0,
+              "dbytes": 0.0,
+              "sbytes": 1.0
+            }
+          },
+          {
+            "index": 781,
+            "severity": "Low",
+            "confidence": 0.5886715769130159,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 6.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 1.0,
+              "smean": 6.0,
+              "spkts": 52.0,
+              "dbytes": 6.0,
+              "sbytes": 1.0
+            }
+          },
+          {
+            "index": 807,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 13922.0,
+              "dwin": 14.43375673,
+              "rate": 0.0,
+              "swin": 14.33333333,
+              "dmean": 6.0,
+              "dpkts": 3.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 43.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 815,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 13993.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 934,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 52362.0,
+              "dwin": 21.92031022,
+              "rate": 0.0,
+              "swin": 15.5,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 1.0,
+              "dbytes": 31.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 936,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 36060.0,
+              "dwin": 21.92031022,
+              "rate": 0.0,
+              "swin": 15.5,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 31.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 937,
+            "severity": "Low",
+            "confidence": 0.5327310933073042,
+            "top_features": {
+              "dur": 443.0,
+              "dwin": 0.0,
+              "rate": 31.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 1.0,
+              "smean": 6.0,
+              "spkts": 28.0,
+              "dbytes": 6.0,
+              "sbytes": 2.0
+            }
+          },
+          {
+            "index": 939,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 40454.0,
+              "dwin": 21.92031022,
+              "rate": 0.0,
+              "swin": 15.5,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 1.0,
+              "dbytes": 31.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 969,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 37152.0,
+              "dwin": 21.92031022,
+              "rate": 0.0,
+              "swin": 15.5,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 31.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 977,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 48508.0,
+              "dwin": 21.92031022,
+              "rate": 0.0,
+              "swin": 15.5,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 31.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1020,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 25991.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1022,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49497.0,
+              "dwin": 5.656854249,
+              "rate": 0.0,
+              "swin": 10.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 14.0,
+              "spkts": 1.0,
+              "dbytes": 20.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1056,
+            "severity": "Low",
+            "confidence": 0.5291705357730067,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 47.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1063,
+            "severity": "Low",
+            "confidence": 0.5321097651533592,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 63.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1186,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 13924.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1194,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 13836.0,
+              "dwin": 14.43375673,
+              "rate": 0.0,
+              "swin": 14.33333333,
+              "dmean": 6.0,
+              "dpkts": 3.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 43.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1196,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 13884.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1206,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 443.0,
+              "dwin": 45.61067127,
+              "rate": 0.0,
+              "swin": 32.33333333,
+              "dmean": 6.0,
+              "dpkts": 3.0,
+              "smean": 85.0,
+              "spkts": 2.0,
+              "dbytes": 97.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1208,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49557.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 1.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1253,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 42048.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 0.0,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 0.0,
+              "spkts": 2.0,
+              "dbytes": 0.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1278,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 59968.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 0.0,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 0.0,
+              "spkts": 1.0,
+              "dbytes": 0.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1285,
+            "severity": "Low",
+            "confidence": 0.5594850995877555,
+            "top_features": {
+              "dur": 49264.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 49.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1317,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49219.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 2.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1361,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49293.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 1.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1363,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49288.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 2.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1365,
+            "severity": "Low",
+            "confidence": 0.5180643487405215,
+            "top_features": {
+              "dur": 443.0,
+              "dwin": 0.0,
+              "rate": 37.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 1.0,
+              "smean": 6.0,
+              "spkts": 64.0,
+              "dbytes": 6.0,
+              "sbytes": 2.0
+            }
+          },
+          {
+            "index": 1366,
+            "severity": "Low",
+            "confidence": 0.5474052736867436,
+            "top_features": {
+              "dur": 49261.0,
+              "dwin": 130.8147545,
+              "rate": 0.0,
+              "swin": 123.5,
+              "dmean": 31.0,
+              "dpkts": 2.0,
+              "smean": 216.0,
+              "spkts": 48.0,
+              "dbytes": 247.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1391,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49334.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 1.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1393,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49321.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1409,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49369.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1463,
+            "severity": "Low",
+            "confidence": 0.5195290513163975,
+            "top_features": {
+              "dur": 49355.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 46.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1481,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 14039.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 2.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1601,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49372.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 1.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1602,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 6.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 1.0,
+              "smean": 6.0,
+              "spkts": -1.0,
+              "dbytes": 6.0,
+              "sbytes": 1.0
+            }
+          },
+          {
+            "index": 1604,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49370.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1611,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49364.0,
+              "dwin": 14.43375673,
+              "rate": 0.0,
+              "swin": 14.33333333,
+              "dmean": 6.0,
+              "dpkts": 3.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 43.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1631,
+            "severity": "Low",
+            "confidence": 0.5455802613510617,
+            "top_features": {
+              "dur": 443.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 62.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1657,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49403.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 1.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1711,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 14065.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1722,
+            "severity": "Low",
+            "confidence": 0.570119958411075,
+            "top_features": {
+              "dur": 49457.0,
+              "dwin": 14.43375673,
+              "rate": 0.0,
+              "swin": 14.33333333,
+              "dmean": 6.0,
+              "dpkts": 3.0,
+              "smean": 31.0,
+              "spkts": 60.0,
+              "dbytes": 43.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1738,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 14101.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1758,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49596.0,
+              "dwin": 21.92031022,
+              "rate": 0.0,
+              "swin": 15.5,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 1.0,
+              "dbytes": 31.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1780,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49495.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 1.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1796,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 50554.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1799,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 52354.0,
+              "dwin": 21.92031022,
+              "rate": 0.0,
+              "swin": 15.5,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 31.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1815,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49503.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 1.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1833,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49531.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 1.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1859,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 39602.0,
+              "dwin": 21.92031022,
+              "rate": 0.0,
+              "swin": 15.5,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 31.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1867,
+            "severity": "Low",
+            "confidence": 0.5180568391592757,
+            "top_features": {
+              "dur": 443.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 64.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1901,
+            "severity": "Low",
+            "confidence": 0.5469356003038071,
+            "top_features": {
+              "dur": 49567.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 48.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 1971,
+            "severity": "Low",
+            "confidence": 0.5329861417076047,
+            "top_features": {
+              "dur": 138.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 216.0,
+              "dmean": 216.0,
+              "dpkts": 12.0,
+              "smean": 216.0,
+              "spkts": 63.0,
+              "dbytes": 2592.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2014,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49513.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2076,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49535.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 1.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2089,
+            "severity": "Low",
+            "confidence": 0.547141732847726,
+            "top_features": {
+              "dur": 137.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 62.0,
+              "dmean": 62.0,
+              "dpkts": 2.0,
+              "smean": 62.0,
+              "spkts": 48.0,
+              "dbytes": 124.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2135,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 389.0,
+              "dwin": 4.949747468,
+              "rate": 0.0,
+              "swin": 3.5,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 7.0,
+              "spkts": 1.0,
+              "dbytes": 7.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2252,
+            "severity": "Low",
+            "confidence": 0.6022596218346425,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 55.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2254,
+            "severity": "Low",
+            "confidence": 0.5441713835993796,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 36.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2260,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2268,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 36526.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 0.0,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 0.0,
+              "spkts": 1.0,
+              "dbytes": 0.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2272,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 38734.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 0.0,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 0.0,
+              "spkts": 1.0,
+              "dbytes": 0.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2279,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 46892.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 0.0,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 0.0,
+              "spkts": 2.0,
+              "dbytes": 0.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2298,
+            "severity": "Low",
+            "confidence": 0.5533559946352287,
+            "top_features": {
+              "dur": 135.0,
+              "dwin": 0.0,
+              "rate": 18.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 1.0,
+              "smean": 6.0,
+              "spkts": 49.0,
+              "dbytes": 6.0,
+              "sbytes": 3.0
+            }
+          },
+          {
+            "index": 2312,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 137.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 62.0,
+              "dmean": 62.0,
+              "dpkts": 2.0,
+              "smean": 62.0,
+              "spkts": 2.0,
+              "dbytes": 124.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2325,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2331,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 80.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2360,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49552.0,
+              "dwin": 17.67766953,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2390,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49228.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2392,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49230.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2393,
+            "severity": "Low",
+            "confidence": 0.527924420579648,
+            "top_features": {
+              "dur": 49233.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 35.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2394,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49231.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2410,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49273.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2412,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49268.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2414,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49281.0,
+              "dwin": 14.43375673,
+              "rate": 0.0,
+              "swin": 14.33333333,
+              "dmean": 6.0,
+              "dpkts": 3.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 43.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2430,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49277.0,
+              "dwin": 14.43375673,
+              "rate": 0.0,
+              "swin": 14.33333333,
+              "dmean": 6.0,
+              "dpkts": 3.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 43.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2431,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49278.0,
+              "dwin": 14.43375673,
+              "rate": 0.0,
+              "swin": 14.33333333,
+              "dmean": 6.0,
+              "dpkts": 3.0,
+              "smean": 31.0,
+              "spkts": 2.0,
+              "dbytes": 43.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2488,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49180.0,
+              "dwin": 26.1629509,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 37.0,
+              "spkts": 1.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2499,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49184.0,
+              "dwin": 26.1629509,
+              "rate": 0.0,
+              "swin": 18.5,
+              "dmean": 0.0,
+              "dpkts": 2.0,
+              "smean": 37.0,
+              "spkts": 1.0,
+              "dbytes": 37.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2514,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": 49512.0,
+              "dwin": 0.0,
+              "rate": 0.0,
+              "swin": 6.0,
+              "dmean": 6.0,
+              "dpkts": 2.0,
+              "smean": 6.0,
+              "spkts": 1.0,
+              "dbytes": 12.0,
+              "sbytes": 0.0
+            }
+          },
+          {
+            "index": 2536,
+            "severity": "Low",
+            "confidence": 0.5712492580341919,
+            "top_features": {
+              "dur": 49316.0,
+              "dwin": 14.43375673,
+              "rate": 0.0,
+              "swin": 14.33333333,
+              "dmean": 6.0,
+              "dpkts": 3.0,
+              "smean": 31.0,
+              "spkts": 50.0,
+              "dbytes": 43.0,
+              "sbytes": 0.0
+            }
+          }
+        ],
+        "precision": 0.23777403035413153,
+        "total_flows": 77141,
+        "detection_rate": 0.04157452454666077,
+        "execution_time": "10.93 minutes",
+        "true_negatives": 61767,
+        "true_positives": 564,
+        "false_negatives": 13002,
+        "false_positives": 1808,
+        "mean_confidence": 0.024844905466853875,
+        "feature_alignment": {
+          "core_features": [
+            "dur",
+            "spkts",
+            "dpkts",
+            "sbytes",
+            "dbytes",
+            "rate",
+            "smean",
+            "dmean",
+            "swin",
+            "dwin"
+          ],
+          "features_found": 10,
+          "feature_mapping": {
+            "dur": " Flow Duration",
+            "dwin": " Init_Win_bytes_backward",
+            "rate": "Flow Bytes/s",
+            "swin": "Init_Win_bytes_forward",
+            "dmean": " Bwd Packet Length Mean",
+            "dpkts": " Total Backward Packets",
+            "smean": " Fwd Packet Length Mean",
+            "spkts": " Total Fwd Packets",
+            "dbytes": " Total Length of Bwd Packets",
+            "sbytes": "Total Length of Fwd Packets"
+          }
+        },
+        "anomalies_detected": 2372,
+        "false_positive_rate": 0.02843885174990169,
+        "execution_time_seconds": 655.5594916343689
+      },
+      "created_at": "2026-04-16 01:59:44.618762+00:00",
+      "username": "admin1",
+      "model_name": "RNSA_KNN_ALIGNED_20260304_210524"
+    },
+    {
+      "id": 4,
+      "user_id": 13,
+      "model_id": 5,
+      "input_file": "C:\\Users\\archive\\UNSW_NB15_training-set.csv",
+      "total_flows": 82332,
+      "anomalies_detected": 53294,
+      "false_positives": null,
+      "false_negatives": null,
+      "execution_time_seconds": null,
+      "metrics": {
+        "k": 1,
+        "r_s": 0.01,
+        "dataset_name": "UNSW_NB15_testing-set.csv",
+        "max_detectors": 1000,
+        "features_count": 10,
+        "detectors_count": 1000,
+        "training_samples": 140272
+      },
+      "results": {
+        "recall": 0.9509617929939116,
+        "metrics": {
+          "k": 1,
+          "r_s": 0.01,
+          "dataset_name": "UNSW_NB15_testing-set.csv",
+          "max_detectors": 1000,
+          "features_count": 10,
+          "detectors_count": 1000,
+          "training_samples": 140272
+        },
+        "accuracy": 0.8492931059612301,
+        "f1_score": 0.874191389694401,
+        "anomalies": [
+          {
+            "index": 0,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "1",
+              "dpkts": "udp",
+              "spkts": 1.1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 3,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "4",
+              "dpkts": "udp",
+              "spkts": 6e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 4,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "5",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 5,
+            "severity": "Minimal",
+            "confidence": 0.3975911021232605,
+            "top_features": {
+              "dur": "6",
+              "dpkts": "udp",
+              "spkts": 3e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.6024088978767395
+          },
+          {
+            "index": 6,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "7",
+              "dpkts": "udp",
+              "spkts": 6e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 7,
+            "severity": "Minimal",
+            "confidence": 0.4283017098903656,
+            "top_features": {
+              "dur": "8",
+              "dpkts": "udp",
+              "spkts": 2.8e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.5716982901096344
+          },
+          {
+            "index": 13,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "14",
+              "dpkts": "udp",
+              "spkts": 7e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 17,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "18",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 18,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "19",
+              "dpkts": "udp",
+              "spkts": 2e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 19,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "20",
+              "dpkts": "udp",
+              "spkts": 4e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 20,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "21",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 21,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "22",
+              "dpkts": "udp",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 23,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "24",
+              "dpkts": "udp",
+              "spkts": 5e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 24,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "25",
+              "dpkts": "udp",
+              "spkts": 3e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 25,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "26",
+              "dpkts": "udp",
+              "spkts": 7e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 26,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "27",
+              "dpkts": "udp",
+              "spkts": 6e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 27,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "28",
+              "dpkts": "udp",
+              "spkts": 2e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 28,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "29",
+              "dpkts": "udp",
+              "spkts": 7e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 30,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "31",
+              "dpkts": "udp",
+              "spkts": 7e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 32,
+            "severity": "Minimal",
+            "confidence": 0.35839602947235105,
+            "top_features": {
+              "dur": "33",
+              "dpkts": "tcp",
+              "spkts": 2.773779,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.641603970527649
+          },
+          {
+            "index": 33,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "34",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 34,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "35",
+              "dpkts": "tcp",
+              "spkts": 1.465041,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 35,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "36",
+              "dpkts": "tcp",
+              "spkts": 0.983874,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 42,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "43",
+              "dpkts": "tcp",
+              "spkts": 0.757295,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 45,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "46",
+              "dpkts": "tcp",
+              "spkts": 1.059359,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 46,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "47",
+              "dpkts": "tcp",
+              "spkts": 0.624048,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 47,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "48",
+              "dpkts": "tcp",
+              "spkts": 1.190292,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 48,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "49",
+              "dpkts": "tcp",
+              "spkts": 0.999472,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 55,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "56",
+              "dpkts": "tcp",
+              "spkts": 1.588788,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 83,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "84",
+              "dpkts": "tcp",
+              "spkts": 2.462774,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 84,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "85",
+              "dpkts": "tcp",
+              "spkts": 1.047169,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 89,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "90",
+              "dpkts": "tcp",
+              "spkts": 2.417396,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 97,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "98",
+              "dpkts": "tcp",
+              "spkts": 0.860208,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 99,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "100",
+              "dpkts": "tcp",
+              "spkts": 1.979445,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 107,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "108",
+              "dpkts": "tcp",
+              "spkts": 1.15935,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 110,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "111",
+              "dpkts": "tcp",
+              "spkts": 0.717487,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 127,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "128",
+              "dpkts": "tcp",
+              "spkts": 0.816781,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 130,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "131",
+              "dpkts": "tcp",
+              "spkts": 1.625287,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 131,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "132",
+              "dpkts": "tcp",
+              "spkts": 1.739142,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 135,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "136",
+              "dpkts": "tcp",
+              "spkts": 1.048635,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 136,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "137",
+              "dpkts": "tcp",
+              "spkts": 1.49338,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 137,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "138",
+              "dpkts": "tcp",
+              "spkts": 1.49338,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 139,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "140",
+              "dpkts": "tcp",
+              "spkts": 1.49338,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 140,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "141",
+              "dpkts": "tcp",
+              "spkts": 1.450415,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 141,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "142",
+              "dpkts": "tcp",
+              "spkts": 1.45018,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 142,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "143",
+              "dpkts": "tcp",
+              "spkts": 1.302269,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 143,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "144",
+              "dpkts": "tcp",
+              "spkts": 1.20946,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 144,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "145",
+              "dpkts": "tcp",
+              "spkts": 0.638839,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 145,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "146",
+              "dpkts": "tcp",
+              "spkts": 1.368353,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 146,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "147",
+              "dpkts": "tcp",
+              "spkts": 1.368353,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 147,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "148",
+              "dpkts": "tcp",
+              "spkts": 0.963874,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 150,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "151",
+              "dpkts": "tcp",
+              "spkts": 0.650809,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 151,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "152",
+              "dpkts": "tcp",
+              "spkts": 1.09756,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 152,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "153",
+              "dpkts": "tcp",
+              "spkts": 0.847027,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 153,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "154",
+              "dpkts": "tcp",
+              "spkts": 0.698707,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 155,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "156",
+              "dpkts": "tcp",
+              "spkts": 0.762124,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 157,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "158",
+              "dpkts": "tcp",
+              "spkts": 1.552272,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 159,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "160",
+              "dpkts": "tcp",
+              "spkts": 0.685279,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 182,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "183",
+              "dpkts": "tcp",
+              "spkts": 1.12155,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 213,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "214",
+              "dpkts": "udp",
+              "spkts": 1e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 214,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "215",
+              "dpkts": "tcp",
+              "spkts": 1.673592,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 215,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "216",
+              "dpkts": "tcp",
+              "spkts": 0.764506,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 217,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "218",
+              "dpkts": "tcp",
+              "spkts": 2.185865,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 218,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "219",
+              "dpkts": "igmp",
+              "spkts": 4e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 222,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "223",
+              "dpkts": "igmp",
+              "spkts": 4e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 233,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "234",
+              "dpkts": "tcp",
+              "spkts": 0.524961,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 234,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "235",
+              "dpkts": "udp",
+              "spkts": 3e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 237,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "238",
+              "dpkts": "igmp",
+              "spkts": 5e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 238,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "239",
+              "dpkts": "igmp",
+              "spkts": 5e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 239,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "240",
+              "dpkts": "tcp",
+              "spkts": 1.129944,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 240,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "241",
+              "dpkts": "tcp",
+              "spkts": 1.964566,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 242,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "243",
+              "dpkts": "udp",
+              "spkts": 7e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 243,
+            "severity": "Minimal",
+            "confidence": 0.38208536505699153,
+            "top_features": {
+              "dur": "244",
+              "dpkts": "ospf",
+              "spkts": 0.921987,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.6179146349430085
+          },
+          {
+            "index": 244,
+            "severity": "Minimal",
+            "confidence": 0.38208536505699153,
+            "top_features": {
+              "dur": "245",
+              "dpkts": "ospf",
+              "spkts": 0.921987,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.6179146349430085
+          },
+          {
+            "index": 245,
+            "severity": "Minimal",
+            "confidence": 0.38208536505699153,
+            "top_features": {
+              "dur": "246",
+              "dpkts": "ospf",
+              "spkts": 0.921987,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.6179146349430085
+          },
+          {
+            "index": 246,
+            "severity": "Minimal",
+            "confidence": 0.38208536505699153,
+            "top_features": {
+              "dur": "247",
+              "dpkts": "ospf",
+              "spkts": 0.921987,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.6179146349430085
+          },
+          {
+            "index": 248,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "249",
+              "dpkts": "gre",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 249,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "250",
+              "dpkts": "gre",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 250,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "251",
+              "dpkts": "gre",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 251,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "252",
+              "dpkts": "gre",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 252,
+            "severity": "Minimal",
+            "confidence": 0.4120706975460052,
+            "top_features": {
+              "dur": "253",
+              "dpkts": "udp",
+              "spkts": 1.6e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.5879293024539948
+          },
+          {
+            "index": 253,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "254",
+              "dpkts": "tcp",
+              "spkts": 0.224524,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 256,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "257",
+              "dpkts": "tcp",
+              "spkts": 0.674665,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 257,
+            "severity": "Low",
+            "confidence": 0.5624343693256377,
+            "top_features": {
+              "dur": "258",
+              "dpkts": "tcp",
+              "spkts": 5.600391,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.43756563067436227
+          },
+          {
+            "index": 258,
+            "severity": "Minimal",
+            "confidence": 0.46376868486404416,
+            "top_features": {
+              "dur": "259",
+              "dpkts": "tcp",
+              "spkts": 0.285988,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.5362313151359559
+          },
+          {
+            "index": 259,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "260",
+              "dpkts": "udp",
+              "spkts": 3e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 260,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "261",
+              "dpkts": "tcp",
+              "spkts": 0.663844,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 261,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "262",
+              "dpkts": "tcp",
+              "spkts": 0.217312,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 262,
+            "severity": "Minimal",
+            "confidence": 0.3980679154396057,
+            "top_features": {
+              "dur": "263",
+              "dpkts": "tcp",
+              "spkts": 7.629429,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.6019320845603944
+          },
+          {
+            "index": 263,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "264",
+              "dpkts": "tcp",
+              "spkts": 0.502392,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 264,
+            "severity": "Minimal",
+            "confidence": 0.4116873025894165,
+            "top_features": {
+              "dur": "265",
+              "dpkts": "tcp",
+              "spkts": 0.460161,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.5883126974105835
+          },
+          {
+            "index": 265,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "266",
+              "dpkts": "udp",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 266,
+            "severity": "Low",
+            "confidence": 0.5504278361797332,
+            "top_features": {
+              "dur": "267",
+              "dpkts": "ospf",
+              "spkts": 1.244202,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.44957216382026677
+          },
+          {
+            "index": 267,
+            "severity": "Low",
+            "confidence": 0.5504278361797332,
+            "top_features": {
+              "dur": "268",
+              "dpkts": "ospf",
+              "spkts": 1.244202,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.44957216382026677
+          },
+          {
+            "index": 268,
+            "severity": "Low",
+            "confidence": 0.5504278361797332,
+            "top_features": {
+              "dur": "269",
+              "dpkts": "ospf",
+              "spkts": 1.244202,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.44957216382026677
+          },
+          {
+            "index": 269,
+            "severity": "Low",
+            "confidence": 0.5504278361797332,
+            "top_features": {
+              "dur": "270",
+              "dpkts": "ospf",
+              "spkts": 1.244202,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.44957216382026677
+          },
+          {
+            "index": 270,
+            "severity": "Low",
+            "confidence": 0.5504278361797332,
+            "top_features": {
+              "dur": "271",
+              "dpkts": "ospf",
+              "spkts": 1.244202,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.44957216382026677
+          },
+          {
+            "index": 271,
+            "severity": "Low",
+            "confidence": 0.5653825759887695,
+            "top_features": {
+              "dur": "272",
+              "dpkts": "tcp",
+              "spkts": 0.289402,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.4346174240112305
+          },
+          {
+            "index": 272,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "273",
+              "dpkts": "tcp",
+              "spkts": 0.667368,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 274,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "275",
+              "dpkts": "tcp",
+              "spkts": 0.197552,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          }
+        ],
+        "precision": 0.8088903066011183,
+        "total_flows": 82332,
+        "detection_rate": 0.9509617929939116,
+        "execution_time": "18.99 minutes",
+        "true_negatives": 26815,
+        "true_positives": 43109,
+        "false_negatives": 2223,
+        "false_positives": 10185,
+        "mean_confidence": 0.4467921183274114,
+        "feature_alignment": {
+          "core_features": [
+            "dur",
+            "spkts",
+            "dpkts",
+            "sbytes",
+            "dbytes",
+            "rate",
+            "smean",
+            "dmean",
+            "swin",
+            "dwin"
+          ],
+          "features_found": 10,
+          "feature_mapping": {
+            "dur": "dur",
+            "dwin": "dwin",
+            "rate": "rate",
+            "swin": "swin",
+            "dmean": "dmean",
+            "dpkts": "dpkts",
+            "smean": "smean",
+            "spkts": "spkts",
+            "dbytes": "dbytes",
+            "sbytes": "sbytes"
+          }
+        },
+        "anomalies_detected": 53294,
+        "false_positive_rate": 0.2752702702702703,
+        "execution_time_seconds": 1139.3046002388,
+        "mean_reconstruction_error": 0.5532078816725887
+      },
+      "created_at": "2026-04-12 16:48:45.768813+00:00",
+      "username": "tester",
+      "model_name": "UNSWNB15 Model_20260412_073808"
+    },
+    {
+      "id": 3,
+      "user_id": 13,
+      "model_id": 5,
+      "input_file": "C:\\Users\\archive\\UNSW_NB15_testing-set.csv",
+      "total_flows": 175341,
+      "anomalies_detected": 118695,
+      "false_positives": null,
+      "false_negatives": null,
+      "execution_time_seconds": null,
+      "metrics": {
+        "k": 1,
+        "r_s": 0.01,
+        "dataset_name": "UNSW_NB15_testing-set.csv",
+        "max_detectors": 1000,
+        "features_count": 10,
+        "detectors_count": 1000,
+        "training_samples": 140272
+      },
+      "results": {
+        "recall": 0.9788421414266681,
+        "metrics": {
+          "k": 1,
+          "r_s": 0.01,
+          "dataset_name": "UNSW_NB15_testing-set.csv",
+          "max_detectors": 1000,
+          "features_count": 10,
+          "detectors_count": 1000,
+          "training_samples": 140272
+        },
+        "accuracy": 0.9748832275394802,
+        "f1_score": 0.9814985968508965,
+        "anomalies": [
+          {
+            "index": 2,
+            "severity": "Minimal",
+            "confidence": 0.33045388460159303,
+            "top_features": {
+              "dur": "3",
+              "dpkts": "tcp",
+              "spkts": 1.623129,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.669546115398407
+          },
+          {
+            "index": 9,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "10",
+              "dpkts": "tcp",
+              "spkts": 0.258687,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 10,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "11",
+              "dpkts": "tcp",
+              "spkts": 0.304853,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 16,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "17",
+              "dpkts": "tcp",
+              "spkts": 0.728252,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 21,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "22",
+              "dpkts": "tcp",
+              "spkts": 0.338017,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 28,
+            "severity": "Low",
+            "confidence": 0.6954875230789184,
+            "top_features": {
+              "dur": "29",
+              "dpkts": "tcp",
+              "spkts": 0.546425,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30451247692108163
+          },
+          {
+            "index": 33,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "34",
+              "dpkts": "udp",
+              "spkts": 2.5e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 36,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "37",
+              "dpkts": "udp",
+              "spkts": 1.5e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 42,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "43",
+              "dpkts": "udp",
+              "spkts": 8e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 48,
+            "severity": "Minimal",
+            "confidence": 0.4324911832809448,
+            "top_features": {
+              "dur": "49",
+              "dpkts": "tcp",
+              "spkts": 1.067039,
+              "dbytes": "FIN",
+              "sbytes": "smtp"
+            },
+            "reconstruction_error": 0.5675088167190552
+          },
+          {
+            "index": 49,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "50",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 54,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "55",
+              "dpkts": "udp",
+              "spkts": 2.4e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 55,
+            "severity": "Low",
+            "confidence": 0.5274209260940551,
+            "top_features": {
+              "dur": "56",
+              "dpkts": "tcp",
+              "spkts": 1.357879,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.4725790739059449
+          },
+          {
+            "index": 59,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "60",
+              "dpkts": "udp",
+              "spkts": 1.1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 60,
+            "severity": "Minimal",
+            "confidence": 0.41716043353080745,
+            "top_features": {
+              "dur": "61",
+              "dpkts": "tcp",
+              "spkts": 0.28907,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.5828395664691925
+          },
+          {
+            "index": 74,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "75",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 78,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "79",
+              "dpkts": "udp",
+              "spkts": 1.1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 81,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "82",
+              "dpkts": "udp",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 82,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "83",
+              "dpkts": "udp",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 87,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "88",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 95,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "96",
+              "dpkts": "udp",
+              "spkts": 1.1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 102,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "103",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 115,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "116",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 117,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "118",
+              "dpkts": "udp",
+              "spkts": 1.1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 122,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "123",
+              "dpkts": "udp",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 125,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "126",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 128,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "129",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 132,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "133",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 136,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "137",
+              "dpkts": "udp",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 138,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "139",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 141,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "142",
+              "dpkts": "icmp",
+              "spkts": 2.2e-05,
+              "dbytes": "ECO",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 161,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "162",
+              "dpkts": "udp",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 171,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "172",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 174,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "175",
+              "dpkts": "udp",
+              "spkts": 1.3e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 178,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "179",
+              "dpkts": "udp",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 179,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "180",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 185,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "186",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 186,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "187",
+              "dpkts": "udp",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 189,
+            "severity": "Low",
+            "confidence": 0.5311821937561034,
+            "top_features": {
+              "dur": "190",
+              "dpkts": "udp",
+              "spkts": 10.675254,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.4688178062438966
+          },
+          {
+            "index": 244,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "245",
+              "dpkts": "tcp",
+              "spkts": 12.364369,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 404,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "405",
+              "dpkts": "tcp",
+              "spkts": 33.829559,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 665,
+            "severity": "Minimal",
+            "confidence": 0.13982446193695067,
+            "top_features": {
+              "dur": "666",
+              "dpkts": "tcp",
+              "spkts": 5.814544,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.8601755380630494
+          },
+          {
+            "index": 1051,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "1052",
+              "dpkts": "tcp",
+              "spkts": 0.609523,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 1093,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "1094",
+              "dpkts": "tcp",
+              "spkts": 4.630582,
+              "dbytes": "FIN",
+              "sbytes": "ssh"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 1469,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "1470",
+              "dpkts": "tcp",
+              "spkts": 8.470179,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 1585,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "1586",
+              "dpkts": "tcp",
+              "spkts": 2.879349,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 1645,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "1646",
+              "dpkts": "tcp",
+              "spkts": 12.311934,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 2833,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "2834",
+              "dpkts": "icmp",
+              "spkts": 9e-06,
+              "dbytes": "ECO",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 4006,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "4007",
+              "dpkts": "tcp",
+              "spkts": 0.462491,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 4906,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "4907",
+              "dpkts": "tcp",
+              "spkts": 0.090741,
+              "dbytes": "RST",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 5313,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "5314",
+              "dpkts": "tcp",
+              "spkts": 0.12289,
+              "dbytes": "RST",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 5611,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "5612",
+              "dpkts": "icmp",
+              "spkts": 3e-06,
+              "dbytes": "ECO",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 5668,
+            "severity": "Low",
+            "confidence": 0.5809418022632599,
+            "top_features": {
+              "dur": "5669",
+              "dpkts": "udp",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.41905819773674013
+          },
+          {
+            "index": 5752,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "5753",
+              "dpkts": "udp",
+              "spkts": 1.1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 5865,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "5866",
+              "dpkts": "udp",
+              "spkts": 4e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 5895,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "5896",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 5951,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "5952",
+              "dpkts": "udp",
+              "spkts": 6e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 6665,
+            "severity": "Low",
+            "confidence": 0.5187635600566863,
+            "top_features": {
+              "dur": "6666",
+              "dpkts": "tcp",
+              "spkts": 9.331473,
+              "dbytes": "FIN",
+              "sbytes": "ftp"
+            },
+            "reconstruction_error": 0.48123643994331367
+          },
+          {
+            "index": 7345,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "7346",
+              "dpkts": "tcp",
+              "spkts": 0.893656,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 8782,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "8783",
+              "dpkts": "tcp",
+              "spkts": 0.429785,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 9121,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "9122",
+              "dpkts": "tcp",
+              "spkts": 0.510725,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 9344,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "9345",
+              "dpkts": "tcp",
+              "spkts": 0.49224,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 9947,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "9948",
+              "dpkts": "tcp",
+              "spkts": 0.449344,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 9969,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "9970",
+              "dpkts": "tcp",
+              "spkts": 0.494141,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 10332,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "10333",
+              "dpkts": "tcp",
+              "spkts": 0.869747,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 10846,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "10847",
+              "dpkts": "tcp",
+              "spkts": 1.456224,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 11384,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "11385",
+              "dpkts": "tcp",
+              "spkts": 4.219578,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 11672,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "11673",
+              "dpkts": "tcp",
+              "spkts": 1.054047,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 11694,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "11695",
+              "dpkts": "tcp",
+              "spkts": 1.95687,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 12118,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "12119",
+              "dpkts": "tcp",
+              "spkts": 0.935245,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 12489,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "12490",
+              "dpkts": "tcp",
+              "spkts": 0.540725,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 12576,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "12577",
+              "dpkts": "tcp",
+              "spkts": 1.314836,
+              "dbytes": "FIN",
+              "sbytes": "ftp"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 12842,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "12843",
+              "dpkts": "udp",
+              "spkts": 7e-06,
+              "dbytes": "INT",
+              "sbytes": "dns"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 12948,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "12949",
+              "dpkts": "tcp",
+              "spkts": 1.108992,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 13009,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "13010",
+              "dpkts": "tcp",
+              "spkts": 0.015718,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 13249,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "13250",
+              "dpkts": "icmp",
+              "spkts": 1.5e-05,
+              "dbytes": "ECO",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 14021,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "14022",
+              "dpkts": "tcp",
+              "spkts": 1.122807,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 14390,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "14391",
+              "dpkts": "tcp",
+              "spkts": 1.905095,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 14616,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "14617",
+              "dpkts": "tcp",
+              "spkts": 1.08673,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 15372,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "15373",
+              "dpkts": "tcp",
+              "spkts": 1.889091,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 15545,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "15546",
+              "dpkts": "tcp",
+              "spkts": 0.948048,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 15850,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "15851",
+              "dpkts": "tcp",
+              "spkts": 2.881138,
+              "dbytes": "FIN",
+              "sbytes": "http"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 16184,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "16185",
+              "dpkts": "udp",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "dns"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 16405,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "16406",
+              "dpkts": "tcp",
+              "spkts": 0.966663,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 16466,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "16467",
+              "dpkts": "icmp",
+              "spkts": 1e-06,
+              "dbytes": "ECO",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 17273,
+            "severity": "Minimal",
+            "confidence": 0.3396226108074188,
+            "top_features": {
+              "dur": "17274",
+              "dpkts": "udp",
+              "spkts": 7e-06,
+              "dbytes": "INT",
+              "sbytes": "dns"
+            },
+            "reconstruction_error": 0.6603773891925813
+          },
+          {
+            "index": 17302,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "17303",
+              "dpkts": "udp",
+              "spkts": 1e-06,
+              "dbytes": "INT",
+              "sbytes": "dns"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 17308,
+            "severity": "Low",
+            "confidence": 0.5999144077301025,
+            "top_features": {
+              "dur": "17309",
+              "dpkts": "udp",
+              "spkts": 3e-06,
+              "dbytes": "INT",
+              "sbytes": "dns"
+            },
+            "reconstruction_error": 0.4000855922698975
+          },
+          {
+            "index": 18578,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "18579",
+              "dpkts": "icmp",
+              "spkts": 3e-06,
+              "dbytes": "ECO",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 18610,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "18611",
+              "dpkts": "tcp",
+              "spkts": 0.226399,
+              "dbytes": "FIN",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 20128,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "20129",
+              "dpkts": "udp",
+              "spkts": 3e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 20159,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "20160",
+              "dpkts": "udp",
+              "spkts": 9e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 20187,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "20188",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 20195,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "20196",
+              "dpkts": "udp",
+              "spkts": 7e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 20242,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "20243",
+              "dpkts": "udp",
+              "spkts": 4e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 20281,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "20282",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 20296,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "20297",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 20309,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "20310",
+              "dpkts": "udp",
+              "spkts": 8e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 20463,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "20464",
+              "dpkts": "udp",
+              "spkts": 1e-05,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          },
+          {
+            "index": 20528,
+            "severity": "Medium",
+            "confidence": 0.7,
+            "top_features": {
+              "dur": "20529",
+              "dpkts": "udp",
+              "spkts": 4e-06,
+              "dbytes": "INT",
+              "sbytes": "-"
+            },
+            "reconstruction_error": 0.30000000000000004
+          }
+        ],
+        "precision": 0.9841695100888833,
+        "total_flows": 175341,
+        "detection_rate": 0.9788421414266681,
+        "execution_time": "19.96 minutes",
+        "true_negatives": 54121,
+        "true_positives": 116816,
+        "false_negatives": 2525,
+        "false_positives": 1879,
+        "mean_confidence": 0.47087916026121357,
+        "feature_alignment": {
+          "core_features": [
+            "dur",
+            "spkts",
+            "dpkts",
+            "sbytes",
+            "dbytes",
+            "rate",
+            "smean",
+            "dmean",
+            "swin",
+            "dwin"
+          ],
+          "features_found": 10,
+          "feature_mapping": {
+            "dur": "dur",
+            "dwin": "dwin",
+            "rate": "rate",
+            "swin": "swin",
+            "dmean": "dmean",
+            "dpkts": "dpkts",
+            "smean": "smean",
+            "spkts": "spkts",
+            "dbytes": "dbytes",
+            "sbytes": "sbytes"
+          }
+        },
+        "anomalies_detected": 118695,
+        "false_positive_rate": 0.033553571428571426,
+        "execution_time_seconds": 1197.7492649555206,
+        "mean_reconstruction_error": 0.5291208397387865
+      },
+      "created_at": "2026-04-12 11:33:14.676066+00:00",
+      "username": "tester",
+      "model_name": "UNSWNB15 Model_20260412_073808"
+    }
+  ]
+}
