@@ -2083,7 +2083,7 @@ Examples:
                     panel_content.append(f"  • {display_name}: {feat_val}")
         
         # Generate AI decision explanation
-        explanation = self.generate_explanation(anomaly, confidence, severity)
+        explanation = self.generate_explanation(confidence, severity)
         if explanation:
             panel_content.append(f"\n[bold]AI Decision Explanation:[/bold]")
             panel_content.append(explanation)
