@@ -29,52 +29,34 @@ from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 def _resolve_logo_path() -> str:
-    """Resolve the path to Vigilante_logo.png for GUI"""
-    # Get the absolute path to the package directory
-    current_dir = Path(__file__).parent.absolute()
+    """Resolve the path to Vigilante_logo.png for GUI - checks root directory first"""
     
-    # Method 1: Check in intrusion_detection/assets/
-    local_path = current_dir / 'assets' / 'Vigilante_logo.png'
-    if local_path.exists():
-        print(f"GUI: Found logo at {local_path}")
-        return str(local_path)
+    # Get the project root directory
+    current_dir = Path(__file__).parent.absolute()  # This is intrusion_detection/
+    project_root = current_dir.parent  # This is vigilante/
     
-    # Method 2: Check in parent directory's assets
-    parent_assets_path = current_dir.parent / 'assets' / 'Vigilante_logo.png'
-    if parent_assets_path.exists():
-        print(f"GUI: Found logo at {parent_assets_path}")
-        return str(parent_assets_path)
+    # Method 1: Check in project root (simplest and most reliable)
+    logo = project_root / 'Vigilante_logo.png'
+    if logo.exists():
+        print(f"GUI: Found logo at {logo}")
+        return str(logo)
     
-    # Method 3: Check in current working directory's assets
-    cwd_path = Path.cwd() / 'assets' / 'Vigilante_logo.png'
-    if cwd_path.exists():
-        print(f"GUI: Found logo at {cwd_path}")
-        return str(cwd_path)
+    # Method 2: Check in intrusion_detection/assets/
+    assets_logo = current_dir / 'assets' / 'Vigilante_logo.png'
+    if assets_logo.exists():
+        print(f"GUI: Found logo at {assets_logo}")
+        return str(assets_logo)
     
-    # Method 4: Try package resources
-    try:
-        from importlib import resources
-        package_name = __package__ if __package__ else 'intrusion_detection'
-        package_asset = resources.files(package_name).joinpath('assets', 'Vigilante_logo.png')
-        if package_asset and hasattr(package_asset, 'exists') and package_asset.exists():
-            print(f"GUI: Found logo via package resource at {package_asset}")
-            return str(package_asset)
-    except Exception as e:
-        print(f"GUI: Package resource lookup failed: {e}")
+    # Method 3: Check in current working directory
+    cwd_logo = Path.cwd() / 'Vigilante_logo.png'
+    if cwd_logo.exists():
+        print(f"GUI: Found logo at {cwd_logo}")
+        return str(cwd_logo)
     
-    # Method 5: Search recursively
-    try:
-        for root, dirs, files in os.walk(current_dir.parent):
-            if 'Vigilante_logo.png' in files:
-                found_path = Path(root) / 'Vigilante_logo.png'
-                print(f"GUI: Found logo via recursive search at {found_path}")
-                return str(found_path)
-    except Exception as e:
-        print(f"GUI: Recursive search failed: {e}")
-    
-    print("GUI: Logo not found in any location.")
-    return str(local_path)  # Return the local path even if it doesn't exist
+    print("GUI: Logo not found in any location")
+    return str(logo)  # Return the root path even if it doesn't exist
 
 logo_path = _resolve_logo_path()
 # Import real modules

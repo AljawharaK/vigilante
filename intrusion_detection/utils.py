@@ -22,52 +22,32 @@ console = Console()
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def _resolve_logo_path() -> str:
-    """Resolve the path to Vigilante_logo.png"""
-    # Get the absolute path to the package directory
-    current_dir = Path(__file__).parent.absolute()
+    """Resolve the path to Vigilante_logo.png - checks root directory first"""
     
-    # Method 1: Check in intrusion_detection/assets/ (correct location from your structure)
-    local_path = current_dir / 'assets' / 'Vigilante_logo.png'
-    print(f"Checking logo path 1: {local_path} - Exists: {local_path.exists()}")
-    if local_path.exists():
-        return str(local_path)
+    # Get the project root directory (where setup.py is located)
+    # Current file is in intrusion_detection/utils.py, so go up 1 level
+    current_dir = Path(__file__).parent.absolute()  # This is intrusion_detection/
+    project_root = current_dir.parent  # This is vigilante/
     
-    # Method 2: Check in parent directory's assets (for when running from different locations)
-    parent_dir = current_dir.parent
-    parent_assets_path = parent_dir / 'assets' / 'Vigilante_logo.png'
-    print(f"Checking logo path 2: {parent_assets_path} - Exists: {parent_assets_path.exists()}")
-    if parent_assets_path.exists():
-        return str(parent_assets_path)
+    # Method 1: Check in project root (simplest and most reliable)
+    logo = project_root / 'Vigilante_logo.png'
+    print(f"Checking root logo path: {logo} - Exists: {logo.exists()}")
+    if logo.exists():
+        return str(logo)
     
-    # Method 3: Check in current working directory's assets
-    cwd_path = Path.cwd() / 'assets' / 'Vigilante_logo.png'
-    print(f"Checking logo path 3: {cwd_path} - Exists: {cwd_path.exists()}")
-    if cwd_path.exists():
-        return str(cwd_path)
+    # Method 2: Check in intrusion_detection/assets/
+    assets_logo = current_dir / 'assets' / 'Vigilante_logo.png'
+    print(f"Checking assets logo path: {assets_logo} - Exists: {assets_logo.exists()}")
+    if assets_logo.exists():
+        return str(assets_logo)
     
-    # Method 4: Try to find using package resources (for installed package)
-    try:
-        from importlib import resources
-        # Use __package__ which should be 'intrusion_detection'
-        package_name = __package__ if __package__ else 'intrusion_detection'
-        package_asset = resources.files(package_name).joinpath('assets', 'Vigilante_logo.png')
-        print(f"Checking package resource: {package_asset}")
-        if package_asset and hasattr(package_asset, 'exists') and package_asset.exists():
-            return str(package_asset)
-    except Exception as e:
-        print(f"Package resource lookup failed: {e}")
+    # Method 3: Check in current working directory
+    cwd_logo = Path.cwd() / 'Vigilante_logo.png'
+    print(f"Checking CWD logo path: {cwd_logo} - Exists: {cwd_logo.exists()}")
+    if cwd_logo.exists():
+        return str(cwd_logo)
     
-    # Method 5: Search recursively for the file (fallback)
-    try:
-        for root, dirs, files in os.walk(current_dir.parent):
-            if 'Vigilante_logo.png' in files:
-                found_path = Path(root) / 'Vigilante_logo.png'
-                print(f"Found logo via recursive search: {found_path}")
-                return str(found_path)
-    except Exception as e:
-        print(f"Recursive search failed: {e}")
-    
-    print(f"Logo not found in any location. Logo will not be displayed.")
+    print(f"Logo not found. Tried: {logo}, {assets_logo}, {cwd_logo}")
     return None
 
 def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
@@ -95,7 +75,6 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     
     # Try to load and add logo
     logo_path = _resolve_logo_path()
-    print(f"Logo path resolved to: {logo_path}")
     
     # Create header with logo and title in navy box
     header_content = []
@@ -126,17 +105,10 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
             print(f"Logo scaled to: {scaled_width:.2f}x{scaled_height:.2f}")
         except Exception as e:
             print(f"Warning: Could not load logo: {e}")
-            import traceback
-            traceback.print_exc()
+            logo_obj = None
     else:
-        print(f"Logo file does not exist at: {logo_path}")
-        # Try to list what's in the assets directory
-        assets_dir = Path(__file__).parent / 'assets'
-        if assets_dir.exists():
-            print(f"Assets directory contents: {list(assets_dir.glob('*'))}")
-        else:
-            print(f"Assets directory does not exist at: {assets_dir}")
-    
+        print(f"Logo file not found at: {logo_path}")
+         
     # Title with navy background box (smaller font)
     title_style = ParagraphStyle(
         'TitleInBox', 
