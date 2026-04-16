@@ -2145,16 +2145,8 @@ Examples:
         "\n- if a detector directly covers this region, then RNSA successfully found an anomaly" \
         "\n- if no detector covers the region, KNN helps RNSA determine the final confidence score.")
         
-        # Check if this sample is covered by RNSA detectors
-        is_covered = self._check_if_sample_covered(anomaly) if hasattr(self, '_check_if_sample_covered') else None
-        
-        if is_covered is True:
-            explanation_parts.append("  • This sample was [green]COVERED[/green] by RNSA detectors (found a matching detector)")
-        elif is_covered is False:
-            explanation_parts.append("  • This sample fell into a [yellow]HOLE[/yellow] (no detector covers this region) K-nearest neighbors provide the best estimate")
-        else:
-            explanation_parts.append("  • For COVERED samples (detected by RNSA): 70% RNSA detector coverage score + 30% KNN neighbor score")
-            explanation_parts.append("  • For HOLE samples (no detector coverage): 30% RNSA detector coverage score + 70% KNN neighbor score")
+        explanation_parts.append("  • For COVERED samples (detected by RNSA): 70% RNSA detector coverage score + 30% KNN neighbor score")
+        explanation_parts.append("  • For HOLE samples (no detector coverage): 30% RNSA detector coverage score + 70% KNN neighbor score")
         
         return "\n".join(explanation_parts)
 

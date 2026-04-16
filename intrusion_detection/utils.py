@@ -84,7 +84,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
     story.append(Spacer(1, 20))
     
-    # Detection Summary
+    # Detection Summary - REMOVED Avg False Positive Rate
     story.append(Paragraph("Detection Summary", styles['Heading2']))
     
     detection_summary = report_data.get('detection_summary', {})
@@ -93,7 +93,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         ["Total Flows Analyzed", f"{detection_summary.get('total_flows_analyzed', 0):,}"],
         ["Total Anomalies Detected", f"{detection_summary.get('total_anomalies_detected', 0):,}"],
         ["Detection Rate", f"{detection_summary.get('detection_rate', 0):.2%}"],
-        ["Avg False Positive Rate", f"{detection_summary.get('avg_false_positive_rate', 0):.2f}%"],
+        # Avg False Positive Rate line REMOVED
     ]
     
     detection_table = Table(detection_data, colWidths=[200, 200])
@@ -123,14 +123,20 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                 display_name = name[:25] + "..." if len(name) > 25 else name
                 accuracy = model.get('accuracy')
                 accuracy_str = f"{accuracy:.2%}" if accuracy else "N/A"
+                # Safely get training_samples - handle None
+                training_samples = model.get('training_samples', 0)
+                samples_str = f"{training_samples:,}" if training_samples else "N/A"
+                # Safely get created_at
+                created_at = model.get('created_at')
+                created_str = created_at.strftime('%Y-%m-%d') if created_at and hasattr(created_at, 'strftime') else 'N/A'
                 model_data.append([
                     str(model.get('id', 'N/A')),
                     display_name,
                     model.get('username', 'N/A'),
                     model.get('model_type', 'rnsa_knn'),
                     accuracy_str,
-                    f"{model.get('training_samples', 0):,}",
-                    model['created_at'].strftime('%Y-%m-%d') if model.get('created_at') and hasattr(model['created_at'], 'strftime') else 'N/A'
+                    samples_str,
+                    created_str
                 ])
         
         model_table = Table(model_data, colWidths=[40, 120, 80, 60, 60, 60, 80])
@@ -182,7 +188,10 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         for anomaly in anomalies[:10]:
             if anomaly:
                 detected_at = anomaly.get('detected_at')
-                detected_str = detected_at.strftime('%Y-%m-%d %H:%M') if detected_at and hasattr(detected_at, 'strftime') else str(detected_at)
+                if detected_at and hasattr(detected_at, 'strftime'):
+                    detected_str = detected_at.strftime('%Y-%m-%d %H:%M')
+                else:
+                    detected_str = str(detected_at) if detected_at else 'N/A'
                 anomaly_data.append([
                     detected_str,
                     str(anomaly.get('index', 'N/A')),
