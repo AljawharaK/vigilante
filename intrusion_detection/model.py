@@ -8,6 +8,39 @@ from sklearn.neighbors import KNeighborsClassifier
 from typing import Tuple, Dict, Any, Optional, List, Union
 import warnings
 warnings.filterwarnings('ignore')
+import sys
+import types
+
+# ========================
+# joblib saves class references, not just data
+# Ensure classes are defined at the top level of the module for loading to work correctly
+# GLOBAL REGISTRATION FOR CUSTOM CLASSES
+# ========================
+def register_custom_classes():
+    """Register custom classes in __main__ module to fix joblib loading"""
+    # Get the __main__ module
+    main_module = sys.modules.get('__main__')
+    if main_module is None:
+        # Create __main__ module if it doesn't exist
+        main_module = types.ModuleType('__main__')
+        sys.modules['__main__'] = main_module
+    
+    # Register Detector class in __main__
+    if not hasattr(main_module, 'Detector'):
+        main_module.Detector = Detector
+    
+    # Register ProposedRNSA_KNN class in __main__
+    if not hasattr(main_module, 'ProposedRNSA_KNN'):
+        main_module.ProposedRNSA_KNN = ProposedRNSA_KNN
+    
+    # Also register in the current module for good measure
+    if not hasattr(sys.modules[__name__], 'Detector'):
+        sys.modules[__name__].Detector = Detector
+    if not hasattr(sys.modules[__name__], 'ProposedRNSA_KNN'):
+        sys.modules[__name__].ProposedRNSA_KNN = ProposedRNSA_KNN
+
+# Call registration at module load
+register_custom_classes()
 
 # ========================
 # Feature alignment mapping for different datasets
@@ -297,10 +330,24 @@ class ProposedRNSA_KNN:
 
     @classmethod
     def load(cls, path: str):
+        """Load model with custom class registration"""
+        # Register custom classes before loading
+        register_custom_classes()
+        
         if not path.endswith('.joblib'):
             path = f"{path}.joblib"
-        model_data = joblib.load(path)
-        return model_data['model']
+        
+        try:
+            model_data = joblib.load(path)
+            
+            # Handle different save formats
+            if isinstance(model_data, dict) and 'model' in model_data:
+                return model_data['model']
+            else:
+                return model_data
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            raise
 
 
 # ========================
@@ -750,7 +797,10 @@ class IntrusionDetectionModel:
     
     @classmethod
     def load(cls, model_path: str):
-        """Load complete model from disk"""
+        """Load complete model from disk with custom class support"""
+        # Register custom classes before loading
+        register_custom_classes()
+        
         # Check if path exists
         if not os.path.exists(model_path):
             # Try adding .joblib extension
@@ -759,36 +809,66 @@ class IntrusionDetectionModel:
             if not os.path.exists(model_path):
                 raise FileNotFoundError(f"Model file not found: {model_path}")
         
-        # Load the model data
-        model_data = joblib.load(model_path)
+        try:
+            # Load the model data
+            model_data = joblib.load(model_path)
+            
+            # If model_data is a dict with 'model' key (our save format)
+            if isinstance(model_data, dict) and 'model' in model_data:
+                # Create model instance
+                model = cls(model_dir=os.path.dirname(model_path))
+                
+                # Restore components
+                model.model = model_data['model']
+                model.feature_names = model_data['feature_names']
+                model.metrics = model_data['metrics']
+                model.threshold = model_data['threshold']
+                model.feature_mapping = model_data.get('feature_mapping', {})
+                
+                # Restore scaler
+                if 'scaler' in model_data and model_data['scaler'] is not None:
+                    model.scaler = model_data['scaler']
+                elif hasattr(model.model, 'scaler'):
+                    model.scaler = model.model.scaler
+                
+                # Set core features
+                if 'core_features' in model_data:
+                    model.CORE_FEATURES = model_data['core_features']
+                
+                return model
+            else:
+                # Legacy format - model_data is the model directly
+                model = cls(model_dir=os.path.dirname(model_path))
+                model.model = model_data
+                # Try to extract attributes
+                if hasattr(model_data, 'feature_names'):
+                    model.feature_names = model_data.feature_names
+                if hasattr(model_data, 'threshold'):
+                    model.threshold = model_data.threshold
+                if hasattr(model_data, 'scaler'):
+                    model.scaler = model_data.scaler
+                if hasattr(model_data, 'feature_mapping'):
+                    model.feature_mapping = model_data.feature_mapping
+                if hasattr(model_data, 'CORE_FEATURES'):
+                    model.CORE_FEATURES = model_data.CORE_FEATURES
+                return model
+                
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            raise
         
-        # Create model instance
-        model = cls(model_dir=os.path.dirname(model_path))
-        
-        # Restore components
-        model.model = model_data['model']
-        model.feature_names = model_data['feature_names']
-        model.metrics = model_data['metrics']
-        model.threshold = model_data['threshold']
-        model.feature_mapping = model_data.get('feature_mapping', {})
-        
-        # Restore scaler
-        if 'scaler' in model_data and model_data['scaler'] is not None:
-            model.scaler = model_data['scaler']
-        elif hasattr(model.model, 'scaler'):
-            model.scaler = model.model.scaler
-        
-        # Set core features
-        if 'core_features' in model_data:
-            model.CORE_FEATURES = model_data['core_features']
-        
-        return model
-    
     def get_feature_summary(self) -> Dict[str, Any]:
         """Get summary of features used by the model"""
+        # Try to get core features from model.model if available
+        core_features = self.CORE_FEATURES
+        if hasattr(self.model, 'CORE_FEATURES'):
+            core_features = self.model.CORE_FEATURES
+        elif hasattr(self.model, 'core_features'):
+            core_features = self.model.core_features
+        
         return {
-            'core_features': self.CORE_FEATURES,
+            'core_features': core_features,
             'feature_mapping': self.feature_mapping,
             'feature_names': self.feature_names,
-            'features_count': len(self.CORE_FEATURES) if self.CORE_FEATURES else 0
+            'features_count': len(core_features) if core_features else 0
         }
