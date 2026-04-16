@@ -950,12 +950,7 @@ Examples:
                 console.print(f"[red]Failed to generate PDF: {e}[/red]")
                 import traceback
                 console.print(traceback.format_exc())
-                # Fallback to JSON
-                json_output = args.output.replace('.pdf', '.json') if args.output.endswith('.pdf') else args.output + '.json'
-                with open(json_output, 'w') as f:
-                    json.dump(report_data, f, indent=2, default=str)
-                console.print(f"[yellow]JSON report saved to: {json_output}[/yellow]")
-
+                
     def handle_detect(self, args):
         """Handle anomaly detection with feature alignment - exactly like RNSA_KNN_training"""
         
