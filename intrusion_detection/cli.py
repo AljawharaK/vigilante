@@ -1702,9 +1702,9 @@ Examples:
                 result = self.trainer.train_model(
                     data_path=args.input,
                     model_name=args.model_name or f"model_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                    r_s=0.01,
+                    r_s=0.05,
                     max_detectors=1000,
-                    k=1,
+                    k=5,
                     dataset_name=os.path.basename(args.input)
                 )
             
@@ -1722,9 +1722,9 @@ Examples:
                     features=result.get('feature_analysis', {}).get('available_features', features),
                     parameters={
                         'model_type': 'rnsa_knn',
-                        'r_s': 0.01,
+                        'r_s': 0.05,
                         'max_detectors': 1000,
-                        'k': 1,
+                        'k': 5,
                         'core_features': temp_model.CORE_FEATURES
                     }
                 )
@@ -2056,7 +2056,7 @@ Examples:
         
         # Add available feature values (like training code)
         if 'top_features' in anomaly and anomaly['top_features']:
-            panel_content.append("\n[bold]Available Features Data:[/bold]")
+            panel_content.append("\n[bold]Contributing Features Data :[/bold]")
             features = anomaly['top_features']
             
             # Nice display names for features

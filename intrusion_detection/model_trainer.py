@@ -30,17 +30,44 @@ class ModelTrainer:
         # Extract labels if present
         y = None
         if has_labels:
-            # Look for label column (case-insensitive)
-            label_cols = ['label', 'Label', 'attack_cat', 'class', 'Label.1', ' Label']
+            # Look for label column (case-insensitive) - matches CLI detection
+            label_cols = ['label', 'Label', ' Label', 'attack_type', 'class', 'Label.1', 'LABEL', 'attack', 'Attack', 'attack_cat']
             for col in label_cols:
                 if col in df.columns:
-                    y = df[col].values
-                    # Convert to binary if needed
-                    if y.dtype == 'object':
-                        # Map non-numeric labels to 0/1
-                        y = np.array([1 if str(v).lower() in ['attack', 'malicious', 'anomaly', '1', 'true'] 
-                                      else 0 for v in y])
-                    print(f"Found label column: '{col}' with {len(np.unique(y))} unique values")
+                    # Get original labels first
+                    original_labels = df[col].values
+                    
+                    print(f"Found label column: '{col}'")
+                    print(f"  Original labels: {np.unique(original_labels)}")
+                    
+                    # Convert string labels to binary (0 for normal/benign, 1 for attack/malicious)
+                    # MATCHES the logic in cli.py handle_detect method
+                    if original_labels.dtype == 'object' or (len(original_labels) > 0 and isinstance(original_labels[0], str)):
+                        # Define what counts as normal/benign (case-insensitive) - SAME AS CLI
+                        normal_terms = ['benign', 'Benign', 'BENIGN', 'normal', 'Normal', '0', 'false', 'no', 'legitimate']
+                        
+                        y_binary = []
+                        for val in original_labels:
+                            val_str = str(val).lower().strip()
+                            is_normal = False
+                            for term in normal_terms:
+                                if term in val_str:
+                                    is_normal = True
+                                    break
+                            
+                            if is_normal:
+                                y_binary.append(0)  # Normal/Benign
+                            else:
+                                y_binary.append(1)  # Attack/Malicious
+                        
+                        y = np.array(y_binary, dtype=np.int32)
+                        print(f"  Converted to binary: 0=normal/benign, 1=attack/malicious")
+                        print(f"  Class distribution: Normal={np.sum(y==0)}, Attack={np.sum(y==1)}")
+                    else:
+                        # Already numeric, just convert to int
+                        y = original_labels.astype(np.int32)
+                        print(f"  Numeric labels: 0={np.sum(y==0)}, 1={np.sum(y==1)}")
+                    
                     # Drop label column from features
                     df = df.drop(columns=[col])
                     break
@@ -80,8 +107,8 @@ class ModelTrainer:
         return result
     
     def train_model(self, data_path: str, model_name: str, 
-                   r_s: float = 0.01, max_detectors: int = 1000, 
-                   k: int = 1, dataset_name: str = None) -> Dict[str, Any]:
+                   r_s: float = 0.05, max_detectors: int = 1000, 
+                   k: int = 5, dataset_name: str = None) -> Dict[str, Any]:
         """Train a complete intrusion detection model using RNSA+KNN with feature alignment"""
         print("\n" + "="*80)
         print(f"RNSA+KNN MODEL TRAINING: {model_name}")

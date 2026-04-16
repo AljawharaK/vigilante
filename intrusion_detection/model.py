@@ -676,7 +676,7 @@ class IntrusionDetectionModel:
         return X_scaled
     
     def fit(self, X_train: np.ndarray, y_train: np.ndarray, 
-           r_s: float = 0.01, max_detectors: int = 1000, k: int = 1,
+           r_s: float = 0.05, max_detectors: int = 1000, k: int = 5,
            dataset_name: str = None):
         """Train the RNSA+KNN model"""
         print("\n" + "="*60)
