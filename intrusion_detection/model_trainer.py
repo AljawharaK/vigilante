@@ -107,8 +107,8 @@ class ModelTrainer:
         return result
     
     def train_model(self, data_path: str, model_name: str, 
-                   r_s: float = 0.05, max_detectors: int = 1000, 
-                   k: int = 5, dataset_name: str = None) -> Dict[str, Any]:
+               r_s: float = 0.05, max_detectors: int = 1000, 
+               k: int = 5, dataset_name: str = None) -> Dict[str, Any]:
         """Train a complete intrusion detection model using RNSA+KNN with feature alignment"""
         print("\n" + "="*80)
         print(f"RNSA+KNN MODEL TRAINING: {model_name}")
@@ -188,6 +188,9 @@ class ModelTrainer:
         result = {
             'model_path': model_path,
             'model_name': unique_name,
+            'training_samples': len(X_train_split),  # ADD THIS - actual training samples used
+            'validation_samples': len(X_val),
+            'features_count': X_train.shape[1],
             'metrics': {
                 'train_accuracy': float(train_accuracy),
                 'test_accuracy': float(val_metrics.get('accuracy', 0)),
@@ -199,17 +202,17 @@ class ModelTrainer:
                 'f1_score': float(val_metrics.get('f1_score', 0)),
                 'detectors': len(model.model.detectors) if model.model else 0,
                 'optimal_dr': float(val_metrics.get('detection_rate', 0)),
-                'optimal_far': float(val_metrics.get('false_alarm_rate', 0))
+                'optimal_far': float(val_metrics.get('false_alarm_rate', 0)),
+                'training_samples': len(X_train_split),  # ADD THIS to metrics too
+                'features_count': X_train.shape[1]  # ADD THIS to metrics too
             },
-            'training_samples': len(X_train_split),
-            'validation_samples': len(X_val),
-            'features_count': X_train.shape[1],
             'feature_analysis': feature_analysis,
             'parameters': {
                 'r_s': r_s,
                 'max_detectors': max_detectors,
                 'k': k,
-                'model_type': 'rnsa_knn'
+                'model_type': 'rnsa_knn',
+                'training_samples': len(X_train_split)  # ADD THIS
             },
             'dataset_name': dataset_name or os.path.basename(data_path),
             'timestamp': timestamp
@@ -224,6 +227,7 @@ class ModelTrainer:
         print("TRAINING COMPLETE")
         print("="*60)
         print(f"Model saved: {model_path}")
+        print(f"Training samples: {len(X_train_split):,}")
         print(f"Detectors generated: {result['metrics']['detectors']}")
         print(f"Train accuracy: {result['metrics']['train_accuracy']:.4f}")
         print(f"Test accuracy: {result['metrics']['test_accuracy']:.4f}")

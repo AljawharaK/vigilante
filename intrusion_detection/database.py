@@ -430,12 +430,32 @@ class DatabaseManager:
         except Exception as e:
             print(f"❌ Error getting all detections: {e}")
             return []
-        
+    
     def save_model(self, user_id: int, model_name: str, model_path: str, 
                dataset_name: str = None, metrics: Dict[str, Any] = None,
                features: List[str] = None, parameters: Dict[str, Any] = None) -> int:
         """Save model metadata to database"""
         try:
+            # Get training_samples from multiple possible locations in metrics
+            training_samples = None
+            
+            if metrics:
+                # Try different possible keys where training_samples might be stored
+                if 'training_samples' in metrics:
+                    training_samples = metrics.get('training_samples')
+                elif 'training_samples' in metrics.get('metrics', {}):
+                    training_samples = metrics['metrics'].get('training_samples')
+                elif 'training_samples' in parameters if parameters else {}:
+                    training_samples = parameters.get('training_samples')
+            
+            # Get features_count from metrics or features list
+            features_count = len(features) if features else None
+            if not features_count and metrics:
+                if 'features_count' in metrics:
+                    features_count = metrics.get('features_count')
+                elif 'features_count' in metrics.get('metrics', {}):
+                    features_count = metrics['metrics'].get('features_count')
+            
             with self.conn.cursor() as cursor:
                 cursor.execute("""
                     INSERT INTO models (
@@ -451,15 +471,15 @@ class DatabaseManager:
                     metrics.get('precision') if metrics else None,
                     metrics.get('recall') if metrics else None,
                     metrics.get('f1_score') if metrics else None,
-                    metrics.get('training_samples') if metrics else None,
-                    metrics.get('features_count') if metrics else None,
+                    training_samples,
+                    features_count,
                     json.dumps(features) if features else None,
                     json.dumps(parameters) if parameters else None,
                     json.dumps(metrics) if metrics else None
                 ))
                 model_id = cursor.fetchone()[0]
                 self.conn.commit()
-                print(f"✅ Model '{model_name}' saved with ID: {model_id}")
+                print(f"✅ Model '{model_name}' saved with ID: {model_id} (training_samples: {training_samples})")
                 return model_id
         except Exception as e:
             self.conn.rollback()

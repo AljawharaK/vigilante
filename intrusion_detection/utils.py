@@ -131,7 +131,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         Paragraph(title_text, title_style),
     ]]
     
-    title_box = Table(title_cell_data, colWidths=[400])
+    title_box = Table(title_cell_data, colWidths=[420])
     title_box.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), NAVY_BLUE),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -204,7 +204,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                     created_str
                 ])
         
-        model_table = Table(model_data, colWidths=[40, 120, 80, 60, 60, 60, 80])
+        model_table = Table(model_data, colWidths=[40, 110, 60, 90, 60, 60, 80])
         model_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
             ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),

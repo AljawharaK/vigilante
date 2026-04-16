@@ -45,13 +45,11 @@ def _resolve_logo_path() -> str:
     # Method 2: Check in intrusion_detection/assets/
     assets_logo = current_dir / 'assets' / 'Vigilante_logo.png'
     if assets_logo.exists():
-        print(f"GUI: Found logo at {assets_logo}")
         return str(assets_logo)
     
     # Method 3: Check in current working directory
     cwd_logo = Path.cwd() / 'Vigilante_logo.png'
     if cwd_logo.exists():
-        print(f"GUI: Found logo at {cwd_logo}")
         return str(cwd_logo)
     
     print("GUI: Logo not found in any location")

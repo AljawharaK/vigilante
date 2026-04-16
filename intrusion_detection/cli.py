@@ -1751,15 +1751,20 @@ Examples:
                 from .model import IntrusionDetectionModel
                 temp_model = IntrusionDetectionModel()
                 available_features, feature_mapping = temp_model._find_features_in_data(df_preview)
-            
+                
+                # Load full data to get training samples count
+                df_full = pd.read_csv(args.input)
+                total_samples = len(df_full)
+                
                 console.print(f"\n[cyan]Feature Analysis:[/cyan]")
                 console.print(f"  Core features required: {len(temp_model.CORE_FEATURES)}")
                 console.print(f"  Features found: {len(available_features)}")
+                console.print(f"  Total training samples: {total_samples:,}")
                 if feature_mapping:
                     console.print(f"  Feature mapping:")
                     for k, v in list(feature_mapping.items())[:5]:
                         console.print(f"    {k} → {v}")
-            
+                
                 # Train model
                 result = self.trainer.train_model(
                     data_path=args.input,
@@ -1769,31 +1774,36 @@ Examples:
                     k=5,
                     dataset_name=os.path.basename(args.input)
                 )
-            
+                
                 # Create a fresh database connection for saving the model
-                # This ensures we don't use a stale connection from long training
                 fresh_db = DatabaseManager()
-            
+                
+                # Prepare metrics with training_samples properly set
+                save_metrics = result.get('metrics', {}).copy()
+                save_metrics['training_samples'] = result.get('training_samples', total_samples)
+                save_metrics['features_count'] = result.get('features_count', len(temp_model.CORE_FEATURES))
+                
                 # Save model to database using fresh connection
                 model_id = fresh_db.save_model(
                     user_id=self.auth.current_user['id'],
                     model_name=result['model_name'],
                     model_path=result['model_path'],
                     dataset_name=os.path.basename(args.input),
-                    metrics=result['metrics'],
+                    metrics=save_metrics,
                     features=result.get('feature_analysis', {}).get('available_features', features),
                     parameters={
                         'model_type': 'rnsa_knn',
                         'r_s': 0.05,
                         'max_detectors': 1000,
                         'k': 5,
-                        'core_features': temp_model.CORE_FEATURES
+                        'core_features': temp_model.CORE_FEATURES,
+                        'training_samples': total_samples
                     }
                 )
-            
+                
                 # Close the fresh connection
                 fresh_db.close()
-            
+                
                 progress.update(task, completed=100)
 
             except Exception as e:
@@ -1805,6 +1815,7 @@ Examples:
         console.print(f"[green]✓ RNSA+KNN Model trained successfully[/green]")
         console.print(f"Model ID: [cyan]{model_id}[/cyan]")
         console.print(f"Model saved to: [cyan]{result['model_path']}[/cyan]")
+        console.print(f"Training samples: [cyan]{total_samples:,}[/cyan]")
 
         # Show metrics
         self.display_training_metrics(result['metrics'])
@@ -1824,7 +1835,7 @@ Examples:
             action="model_train",
             resource=args.input,
             status="success",
-            details={"model_id": model_id, "model_name": result['model_name']}
+            details={"model_id": model_id, "model_name": result['model_name'], "training_samples": total_samples}
         )
 
     # Show RNSA+KNN specific metrics
