@@ -14,7 +14,7 @@ from .model import IntrusionDetectionModel, find_matching_features, align_featur
 class ModelTrainer:
     """Train and manage intrusion detection models using RNSA+KNN with feature alignment"""
     
-    def __init__(self, model_dir: str = "models"):
+    def __init__(self, model_dir: str = "saved_models"):
         self.model_dir = model_dir
         os.makedirs(model_dir, exist_ok=True)
     

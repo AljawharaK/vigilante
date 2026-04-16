@@ -3,7 +3,7 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
 from typing import Tuple, Dict, Any, Optional, List, Union
 import warnings
@@ -60,6 +60,8 @@ FEATURE_VARIATIONS = {
 # ========================
 # Detector Class
 # ========================
+# intrusion_detection/model.py - ADD THESE CLASSES at the top of the file
+
 class Detector:
     """Represents a mature detector with center and radius"""
     def __init__(self, center: np.ndarray, radius: float):
@@ -75,148 +77,119 @@ class Detector:
         """Calculate how well a sample is covered by this detector (0 to 1)"""
         distance = np.linalg.norm(sample - self.center)
         if distance <= self.radius:
-            # If inside detector, score = 1 - (distance/radius)
             return 1.0 - (distance / self.radius)
         else:
             return 0.0
 
 
-# ========================
-# RNSA + KNN Model
-# ========================
-class RNSA_KNN_Model:
+class ProposedRNSA_KNN:
     """
     Implementation of the RNSA+KNN algorithm from the 2019 paper
     Uses abnormal samples as detector centers + KNN for hole samples
     """
 
-    def __init__(self, r_s: float = 0.01, max_detectors: int = 1000,
-                 k: int = 1, estimated_coverage: float = 0.99):
-        """
-        Parameters:
-        -----------
-        r_s : float
-            Self radius for tolerance checking
-        max_detectors : int
-            Maximum number of detectors to generate
-        k : int
-            Number of neighbors for KNN reclassification (for holes)
-        """
+    def __init__(self, r_s: float = 0.05, max_detectors: int = 1000, k: int = 5):
         self.r_s = r_s
         self.max_detectors = max_detectors
         self.k = k
         self.detectors: List[Detector] = []
         self.knn = KNeighborsClassifier(n_neighbors=k)
-        self.scaler = MinMaxScaler()
-        self.feature_names = None
-        self.metrics = {}
-        self.threshold = 0.5
+        self.scaler = StandardScaler()
+        self.is_fitted = False
         self.datasets_trained_on = []
         self.all_training_data = None
         self.all_training_labels = None
         self.expected_n_features = None
+        self.unsw_feature_names = None
+        self.model_dir = "saved_models"
+        self.metrics = {}
+        self.feature_names = None
+        self.feature_mapping = FEATURE_ALIGNMENT_MAP
+        self.CORE_FEATURES = ['dur', 'spkts', 'dpkts', 'sbytes', 'dbytes', 
+                              'rate', 'smean', 'dmean', 'swin', 'dwin']
+        self.threshold = 0.5
+        self.feature_stats = {}
 
     def _euclidean_distance(self, a: np.ndarray, b: np.ndarray) -> float:
-        """Calculate Euclidean distance between two vectors"""
         return np.linalg.norm(a - b)
 
     def _calculate_radius(self, candidate_center: np.ndarray,
                           normal_samples: np.ndarray) -> Tuple[bool, float]:
-        """
-        Calculate detector radius based on minimum distance to normal samples
-        Returns: (is_valid, radius)
-        """
         min_distance = float('inf')
-
         for normal_sample in normal_samples:
             distance = self._euclidean_distance(candidate_center, normal_sample)
             if distance < min_distance:
                 min_distance = distance
-
-        # Radius = distance to closest normal sample - self_radius
         radius = min_distance - self.r_s
-
-        # Detector is valid if radius > 0 (not overlapping with self-region)
         is_valid = radius > 0
-
         return is_valid, radius
 
     def _is_redundant(self, candidate_center: np.ndarray) -> bool:
-        """
-        Check if candidate detector is redundant (covered by existing detectors)
-        """
         for detector in self.detectors:
             if detector.covers(candidate_center):
                 return True
         return False
 
-    def fit(self, X_train: np.ndarray, y_train: np.ndarray, dataset_name: str = None):
-        """
-        Train the model using both normal and abnormal samples
-        
-        Parameters:
-        -----------
-        X_train : np.ndarray
-            Training features
-        y_train : np.ndarray
-            Training labels (0=normal, 1=abnormal)
-        dataset_name : str, optional
-            Name of the dataset being trained on
-        """
-        # Store dataset name
+    def _align_features(self, X: np.ndarray, target_n_features: int) -> np.ndarray:
+        current_n_features = X.shape[1]
+        if current_n_features == target_n_features:
+            return X
+        if current_n_features < target_n_features:
+            padding = target_n_features - current_n_features
+            X_aligned = np.pad(X, ((0, 0), (0, padding)), mode='constant', constant_values=0)
+        else:
+            X_aligned = X[:, :target_n_features]
+        return X_aligned
+
+    def _calculate_severity(self, confidence: float) -> str:
+        if confidence >= 0.85:
+            return "HIGH"
+        elif confidence >= 0.70:
+            return "MEDIUM"
+        else:
+            return "LOW"
+
+    def fit(self, X_train: np.ndarray, y_train: np.ndarray, dataset_name: str = None, feature_names=None):
         if dataset_name:
             self.datasets_trained_on.append(dataset_name)
+            self.feature_stats[dataset_name] = {
+                'mean': np.mean(X_train, axis=0),
+                'std': np.std(X_train, axis=0),
+                'min': np.min(X_train, axis=0),
+                'max': np.max(X_train, axis=0)
+            }
+        if feature_names is not None:
+            self.feature_names = feature_names
+        if dataset_name == "UNSW-NB15" and feature_names is not None:
+            self.unsw_feature_names = feature_names
 
-        # Set expected features on first fit
-        if self.expected_n_features is None:
+        if not self.is_fitted:
             self.expected_n_features = X_train.shape[1]
-            print(f"First training with {self.expected_n_features} features")
-        
-        # Normalize data
-        X_train_scaled = self.scaler.fit_transform(X_train)
+            X_train_scaled = self.scaler.fit_transform(X_train)
+            self.is_fitted = True
+        else:
+            if X_train.shape[1] != self.expected_n_features:
+                X_train = self._align_features(X_train, self.expected_n_features)
+            X_train_scaled = self.scaler.transform(X_train)
 
-        # Separate normal and abnormal samples
         normal_mask = (y_train == 0)
         abnormal_mask = (y_train == 1)
-
         normal_samples = X_train_scaled[normal_mask]
         abnormal_samples = X_train_scaled[abnormal_mask]
 
-        print(f"Training with {len(normal_samples)} normal and {len(abnormal_samples)} abnormal samples")
-
-        # PHASE 1: Generate detectors from abnormal samples (Algorithm 1 from paper)
-        print("Phase 1: Generating detectors from abnormal samples...")
-        
-        # Don't reset detectors - continue adding to existing ones
         if len(self.detectors) == 0:
             self.detectors = []
 
         for i, abnormal_sample in enumerate(abnormal_samples):
             if len(self.detectors) >= self.max_detectors:
                 break
-
-            # Check redundancy with existing detectors
             if self._is_redundant(abnormal_sample):
                 continue
-
-            # Tolerance check and radius calculation
             is_valid, radius = self._calculate_radius(abnormal_sample, normal_samples)
-
             if is_valid:
-                # Create new detector with calculated radius
                 detector = Detector(abnormal_sample.copy(), radius)
                 self.detectors.append(detector)
 
-            if (i + 1) % 100 == 0:
-                print(f"  Processed {i+1}/{len(abnormal_samples)} abnormal samples, "
-                      f"generated {len(self.detectors)} detectors")
-
-        print(f"Total detectors: {len(self.detectors)}")
-
-        # PHASE 2: Train KNN for hole remediation
-        print("Phase 2: Training KNN for hole remediation...")
-        
-        # Store all training data for KNN retraining
         if self.all_training_data is None:
             self.all_training_data = X_train_scaled
             self.all_training_labels = y_train
@@ -224,81 +197,45 @@ class RNSA_KNN_Model:
             self.all_training_data = np.vstack([self.all_training_data, X_train_scaled])
             self.all_training_labels = np.hstack([self.all_training_labels, y_train])
 
-        # Retrain KNN with all accumulated data
         self.knn.fit(self.all_training_data, self.all_training_labels)
-
         return self
 
     def _nsa_classify(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        NSA classification phase
-        Returns: (predictions, hole_samples_mask, covered_samples_mask)
-        """
+        if X.shape[1] != self.expected_n_features:
+            X = self._align_features(X, self.expected_n_features)
         X_scaled = self.scaler.transform(X)
         n_samples = len(X_scaled)
-
-        predictions = np.zeros(n_samples, dtype=int)  # Default: normal (0)
-        covered_mask = np.zeros(n_samples, dtype=bool)  # Samples covered by detectors
-
-        # Check each sample against all detectors
+        predictions = np.zeros(n_samples, dtype=int)
+        covered_mask = np.zeros(n_samples, dtype=bool)
         for i, sample in enumerate(X_scaled):
             for detector in self.detectors:
                 if detector.covers(sample):
-                    predictions[i] = 1  # Abnormal
+                    predictions[i] = 1
                     covered_mask[i] = True
                     break
-
-        # Samples in holes are those NOT covered by any detector
         hole_mask = ~covered_mask
-
         return predictions, hole_mask, covered_mask
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """
-        Predict using two-phase approach: NSA + KNN reclassification
-
-        Parameters:
-        -----------
-        X : np.ndarray
-            Test features
-
-        Returns:
-        --------
-        predictions : np.ndarray
-            Predicted labels (0=normal, 1=abnormal)
-        """
-        # Phase 1: NSA classification
         nsa_predictions, hole_mask, _ = self._nsa_classify(X)
-
-        # Phase 2: KNN reclassification only for samples in holes
         if np.any(hole_mask):
+            if X.shape[1] != self.expected_n_features:
+                X = self._align_features(X, self.expected_n_features)
             X_scaled = self.scaler.transform(X)
             hole_samples = X_scaled[hole_mask]
-
-            # Reclassify hole samples using KNN
             knn_predictions = self.knn.predict(hole_samples)
-
-            # Update predictions for hole samples
             final_predictions = nsa_predictions.copy()
             final_predictions[hole_mask] = knn_predictions
         else:
             final_predictions = nsa_predictions
-
         return final_predictions
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        """
-        Predict probability scores for ROC curve
-        For NSA+KNN: Use maximum detector coverage score for NSA part,
-        then blend with KNN probabilities for hole samples
-        """
+        if X.shape[1] != self.expected_n_features:
+            X = self._align_features(X, self.expected_n_features)
         X_scaled = self.scaler.transform(X)
         n_samples = len(X_scaled)
-
-        # Initialize probability scores
         prob_scores = np.zeros(n_samples, dtype=float)
-
-        # Phase 1: NSA coverage scores
         for i, sample in enumerate(X_scaled):
             max_coverage = 0.0
             for detector in self.detectors:
@@ -306,164 +243,64 @@ class RNSA_KNN_Model:
                 if coverage > max_coverage:
                     max_coverage = coverage
             prob_scores[i] = max_coverage
-
-        # Phase 2: Get KNN probabilities for all samples
         knn_proba = self.knn.predict_proba(X_scaled)
-
-        # Get hole mask
         _, hole_mask, _ = self._nsa_classify(X)
-
-        # Blend probabilities
-        # For covered samples: 70% NSA, 30% KNN
-        # For hole samples: 30% NSA, 70% KNN
         for i in range(n_samples):
-            if not hole_mask[i]:  # Covered by detector
+            if not hole_mask[i]:
                 prob_scores[i] = 0.7 * prob_scores[i] + 0.3 * knn_proba[i, 1]
-            else:  # In hole
+            else:
                 prob_scores[i] = 0.3 * prob_scores[i] + 0.7 * knn_proba[i, 1]
-
-        # Convert to 2D array expected by sklearn
         proba_array = np.zeros((n_samples, 2))
-        proba_array[:, 0] = 1 - prob_scores  # Probability of class 0 (normal)
-        proba_array[:, 1] = prob_scores      # Probability of class 1 (abnormal)
-
+        proba_array[:, 0] = 1 - prob_scores
+        proba_array[:, 1] = prob_scores
         return proba_array
-    
+
     def evaluate(self, X_test: np.ndarray, y_test: np.ndarray) -> Dict[str, Any]:
-        """Evaluate model and return comprehensive metrics"""
-        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-        from sklearn.metrics import confusion_matrix, roc_curve, auc
-        
-        # Make predictions
+        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_curve, auc
         y_pred = self.predict(X_test)
         y_scores = self.predict_proba(X_test)[:, 1]
-        
-        # Calculate basic metrics
         accuracy = accuracy_score(y_test, y_pred)
         precision = precision_score(y_test, y_pred, zero_division=0)
         recall = recall_score(y_test, y_pred, zero_division=0)
         f1 = f1_score(y_test, y_pred, zero_division=0)
-        
-        # Calculate confusion matrix
         cm = confusion_matrix(y_test, y_pred)
         if cm.shape == (2, 2):
             TN, FP, FN, TP = cm.ravel()
             detection_rate = TP / (TP + FN) if (TP + FN) > 0 else 0
             false_alarm_rate = FP / (FP + TN) if (FP + TN) > 0 else 0
         else:
-            TN, FP, FN, TP = 0, 0, 0, 0
-            detection_rate = 0
-            false_alarm_rate = 0
-        
-        # Calculate ROC metrics
+            detection_rate = false_alarm_rate = 0
         fpr, tpr, thresholds = roc_curve(y_test, y_scores)
         roc_auc = auc(fpr, tpr)
-        
-        # Find optimal threshold (Youden's J statistic)
         threshold = tpr - fpr
         optimal_idx = np.argmax(threshold)
-        optimal_threshold = thresholds[optimal_idx]
-        
-        # Calculate metrics at optimal threshold
-        y_pred_optimal = (y_scores >= optimal_threshold).astype(int)
-        cm_optimal = confusion_matrix(y_test, y_pred_optimal)
-        if cm_optimal.shape == (2, 2):
-            TN_opt, FP_opt, FN_opt, TP_opt = cm_optimal.ravel()
-            optimal_dr = TP_opt / (TP_opt + FN_opt) if (TP_opt + FN_opt) > 0 else 0
-            optimal_far = FP_opt / (FP_opt + TN_opt) if (FP_opt + TN_opt) > 0 else 0
-        else:
-            optimal_dr = 0
-            optimal_far = 0
-        
-        # Get number of anomalies detected
-        anomalies_detected = int(np.sum(y_pred))
-        
+        optimal_threshold = thresholds[optimal_idx] if len(thresholds) > 0 else 0.5
         return {
-            'accuracy': float(accuracy),
-            'precision': float(precision),
-            'recall': float(recall),
-            'f1_score': float(f1),
-            'detection_rate': float(detection_rate),
-            'false_alarm_rate': float(false_alarm_rate),
-            'auc': float(roc_auc),
-            'optimal_threshold': float(optimal_threshold),
-            'optimal_dr': float(optimal_dr),
-            'optimal_far': float(optimal_far),
-            'true_positives': int(TP),
-            'false_positives': int(FP),
-            'true_negatives': int(TN),
-            'false_negatives': int(FN),
-            'anomalies_detected': anomalies_detected,
-            'anomaly_rate': float(anomalies_detected / len(y_test)) if len(y_test) > 0 else 0,
-            'threshold': float(self.threshold),
-            'detectors_count': len(self.detectors)
+            'accuracy': float(accuracy), 'precision': float(precision), 'recall': float(recall),
+            'f1_score': float(f1), 'detection_rate': float(detection_rate),
+            'false_alarm_rate': float(false_alarm_rate), 'auc': float(roc_auc),
+            'optimal_threshold': float(optimal_threshold)
         }
 
-    def save(self, model_name: str):
-        """Save complete model to disk - exactly like RNSA_KNN_training code"""
-        # Ensure .joblib extension
-        if not model_name.endswith('.joblib'):
-            model_name = f"{model_name}.joblib"
-    
-        model_path = os.path.join(self.model_dir, model_name)
-    
-        # Save all model data in one file - MATCHING RNSA_KNN_training format
+    def save(self, path: str):
+        if not path.endswith('.joblib'):
+            path = f"{path}.joblib"
+        os.makedirs(os.path.dirname(path) if os.path.dirname(path) else '.', exist_ok=True)
         model_data = {
-            'model': self.model,
-            'feature_names': self.feature_names,
-            'metrics': self.metrics,
-            'threshold': float(self.threshold),
-            'model_type': 'rnsa_knn',
-            'scaler': self.scaler if hasattr(self, 'scaler') else None,
-            'feature_mapping': self.feature_mapping,
-            'core_features': self.CORE_FEATURES,
-            'feature_stats': getattr(self.model, 'feature_stats', {})  # Match training code
+            'model': self, 'feature_names': self.feature_names, 'metrics': self.metrics,
+            'threshold': float(self.threshold), 'model_type': 'rnsa_knn',
+            'scaler': self.scaler, 'feature_mapping': self.feature_mapping,
+            'core_features': self.CORE_FEATURES, 'feature_stats': self.feature_stats
         }
-    
-        joblib.dump(model_data, model_path)
-    
-        print(f"Model saved to: {model_path}")
-        return model_path
+        joblib.dump(model_data, path)
+        return path
 
     @classmethod
-    def load(cls, model_path: str):
-        """Load complete model from disk - exactly like RNSA_KNN_training code"""
-        # Check if path exists
-        if not os.path.exists(model_path):
-            # Try adding .joblib extension
-            if not model_path.endswith('.joblib'):
-                model_path = f"{model_path}.joblib"
-            if not os.path.exists(model_path):
-                raise FileNotFoundError(f"Model file not found: {model_path}")
-    
-        # Load the model data
-        model_data = joblib.load(model_path)
-    
-        # Create model instance
-        model = cls(model_dir=os.path.dirname(model_path))
-    
-        # Restore components - matching training code structure
-        model.model = model_data['model']
-        model.feature_names = model_data['feature_names']
-        model.metrics = model_data['metrics']
-        model.threshold = model_data['threshold']
-        model.feature_mapping = model_data.get('feature_mapping', {})
-    
-        # Restore scaler - match training code
-        if 'scaler' in model_data and model_data['scaler'] is not None:
-            model.scaler = model_data['scaler']
-        elif hasattr(model.model, 'scaler'):
-            model.scaler = model.model.scaler
-    
-        # Set core features - match training code
-        if 'core_features' in model_data:
-            model.CORE_FEATURES = model_data['core_features']
-    
-        # Restore feature stats if present
-        if hasattr(model.model, 'feature_stats'):
-            model.model.feature_stats = model_data.get('feature_stats', {})
-    
-        return model
+    def load(cls, path: str):
+        if not path.endswith('.joblib'):
+            path = f"{path}.joblib"
+        model_data = joblib.load(path)
+        return model_data['model']
 
 
 # ========================
@@ -777,7 +614,7 @@ class IntrusionDetectionModel:
         
         # Scale features
         if fit_scaler:
-            self.scaler = MinMaxScaler()
+            self.scaler = StandardScaler()
             X_scaled = self.scaler.fit_transform(X_array)
         else:
             if self.scaler is None:

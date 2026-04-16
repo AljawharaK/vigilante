@@ -919,7 +919,6 @@ Examples:
                     model_path,
                     os.path.join("saved_models", os.path.basename(model_path)),
                     os.path.basename(model_path),
-                    os.path.join("models", os.path.basename(model_path))
                 ]
             
                 found = False
