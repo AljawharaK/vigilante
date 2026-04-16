@@ -83,7 +83,7 @@ vigilante admin user-create --username analyst1 --email analyst@company.com --ro
 vigilante admin user-modify --username user1 --role Administrator
 vigilante admin user-deactivate --username olduser
 # 2. Monitor system activity
-vigilante admin audit-logs --period 7d
+vigilante admin audit-logs --period 7d --output audit_log.csv
 vigilante admin system-report --period 30d --output monthly_report.pdf
 
 # Analyst Detection & Analysis

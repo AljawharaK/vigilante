@@ -633,9 +633,9 @@ Examples:
         """View audit logs (Administrator only)"""
         if not self.check_admin():
             return
-    
+
         period_days = int(args.period.rstrip('d'))
-    
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -643,15 +643,18 @@ Examples:
         ) as progress:
             progress.add_task(description="Retrieving audit logs...", total=None)
             logs = self.db.get_audit_logs(period_days)
-    
+
         if not logs:
             console.print("[yellow]No audit logs found for the specified period[/yellow]")
             return
-    
+        
+        # Filter out None values
+        logs = [log for log in logs if log is not None]
+
         # Display summary stats
         console.print(f"[green]Found {len(logs)} audit log entries[/green]\n")
-    
-        # Create detailed table
+
+        # Create detailed table with better formatting
         table = Table(title=f"Audit Logs - Last {args.period}", box=ROUNDED)
         table.add_column("ID", style="dim", width=6)
         table.add_column("Timestamp", style="cyan", width=20)
@@ -659,41 +662,56 @@ Examples:
         table.add_column("Action", style="yellow", width=20)
         table.add_column("Resource", style="blue", width=30)
         table.add_column("Status", style="magenta", width=10)
-    
+
+        # Color-code different action types
+        action_colors = {
+            'login': 'green',
+            'logout': 'yellow',
+            'model_train': 'cyan',
+            'detect': 'blue',
+            'user_create': 'purple',
+            'user_deactivate': 'red',
+            'password_change': 'orange',
+            'user_role_update': 'magenta'
+        }
+
         for log in logs[:100]:  # Show first 100
-            timestamp = log['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-            username = log['username'] or 'System'
-            resource = log['resource'] or '-'
-        
+            timestamp = log['created_at'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(log['created_at'], 'strftime') else str(log.get('created_at', ''))[:19]
+            username = log.get('username') or 'System'
+            resource = log.get('resource') or '-'
+            
             # Truncate long resource names
             if len(resource) > 25:
                 resource = resource[:22] + '...'
-        
+            
+            # Get action color
+            action = log.get('action', '')
+            
             table.add_row(
-                str(log['id']),
+                str(log.get('id', '')),
                 timestamp,
                 username,
-                log['action'],
+                f"[{action_colors.get(action, 'yellow')}]{action}[/{action_colors.get(action, 'yellow')}]",
                 resource,
-                log['status']
+                log.get('status', 'success')
             )
-    
+
         console.print(table)
         console.print(f"[dim]Showing {min(100, len(logs))} of {len(logs)} logs[/dim]")
-    
+
         # Show action summary
         from collections import Counter
-        actions = Counter([log['action'] for log in logs])
-    
+        actions = Counter([log.get('action', '') for log in logs])
+
         summary_table = Table(title="Action Summary", box=ROUNDED)
         summary_table.add_column("Action", style="cyan")
         summary_table.add_column("Count", style="green", justify="right")
-    
+
         for action, count in actions.most_common(10):
             summary_table.add_row(action, str(count))
-    
+
         console.print(summary_table)
-    
+
         # Save to CSV if requested
         if args.output:
             try:
@@ -716,7 +734,7 @@ Examples:
             TextColumn("[progress.description]{task.description}"),
             transient=True,
         ) as progress:
-            task = progress.add_task("Collecting data...", total=5)
+            task = progress.add_task("Collecting data...", total=6)
             
             end_date = datetime.now()
             start_date = end_date - timedelta(days=period_days)
@@ -730,11 +748,22 @@ Examples:
             
             progress.update(task, advance=1, description="Getting user logs...")
             try:
-                # Get audit logs for user activity (same as handle_admin_audit_logs)
+                # Get audit logs for user activity - this should include ALL actions
                 audit_logs = self.db.get_audit_logs(period_days)
+                # Filter out None values
+                audit_logs = [log for log in audit_logs if log is not None]
             except Exception as e:
                 console.print(f"[yellow]Warning: Could not get audit logs: {e}[/yellow]")
                 audit_logs = []
+            
+            progress.update(task, advance=1, description="Getting training logs...")
+            try:
+                # Get model training events separately if needed
+                training_events = self.db.get_audit_logs(period_days)
+                training_events = [log for log in training_events if log and log.get('action') == 'model_train']
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not get training logs: {e}[/yellow]")
+                training_events = []
             
             progress.update(task, advance=1, description="Getting recent anomalies...")
             try:
@@ -963,6 +992,7 @@ Examples:
         
         # Load model
         model = None
+        model_id = None
         if args.model_id:
             # Load from database
             model_data = self.db.get_model(args.model_id, self.auth.current_user['id'])
@@ -971,6 +1001,7 @@ Examples:
                 return
 
             model_path = model_data['model_path']
+            model_id = args.model_id
         
             # Check if path exists
             if not os.path.exists(model_path):
@@ -1026,6 +1057,11 @@ Examples:
         start_time = time.time()
         
         self.db.set_long_timeout()
+        
+        detection_id = None
+        detection_success = False
+        anomalies_count = 0
+        total_flows = 0
 
         try:
             with Progress(
@@ -1059,7 +1095,6 @@ Examples:
 
                         # Convert string labels to binary (0 for normal/benign, 1 for attack/malicious)
                         if original_labels.dtype == 'object' or isinstance(original_labels[0], str):
-                            # Define what counts as normal/benign (case-insensitive) - MATCHES training code
                             normal_terms = ['benign', 'Benign', 'BENIGN', 'normal', 'Normal', '0', 'false', 'no', 'legitimate']
                 
                             y_true_binary = []
@@ -1070,17 +1105,16 @@ Examples:
                                     if term in val_str:
                                         is_normal = True
                                         break
-                    
+                        
                                 if is_normal:
-                                    y_true_binary.append(0)  # Normal
+                                    y_true_binary.append(0)
                                 else:
-                                    y_true_binary.append(1)  # Attack/Malicious
+                                    y_true_binary.append(1)
                 
                             y_true = np.array(y_true_binary)
                             console.print(f"  Converted to binary: 0=normal, 1=attack")
                             console.print(f"  Class distribution: Normal={np.sum(y_true==0)}, Attack={np.sum(y_true==1)}")
                         else:
-                            # Already numeric, just convert to int
                             y_true = original_labels.astype(np.int32)
 
                         break
@@ -1090,15 +1124,12 @@ Examples:
                     df_features = df.copy()
                     y_true = None
                 else:
-                    # Create features dataframe WITHOUT the label column
                     df_features = df.drop(columns=[label_column_name])
             
                 # Use model's preprocessing
-                # Clean data first
                 df_features.replace([np.inf, -np.inf], np.nan, inplace=True)
                 df_features.dropna(inplace=True)
             
-                # Preprocess data using model's method (this will align features)
                 X = model.preprocess_data(df_features, fit_scaler=False)
         
                 # Detect anomalies
@@ -1111,9 +1142,8 @@ Examples:
                 # Calculate execution time
                 execution_time = time.time() - start_time
         
-                # Prepare results using the appropriate function
+                # Prepare results
                 if has_labels and y_true is not None:
-                    # Ensure y_true and predictions align
                     if len(y_true) != len(predictions):
                         console.print(f"[yellow]Warning: Label length ({len(y_true)}) doesn't match features ({len(predictions)}). Truncating...[/yellow]")
                         min_len = min(len(y_true), len(predictions))
@@ -1121,12 +1151,10 @@ Examples:
                         thresholded_predictions = thresholded_predictions[:min_len]
                         confidence_scores = confidence_scores[:min_len]
                     
-                    # Use prepare_detection_results_with_labels for labeled data
                     results = self.prepare_detection_results_with_labels(
                         df_features, thresholded_predictions, confidence_scores, y_true, model, execution_time
                     )
                 else:
-                    # Use prepare_detection_results for unlabeled data
                     results = self.prepare_detection_results(
                         df_features, thresholded_predictions, confidence_scores, model, execution_time
                     )
@@ -1146,18 +1174,45 @@ Examples:
                     save_db = DatabaseManager()
                     detection_id = save_db.save_detection(
                         user_id=self.auth.current_user['id'],
-                        model_id=args.model_id if args.model_id else None,
+                        model_id=model_id,
                         input_file=args.input,
                         results=serializable_results
                     )
                     save_db.close()
+                    detection_success = True
+                    anomalies_count = results['anomalies_detected']
+                    total_flows = results['total_flows']
                 except Exception as e:
                     console.print(f"[yellow]Warning: Could not save detection to database: {e}[/yellow]")
-                    detection_id = None
         
                 progress.update(task, completed=100)
             
+            # Log detection event
+            self.db.log_audit_event(
+                user_id=self.auth.current_user['id'],
+                username=self.auth.current_user['username'],
+                action="detect",
+                resource=args.input,
+                status="success" if detection_success else "partial",
+                details={
+                    "model_id": model_id,
+                    "total_flows": total_flows,
+                    "anomalies_detected": anomalies_count,
+                    "execution_time_seconds": execution_time,
+                    "detection_id": detection_id
+                }
+            )
+            
         except Exception as e:
+            # Log failed detection attempt
+            self.db.log_audit_event(
+                user_id=self.auth.current_user['id'],
+                username=self.auth.current_user['username'],
+                action="detect",
+                resource=args.input,
+                status="failed",
+                details={"error": str(e)}
+            )
             console.print(f"[red]Detection failed: {e}[/red]")
             if hasattr(self.args, 'verbose') and self.args.verbose:
                 console.print(traceback.format_exc())
@@ -1166,7 +1221,7 @@ Examples:
         # Display results
         console.print(f"[green]✓ Detection analysis completed[/green]")
         console.print(f"[yellow]⚠️ Anomalies detected: {results['anomalies_detected']} / {results['total_flows']}[/yellow]")
-
+        
         # Show detection summary in a table
         if results['anomalies']:
             console.print(f"\n[bold cyan]DETECTED ANOMALIES (First 50)[/bold cyan]")
@@ -1804,9 +1859,34 @@ Examples:
                 # Close the fresh connection
                 fresh_db.close()
                 
+                # Log training event with correct details
+                self.db.log_audit_event(
+                    user_id=self.auth.current_user['id'],
+                    username=self.auth.current_user['username'],
+                    action="model_train",
+                    resource=args.input,
+                    status="success",
+                    details={
+                        "model_id": model_id, 
+                        "model_name": result['model_name'], 
+                        "training_samples": total_samples,
+                        "features_used": len(available_features),
+                        "accuracy": result['metrics'].get('test_accuracy', 0)
+                    }
+                )
+                
                 progress.update(task, completed=100)
 
             except Exception as e:
+                # Log failed training attempt
+                self.db.log_audit_event(
+                    user_id=self.auth.current_user['id'],
+                    username=self.auth.current_user['username'],
+                    action="model_train",
+                    resource=args.input,
+                    status="failed",
+                    details={"error": str(e)}
+                )
                 console.print(f"[red]Training failed: {e}[/red]")
                 if hasattr(self.args, 'verbose') and self.args.verbose:
                     console.print(traceback.format_exc())
@@ -1827,16 +1907,6 @@ Examples:
             console.print(f"  Features used: {fa.get('coverage', 0):.1f}% coverage")
             console.print(f"  Features found: {len(fa.get('available_features', []))}")
             console.print(f"  Missing features: {len(fa.get('missing_features', []))}")
-
-        # Log training event
-        self.db.log_audit_event(
-            user_id=self.auth.current_user['id'],
-            username=self.auth.current_user['username'],
-            action="model_train",
-            resource=args.input,
-            status="success",
-            details={"model_id": model_id, "model_name": result['model_name'], "training_samples": total_samples}
-        )
 
     # Show RNSA+KNN specific metrics
     def display_training_metrics(self, metrics):
