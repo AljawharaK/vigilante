@@ -40,7 +40,6 @@ def _resolve_logo_path() -> str:
     # Method 1: Check in project root (simplest and most reliable)
     logo = project_root / 'Vigilante_logo.png'
     if logo.exists():
-        print(f"GUI: Found logo at {logo}")
         return str(logo)
     
     # Method 2: Check in intrusion_detection/assets/

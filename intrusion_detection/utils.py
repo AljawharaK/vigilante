@@ -47,8 +47,9 @@ def _resolve_logo_path() -> str:
 
 def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     """Generate PDF report for system statistics with logo, models, and anomalies"""
-
-    from PIL import Image as PILImage  # Import PIL Image with alias to avoid conflict
+    
+    from PIL import Image as PILImage
+    from reportlab.platypus import Image as ReportLabImage, CenterFlowable
     
     doc = SimpleDocTemplate(
         output_path,
@@ -70,86 +71,65 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     # Try to load and add logo
     logo_path = _resolve_logo_path()
     
-    # Create header with logo and title in navy box
-    header_content = []
-    
-    # Add logo if available
-    logo_obj = None
+    # Create centered header with logo on top and title below
     if logo_path and os.path.exists(logo_path):
         try:
-            from reportlab.platypus import Image as ReportLabImage  # Import ReportLab Image with alias
-            
-            # Open with PIL to get dimensions (using the correctly imported PIL Image)
+            # Open with PIL to get dimensions
             img = PILImage.open(logo_path)
             img_width, img_height = img.size
-            print(f"Logo loaded successfully: {img_width}x{img_height}")
             
-            # Target logo height of 50 points
-            target_height = 50
+            # Target logo height of 60 points (slightly larger for better visibility)
+            target_height = 60
             scale = target_height / img_height
             scaled_width = img_width * scale
             scaled_height = img_height * scale
             
-            # Ensure width doesn't exceed 80 points
-            if scaled_width > 80:
-                scale = 80 / img_width
+            # Ensure width doesn't exceed 100 points
+            if scaled_width > 100:
+                scale = 100 / img_width
                 scaled_width = img_width * scale
                 scaled_height = img_height * scale
             
-            # Use ReportLab Image for the PDF
+            # Create centered logo
             logo_obj = ReportLabImage(logo_path, width=scaled_width, height=scaled_height)
+            
+            # Add logo centered
+            story.append(Spacer(1, 20))
+            story.append(CenterFlowable(logo_obj))
+            story.append(Spacer(1, 10))
+            
         except Exception as e:
             print(f"Warning: Could not load logo: {e}")
             import traceback
             traceback.print_exc()
-            logo_obj = None
     else:
         print(f"Logo file not found at: {logo_path}")
-
-    # Title with navy background box (smaller font)
+        story.append(Spacer(1, 30))
+    
+    # Title style for centered text without box
     title_style = ParagraphStyle(
-        'TitleInBox', 
-        parent=styles['Heading1'], 
-        fontSize=16,
-        spaceAfter=3,
-        textColor=WHITE,
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=NAVY_BLUE,
         alignment=1,  # Center alignment
-        fontName='Helvetica-Bold'
+        fontName='Helvetica-Bold',
+        spaceAfter=10,
     )
     
-    # Create title text
-    title_text = "Vigilante - Administrator System Report"
+    # Add title
+    title_text = "Vigilante-Administrator System Report"
+    story.append(Paragraph(title_text, title_style))
     
-    # Create a single cell table with navy background for the title section
-    title_cell_data = [[
-        Paragraph(title_text, title_style),
-    ]]
-    
-    title_box = Table(title_cell_data, colWidths=[380])
-    title_box.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), NAVY_BLUE),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-        ('LEFTPADDING', (0, 0), (-1, -1), 20),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 20),
-    ]))
-    
-    # If logo exists, create a header with logo on left and title box on right
-    if logo_obj:
-        header_table = Table([[logo_obj, title_box]], colWidths=[60, 390])
-        header_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LEFTPADDING', (0, 0), (0, 0), 0),
-        ]))
-        story.append(header_table)
-    else:
-        # Just the title box if no logo
-        story.append(title_box)
-    
+    # Add a decorative line
+    line_style = ParagraphStyle(
+        'LineStyle',
+        parent=styles['Normal'],
+        fontSize=1,
+        textColor=NAVY_BLUE,
+        alignment=1,
+    )
+    story.append(Paragraph("_" * 80, line_style))
     story.append(Spacer(1, 20))
     
     # Report period
@@ -172,13 +152,13 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     
     detection_table = Table(detection_data, colWidths=[200, 200])
     detection_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),  # Navy header
+        ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
         ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 12),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),  # Lilac data rows (changed from LIGHT_GRAY)
+        ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),
         ('GRID', (0, 0), (-1, -1), 1, colors.black)
     ]))
     story.append(detection_table)
@@ -213,13 +193,13 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         
         model_table = Table(model_data, colWidths=[40, 120, 80, 60, 60, 60, 80])
         model_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),  # Navy header
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
             ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),  # Lilac data rows (changed from LIGHT_GRAY)
+            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('FONTSIZE', (0, 1), (-1, -1), 8)
         ]))
@@ -262,13 +242,13 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         log_table = Table(log_data, colWidths=[40, 100, 80, 80, 100, 50])
         
         table_style = [
-            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),  # Navy header
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
             ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),  # Lilac data rows (changed from LIGHT_GRAY)
+            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('FONTSIZE', (0, 1), (-1, -1), 8),
         ]
@@ -310,13 +290,13 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         
         anomaly_table = Table(anomaly_data, colWidths=[120, 80, 80, 80])
         anomaly_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),  # Navy header
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
             ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),  # Lilac data rows (changed from LIGHT_GRAY)
+            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),
             ('GRID', (0, 0), (-1, -1), 1, colors.grey),
             ('FONTSIZE', (0, 1), (-1, -1), 9)
         ]))
