@@ -37,7 +37,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     # Define custom colors
     LILAC_PURPLE = colors.HexColor("#BFA7F3")
     NAVY_BLUE = colors.HexColor("#3E346D")
-    LIGHT_GRAY = colors.HexColor("#f5f5f5")
+    WHITE = colors.white
     
     # Try to load and add logo
     logo_path = None
@@ -45,16 +45,15 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     if local_logo.exists():
         logo_path = str(local_logo)
     
-    # Create header with logo and title
+    # Create header with logo and title in navy box
     header_content = []
     
+    # Add logo if available
     if logo_path and os.path.exists(logo_path):
         try:
-            # Load and resize logo
             img = Image.open(logo_path)
             img_width, img_height = img.size
-            # Scale logo to fit (max 60px width for better proportion)
-            scale = min(60 / img_width, 60 / img_height)
+            scale = min(40 / img_width, 40 / img_height)  # Slightly smaller logo
             scaled_width = img_width * scale
             scaled_height = img_height * scale
             
@@ -64,36 +63,63 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         except Exception as e:
             print(f"Warning: Could not load logo: {e}")
     
-    # Title header
+    # Title with navy background box (smaller font)
     title_style = ParagraphStyle(
-        'TitleWithLogo', 
+        'TitleInBox', 
         parent=styles['Heading1'], 
-        fontSize=28, 
-        spaceAfter=5,
-        textColor=NAVY_BLUE,
-        alignment=1  # Center alignment
+        fontSize=18,  # Reduced from 28
+        spaceAfter=3,
+        textColor=WHITE,
+        alignment=1,
+        fontName='Helvetica-Bold'
     )
-    header_content.append(Paragraph("Vigilante Security - System Report", title_style))
     
-    # Subtitle
+    # Subtitle style
     subtitle_style = ParagraphStyle(
-        'Subtitle', 
+        'SubtitleInBox', 
         parent=styles['Heading3'], 
-        fontSize=14,
-        textColor=LILAC_PURPLE,
-        alignment=1
+        fontSize=12,  # Reduced from 14
+        textColor=colors.lightgrey,
+        alignment=1,
+        fontName='Helvetica'
     )
-    header_content.append(Paragraph("Administrator Report - Role-Based Access System", subtitle_style))
     
-    # Add header as a table for centered layout
-    header_table = Table([[content] for content in header_content], colWidths=[450])
-    header_table.setStyle(TableStyle([
+    # Create title text
+    title_text = "Vigilante - Administrator System Report"
+    subtitle_text = "Role-Based Access Control System"
+    
+    # Create a single cell table with navy background for the title section
+    title_cell_data = [[
+        Paragraph(title_text, title_style),
+        Paragraph(subtitle_text, subtitle_style)
+    ]]
+    
+    title_box = Table(title_cell_data, colWidths=[450])
+    title_box.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), NAVY_BLUE),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 15),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+        ('LEFTPADDING', (0, 0), (-1, -1), 20),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 20),
+        ('BOX', (0, 0), (-1, -1), 1, NAVY_BLUE),
     ]))
-    story.append(header_table)
+    
+    # If logo exists, create a header with logo on left and title box on right
+    if logo_path and os.path.exists(logo_path):
+        header_table = Table([[logo, title_box]], colWidths=[60, 390])
+        header_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (0, 0), 0),
+        ]))
+        story.append(header_table)
+    else:
+        # Just the title box if no logo
+        story.append(title_box)
+    
     story.append(Spacer(1, 20))
     
     # Report period
@@ -116,13 +142,13 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     
     detection_table = Table(detection_data, colWidths=[200, 200])
     detection_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),  # Navy header
+        ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 12),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), LIGHT_GRAY),
+        ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),  # Lilac data rows (changed from LIGHT_GRAY)
         ('GRID', (0, 0), (-1, -1), 1, colors.black)
     ]))
     story.append(detection_table)
@@ -157,13 +183,13 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         
         model_table = Table(model_data, colWidths=[40, 120, 80, 60, 60, 60, 80])
         model_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),  # Navy header
+            ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('BACKGROUND', (0, 1), (-1, -1), LIGHT_GRAY),
+            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),  # Lilac data rows (changed from LIGHT_GRAY)
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('FONTSIZE', (0, 1), (-1, -1), 8)
         ]))
@@ -172,7 +198,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         story.append(Paragraph("No models found in the system.", styles['Normal']))
     story.append(Spacer(1, 20))
     
-    # User Logs (replacing User Activity)
+    # User Logs
     story.append(Paragraph("User Logs", styles['Heading2']))
     
     user_logs = report_data.get('user_logs', [])
@@ -193,7 +219,6 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                     resource = resource[:22] + '...'
                 
                 status = log.get('status', 'success')
-                status_color = colors.green if status == 'success' else colors.red
                 
                 log_data.append([
                     str(log.get('id', '')),
@@ -206,23 +231,17 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         
         log_table = Table(log_data, colWidths=[40, 100, 80, 80, 100, 50])
         
-        # Style the table
         table_style = [
-            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),  # Navy header
+            ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('BACKGROUND', (0, 1), (-1, -1), LIGHT_GRAY),
+            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),  # Lilac data rows (changed from LIGHT_GRAY)
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('FONTSIZE', (0, 1), (-1, -1), 8),
         ]
-        
-        # Add alternating row colors
-        for i in range(1, len(log_data)):
-            if i % 2 == 0:
-                table_style.append(('BACKGROUND', (0, i), (-1, i), colors.whitesmoke))
         
         log_table.setStyle(TableStyle(table_style))
         story.append(log_table)
@@ -252,9 +271,6 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                 confidence_str = f"{confidence:.2f}" if confidence is not None else "0.00"
                 severity = anomaly.get('severity', 'Medium')
                 
-                # Color code severity
-                severity_color = colors.red if severity in ['Critical', 'High'] else colors.orange if severity == 'Medium' else colors.green
-                
                 anomaly_data.append([
                     detected_str,
                     str(anomaly.get('index', 'N/A')),
@@ -264,13 +280,13 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         
         anomaly_table = Table(anomaly_data, colWidths=[120, 80, 80, 80])
         anomaly_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),  # Navy header
+            ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), LIGHT_GRAY),
+            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),  # Lilac data rows (changed from LIGHT_GRAY)
             ('GRID', (0, 0), (-1, -1), 1, colors.grey),
             ('FONTSIZE', (0, 1), (-1, -1), 9)
         ]))
