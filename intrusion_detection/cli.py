@@ -728,12 +728,13 @@ Examples:
                 console.print(f"[yellow]Warning: Could not get detection summary: {e}[/yellow]")
                 detection_summary = []
             
-            progress.update(task, advance=1, description="Getting user activity...")
+            progress.update(task, advance=1, description="Getting user logs...")
             try:
-                user_activity = self.db.get_user_activity(period_days)
+                # Get audit logs for user activity (same as handle_admin_audit_logs)
+                audit_logs = self.db.get_audit_logs(period_days)
             except Exception as e:
-                console.print(f"[yellow]Warning: Could not get user activity: {e}[/yellow]")
-                user_activity = {}
+                console.print(f"[yellow]Warning: Could not get audit logs: {e}[/yellow]")
+                audit_logs = []
             
             progress.update(task, advance=1, description="Getting recent anomalies...")
             try:
@@ -824,7 +825,6 @@ Examples:
                     name = model.get('name', 'N/A')
                     display_name = name[:30] + "..." if len(name) > 30 else name
                     accuracy = model.get('accuracy')
-                    # FIX: Check if accuracy is None before formatting
                     if accuracy is not None:
                         accuracy_str = f"{accuracy:.2%}"
                     else:
@@ -849,19 +849,52 @@ Examples:
         else:
             console.print("[yellow]No models found in the system[/yellow]")
 
-        # Display user activity
-        if user_activity and any(user_activity.values()):
-            activity_table = Table(title="User Activity Summary", box=ROUNDED)
-            activity_table.add_column("Metric", style="cyan")
-            activity_table.add_column("Count", style="green", justify="right")
-        
-            activity_table.add_row("Total Logins", str(user_activity.get('total_logins', 0)))
-            activity_table.add_row("Models Trained", str(user_activity.get('models_trained', 0)))
-            activity_table.add_row("Detection Jobs Run", str(user_activity.get('detection_jobs_run', 0)))
-        
-            console.print(activity_table)
+        # Display User Logs (same as audit logs format)
+        if audit_logs:
+            console.print("\n[bold cyan]User Logs[/bold cyan]")
+            log_table = Table(title=f"User Activity Logs - Last {args.period}", box=ROUNDED)
+            log_table.add_column("ID", style="dim", width=6)
+            log_table.add_column("Timestamp", style="cyan", width=20)
+            log_table.add_column("User", style="green", width=15)
+            log_table.add_column("Action", style="yellow", width=20)
+            log_table.add_column("Resource", style="blue", width=30)
+            log_table.add_column("Status", style="magenta", width=10)
+
+            for log in audit_logs[:50]:  # Show first 50
+                timestamp = log['created_at'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(log['created_at'], 'strftime') else str(log.get('created_at', ''))[:19]
+                username = log.get('username') or 'System'
+                resource = log.get('resource') or '-'
+            
+                # Truncate long resource names
+                if len(resource) > 25:
+                    resource = resource[:22] + '...'
+            
+                log_table.add_row(
+                    str(log.get('id', '')),
+                    timestamp,
+                    username,
+                    log.get('action', ''),
+                    resource,
+                    log.get('status', 'success')
+                )
+
+            console.print(log_table)
+            console.print(f"[dim]Showing {min(50, len(audit_logs))} of {len(audit_logs)} logs[/dim]")
+            
+            # Show action summary
+            from collections import Counter
+            actions = Counter([log.get('action', '') for log in audit_logs])
+
+            summary_table = Table(title="Action Summary", box=ROUNDED)
+            summary_table.add_column("Action", style="cyan")
+            summary_table.add_column("Count", style="green", justify="right")
+
+            for action, count in actions.most_common(10):
+                summary_table.add_row(action, str(count))
+
+            console.print(summary_table)
         else:
-            console.print("[yellow]No user activity data found for the specified period[/yellow]")
+            console.print("[yellow]No user activity logs found for the specified period[/yellow]")
 
         # Display recent anomalies - FIXED: Handle None confidence values
         if recent_anomalies:
@@ -877,7 +910,6 @@ Examples:
                     detected_str = detected_at.strftime('%Y-%m-%d %H:%M') if detected_at and hasattr(detected_at, 'strftime') else str(detected_at) if detected_at else 'N/A'
                     
                     confidence = anomaly.get('confidence', 0)
-                    # FIX: Handle None confidence
                     confidence_str = f"{confidence:.2f}" if confidence is not None else "0.00"
                     
                     anomaly_table.add_row(
@@ -902,7 +934,7 @@ Examples:
                 "total_anomalies_detected": total_anomalies,
                 "detection_rate": anomaly_rate,
             },
-            "user_activity": user_activity,
+            "user_logs": audit_logs,  # Changed from user_activity to user_logs
             "recent_anomalies": recent_anomalies[:10],
             "all_models": all_models,
             "all_detections": all_detections

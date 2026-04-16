@@ -20,6 +20,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     from reportlab.lib.utils import ImageReader
     from PIL import Image
     import os
+    from pathlib import Path
     
     doc = SimpleDocTemplate(
         output_path,
@@ -33,49 +34,67 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     styles = getSampleStyleSheet()
     story = []
     
+    # Define custom colors
+    LILAC_PURPLE = colors.HexColor("#BFA7F3")
+    NAVY_BLUE = colors.HexColor("#3E346D")
+    LIGHT_GRAY = colors.HexColor("#f5f5f5")
+    
     # Try to load and add logo
     logo_path = None
-    from pathlib import Path
     local_logo = Path(__file__).parent / 'assets' / 'Vigilante_logo.png'
     if local_logo.exists():
         logo_path = str(local_logo)
+    
+    # Create header with logo and title
+    header_content = []
     
     if logo_path and os.path.exists(logo_path):
         try:
             # Load and resize logo
             img = Image.open(logo_path)
             img_width, img_height = img.size
-            # Scale logo to fit (max 100px width)
-            scale = min(100 / img_width, 80 / img_height)
+            # Scale logo to fit (max 60px width for better proportion)
+            scale = min(60 / img_width, 60 / img_height)
             scaled_width = img_width * scale
             scaled_height = img_height * scale
             
             from reportlab.platypus import Image
             logo = Image(logo_path, width=scaled_width, height=scaled_height)
-            
-            # Create header with logo and title
-            header_table = Table(
-                [[logo, Paragraph("Vigilante Security - System Report", 
-                                 ParagraphStyle('TitleWithLogo', parent=styles['Heading1'], 
-                                              fontSize=24, spaceAfter=30, 
-                                              textColor=colors.HexColor('#1a237e')))]],
-                colWidths=[100, 400]
-            )
-            story.append(header_table)
+            header_content.append(logo)
         except Exception as e:
             print(f"Warning: Could not load logo: {e}")
-            story.append(Paragraph("Vigilante Security - System Report", 
-                                  ParagraphStyle('CustomTitle', parent=styles['Heading1'], 
-                                               fontSize=24, spaceAfter=30, alignment=1,
-                                               textColor=colors.HexColor('#1a237e'))))
-    else:
-        story.append(Paragraph("Vigilante Security - System Report", 
-                              ParagraphStyle('CustomTitle', parent=styles['Heading1'], 
-                                           fontSize=24, spaceAfter=30, alignment=1,
-                                           textColor=colors.HexColor('#1a237e'))))
     
-    story.append(Paragraph("Administrator Report - Role-Based Access System", 
-                          ParagraphStyle('Subtitle', parent=styles['Heading3'], alignment=1)))
+    # Title header
+    title_style = ParagraphStyle(
+        'TitleWithLogo', 
+        parent=styles['Heading1'], 
+        fontSize=28, 
+        spaceAfter=5,
+        textColor=NAVY_BLUE,
+        alignment=1  # Center alignment
+    )
+    header_content.append(Paragraph("Vigilante Security - System Report", title_style))
+    
+    # Subtitle
+    subtitle_style = ParagraphStyle(
+        'Subtitle', 
+        parent=styles['Heading3'], 
+        fontSize=14,
+        textColor=LILAC_PURPLE,
+        alignment=1
+    )
+    header_content.append(Paragraph("Administrator Report - Role-Based Access System", subtitle_style))
+    
+    # Add header as a table for centered layout
+    header_table = Table([[content] for content in header_content], colWidths=[450])
+    header_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(header_table)
+    story.append(Spacer(1, 20))
     
     # Report period
     period = report_data.get('report_period', {})
@@ -83,6 +102,8 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     story.append(Paragraph(period_text, styles['Normal']))
     story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
     story.append(Spacer(1, 20))
+    
+    # Detection Summary
     story.append(Paragraph("Detection Summary", styles['Heading2']))
     
     detection_summary = report_data.get('detection_summary', {})
@@ -95,13 +116,13 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     
     detection_table = Table(detection_data, colWidths=[200, 200])
     detection_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 12),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('BACKGROUND', (0, 1), (-1, -1), LIGHT_GRAY),
         ('GRID', (0, 0), (-1, -1), 1, colors.black)
     ]))
     story.append(detection_table)
@@ -120,10 +141,8 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                 display_name = name[:25] + "..." if len(name) > 25 else name
                 accuracy = model.get('accuracy')
                 accuracy_str = f"{accuracy:.2%}" if accuracy else "N/A"
-                # Safely get training_samples - handle None
                 training_samples = model.get('training_samples', 0)
                 samples_str = f"{training_samples:,}" if training_samples else "N/A"
-                # Safely get created_at
                 created_at = model.get('created_at')
                 created_str = created_at.strftime('%Y-%m-%d') if created_at and hasattr(created_at, 'strftime') else 'N/A'
                 model_data.append([
@@ -138,13 +157,13 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         
         model_table = Table(model_data, colWidths=[40, 120, 80, 60, 60, 60, 80])
         model_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('BACKGROUND', (0, 1), (-1, -1), LIGHT_GRAY),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('FONTSIZE', (0, 1), (-1, -1), 8)
         ]))
@@ -153,26 +172,65 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         story.append(Paragraph("No models found in the system.", styles['Normal']))
     story.append(Spacer(1, 20))
     
-    # User Activity
-    story.append(Paragraph("User Activity", styles['Heading2']))
+    # User Logs (replacing User Activity)
+    story.append(Paragraph("User Logs", styles['Heading2']))
     
-    user_activity = report_data.get('user_activity', {})
-    activity_data = [
-        ["Activity", "Count"],
-        ["Total Logins", str(user_activity.get('total_logins', 0))],
-        ["Models Trained", str(user_activity.get('models_trained', 0))],
-        ["Detection Jobs Run", str(user_activity.get('detection_jobs_run', 0))]
-    ]
-    
-    activity_table = Table(activity_data, colWidths=[200, 200])
-    activity_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    story.append(activity_table)
+    user_logs = report_data.get('user_logs', [])
+    if user_logs:
+        log_data = [["ID", "Timestamp", "User", "Action", "Resource", "Status"]]
+        
+        for log in user_logs[:20]:
+            if log:
+                timestamp = log.get('created_at')
+                if timestamp and hasattr(timestamp, 'strftime'):
+                    timestamp_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    timestamp_str = str(timestamp)[:19] if timestamp else 'N/A'
+                
+                username = log.get('username') or 'System'
+                resource = log.get('resource') or '-'
+                if len(resource) > 25:
+                    resource = resource[:22] + '...'
+                
+                status = log.get('status', 'success')
+                status_color = colors.green if status == 'success' else colors.red
+                
+                log_data.append([
+                    str(log.get('id', '')),
+                    timestamp_str,
+                    username,
+                    log.get('action', ''),
+                    resource,
+                    status
+                ])
+        
+        log_table = Table(log_data, colWidths=[40, 100, 80, 80, 100, 50])
+        
+        # Style the table
+        table_style = [
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('BACKGROUND', (0, 1), (-1, -1), LIGHT_GRAY),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ]
+        
+        # Add alternating row colors
+        for i in range(1, len(log_data)):
+            if i % 2 == 0:
+                table_style.append(('BACKGROUND', (0, i), (-1, i), colors.whitesmoke))
+        
+        log_table.setStyle(TableStyle(table_style))
+        story.append(log_table)
+        story.append(Spacer(1, 5))
+        story.append(Paragraph(f"Showing {min(20, len(user_logs))} of {len(user_logs)} logs", 
+                              ParagraphStyle('Footnote', parent=styles['Normal'], fontSize=8, textColor=colors.gray)))
+    else:
+        story.append(Paragraph("No user logs found for the specified period.", styles['Normal']))
     story.append(Spacer(1, 20))
     
     # Recent Anomalies
@@ -189,22 +247,30 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                     detected_str = detected_at.strftime('%Y-%m-%d %H:%M')
                 else:
                     detected_str = str(detected_at) if detected_at else 'N/A'
+                
+                confidence = anomaly.get('confidence', 0)
+                confidence_str = f"{confidence:.2f}" if confidence is not None else "0.00"
+                severity = anomaly.get('severity', 'Medium')
+                
+                # Color code severity
+                severity_color = colors.red if severity in ['Critical', 'High'] else colors.orange if severity == 'Medium' else colors.green
+                
                 anomaly_data.append([
                     detected_str,
                     str(anomaly.get('index', 'N/A')),
-                    f"{anomaly.get('confidence', 0):.2f}",
-                    anomaly.get('severity', 'Medium')
+                    confidence_str,
+                    severity
                 ])
         
         anomaly_table = Table(anomaly_data, colWidths=[120, 80, 80, 80])
         anomaly_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+            ('BACKGROUND', (0, 1), (-1, -1), LIGHT_GRAY),
             ('GRID', (0, 0), (-1, -1), 1, colors.grey),
             ('FONTSIZE', (0, 1), (-1, -1), 9)
         ]))
@@ -214,8 +280,8 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     
     # Footer
     story.append(Spacer(1, 40))
-    story.append(Paragraph("Confidential - For authorized personnel only", 
-                          ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=1)))
+    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=1, textColor=colors.gray)
+    story.append(Paragraph("Confidential - For authorized personnel only", footer_style))
     
     # Build PDF
     doc.build(story)
