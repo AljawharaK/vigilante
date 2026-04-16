@@ -83,8 +83,6 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     story.append(Paragraph(period_text, styles['Normal']))
     story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
     story.append(Spacer(1, 20))
-    
-    # Detection Summary - REMOVED Avg False Positive Rate
     story.append(Paragraph("Detection Summary", styles['Heading2']))
     
     detection_summary = report_data.get('detection_summary', {})
@@ -93,7 +91,6 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         ["Total Flows Analyzed", f"{detection_summary.get('total_flows_analyzed', 0):,}"],
         ["Total Anomalies Detected", f"{detection_summary.get('total_anomalies_detected', 0):,}"],
         ["Detection Rate", f"{detection_summary.get('detection_rate', 0):.2%}"],
-        # Avg False Positive Rate line REMOVED
     ]
     
     detection_table = Table(detection_data, colWidths=[200, 200])

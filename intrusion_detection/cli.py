@@ -716,7 +716,7 @@ Examples:
             TextColumn("[progress.description]{task.description}"),
             transient=True,
         ) as progress:
-            task = progress.add_task("Collecting data...", total=6)
+            task = progress.add_task("Collecting data...", total=5)
             
             end_date = datetime.now()
             start_date = end_date - timedelta(days=period_days)
@@ -808,7 +808,7 @@ Examples:
         else:
             console.print("[yellow]No detection data found for the specified period[/yellow]")
 
-        # Display all models
+        # Display all models - FIXED: Handle None accuracy values
         if all_models:
             model_table = Table(title="All Models in System", box=ROUNDED)
             model_table.add_column("ID", style="cyan")
@@ -824,15 +824,26 @@ Examples:
                     name = model.get('name', 'N/A')
                     display_name = name[:30] + "..." if len(name) > 30 else name
                     accuracy = model.get('accuracy')
-                    accuracy_str = f"{accuracy:.2%}" if accuracy else "N/A"
+                    # FIX: Check if accuracy is None before formatting
+                    if accuracy is not None:
+                        accuracy_str = f"{accuracy:.2%}"
+                    else:
+                        accuracy_str = "N/A"
+                    
+                    training_samples = model.get('training_samples')
+                    samples_str = f"{training_samples:,}" if training_samples else "N/A"
+                    
+                    created_at = model.get('created_at')
+                    created_str = created_at.strftime('%Y-%m-%d') if created_at and hasattr(created_at, 'strftime') else 'N/A'
+                    
                     model_table.add_row(
                         str(model.get('id', 'N/A')),
                         display_name,
                         model.get('username', 'N/A'),
                         model.get('model_type', 'rnsa_knn'),
                         accuracy_str,
-                        f"{model.get('training_samples', 0):,}",
-                        model['created_at'].strftime('%Y-%m-%d') if model.get('created_at') and hasattr(model['created_at'], 'strftime') else 'N/A'
+                        samples_str,
+                        created_str
                     )
             console.print(model_table)
         else:
@@ -852,7 +863,7 @@ Examples:
         else:
             console.print("[yellow]No user activity data found for the specified period[/yellow]")
 
-        # Display recent anomalies
+        # Display recent anomalies - FIXED: Handle None confidence values
         if recent_anomalies:
             anomaly_table = Table(title="Recent Anomalies", box=ROUNDED)
             anomaly_table.add_column("Detected At", style="cyan")
@@ -863,11 +874,16 @@ Examples:
             for anomaly in recent_anomalies[:10]:
                 if anomaly:
                     detected_at = anomaly.get('detected_at')
-                    detected_str = detected_at.strftime('%Y-%m-%d %H:%M') if detected_at and hasattr(detected_at, 'strftime') else str(detected_at)
+                    detected_str = detected_at.strftime('%Y-%m-%d %H:%M') if detected_at and hasattr(detected_at, 'strftime') else str(detected_at) if detected_at else 'N/A'
+                    
+                    confidence = anomaly.get('confidence', 0)
+                    # FIX: Handle None confidence
+                    confidence_str = f"{confidence:.2f}" if confidence is not None else "0.00"
+                    
                     anomaly_table.add_row(
                         detected_str,
                         str(anomaly.get('index', 'N/A')),
-                        f"{anomaly.get('confidence', 0):.2f}",
+                        confidence_str,
                         anomaly.get('severity', 'Medium')
                     )
             console.print(anomaly_table)
@@ -900,6 +916,8 @@ Examples:
                 console.print(f"[green]✓ Full report saved to: {args.output}[/green]")
             except Exception as e:
                 console.print(f"[red]Failed to generate PDF: {e}[/red]")
+                import traceback
+                console.print(traceback.format_exc())
                 # Fallback to JSON
                 json_output = args.output.replace('.pdf', '.json') if args.output.endswith('.pdf') else args.output + '.json'
                 with open(json_output, 'w') as f:
