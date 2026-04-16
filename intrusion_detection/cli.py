@@ -2083,7 +2083,7 @@ Examples:
                     panel_content.append(f"  • {display_name}: {feat_val}")
         
         # Generate AI decision explanation
-        explanation = self.generate_explanation(confidence, severity)
+        explanation = self.generate_explanation(anomaly,confidence, severity)
         if explanation:
             panel_content.append(f"\n[bold]AI Decision Explanation:[/bold]")
             panel_content.append(explanation)
@@ -2094,7 +2094,7 @@ Examples:
             border_style="yellow" if severity in ['High', 'Critical'] else "cyan"
         ))
 
-    def generate_explanation(self, confidence, severity):
+    def generate_explanation(self, anomaly, confidence, severity):
         """Generate explanation"""
         
         explanation_parts = []
@@ -2120,6 +2120,24 @@ Examples:
             explanation_parts.append(f"Low confidence ({confidence:.1%}) - Some deviation detected but pattern is mostly normal.")
         else:
             explanation_parts.append(f"ℹMinimal confidence ({confidence:.1%}) - Mostly normal with slight variations.")
+        
+        # 3. Explain how confidence score is calculated (NSA + KNN blending)
+        explanation_parts.append("\n[bold]How Confidence Score is Calculated:[/bold]")
+        explanation_parts.append("The model uses a hybrid RNSA (Real-Valued Negative Selection) + KNN approach with 0.5 threshold" \
+        "\nwhere confidence (probability of being abnormal) ranges 0 to 1. It generates detectors and checks their coverage" \
+        "\n- if a detector directly covers this region, then RNSA successfully found an anomaly" \
+        "\n- if no detector covers the region, KNN helps RNSA determine the final confidence score.")
+        
+        # Check if this sample is covered by RNSA detectors
+        is_covered = self._check_if_sample_covered(anomaly) if hasattr(self, '_check_if_sample_covered') else None
+        
+        if is_covered is True:
+            explanation_parts.append("  • This sample was [green]COVERED[/green] by RNSA detectors (found a matching detector)")
+        elif is_covered is False:
+            explanation_parts.append("  • This sample fell into a [yellow]HOLE[/yellow] (no detector covers this region) K-nearest neighbors provide the best estimate")
+        else:
+            explanation_parts.append("  • For COVERED samples (detected by RNSA): 70% RNSA detector coverage score + 30% KNN neighbor score")
+            explanation_parts.append("  • For HOLE samples (no detector coverage): 30% RNSA detector coverage score + 70% KNN neighbor score")
         
         return "\n".join(explanation_parts)
 
