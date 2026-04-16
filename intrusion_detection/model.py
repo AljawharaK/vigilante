@@ -637,7 +637,7 @@ class IntrusionDetectionModel:
         print("="*60)
         
         # Initialize and train model
-        self.model = RNSA_KNN_Model(
+        self.model = ProposedRNSA_KNN(
             r_s=r_s,
             max_detectors=max_detectors,
             k=k
