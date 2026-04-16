@@ -704,43 +704,44 @@ Examples:
                 console.print(f"[red]Failed to save CSV: {e}[/red]")
 
     def handle_admin_system_report(self, args):
+        """Generate system report with PDF including models and anomalies"""
         if not self.check_admin():
             return
-    
+
         period_days = int(args.period.rstrip('d'))
         console.print(f"[cyan]Generating system report for the last {args.period}...[/cyan]")
-    
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             transient=True,
         ) as progress:
-            task = progress.add_task("Collecting data...", total=5)
-        
+            task = progress.add_task("Collecting data...", total=6)
+            
             end_date = datetime.now()
             start_date = end_date - timedelta(days=period_days)
-        
+            
             progress.update(task, advance=1, description="Getting detection summary...")
             try:
                 detection_summary = self.db.get_detection_summary(None, period_days)
             except Exception as e:
                 console.print(f"[yellow]Warning: Could not get detection summary: {e}[/yellow]")
                 detection_summary = []
-        
+            
             progress.update(task, advance=1, description="Getting user activity...")
             try:
                 user_activity = self.db.get_user_activity(period_days)
             except Exception as e:
                 console.print(f"[yellow]Warning: Could not get user activity: {e}[/yellow]")
                 user_activity = {}
-        
+            
             progress.update(task, advance=1, description="Getting recent anomalies...")
             try:
                 recent_anomalies = self.db.get_recent_anomalies(period_days, limit=20)
             except Exception as e:
                 console.print(f"[yellow]Warning: Could not get recent anomalies: {e}[/yellow]")
                 recent_anomalies = []
-        
+            
             progress.update(task, advance=1, description="Getting all models...")
             try:
                 all_models = self.db.get_all_models()
@@ -754,26 +755,32 @@ Examples:
             except Exception as e:
                 console.print(f"[yellow]Warning: Could not get detections: {e}[/yellow]")
                 all_detections = []
-        
+            
             progress.update(task, advance=1, description="Compiling report...")
-    
-        # Calculate totals
-        total_flows = sum(d.get('total_flows', 0) for d in detection_summary)
-        total_anomalies = sum(d.get('total_anomalies', 0) for d in detection_summary)
-    
+
+        # Calculate totals safely
+        total_flows = 0
+        total_anomalies = 0
+        for d in detection_summary:
+            if d:
+                total_flows += d.get('total_flows', 0) if d.get('total_flows') else 0
+                total_anomalies += d.get('total_anomalies', 0) if d.get('total_anomalies') else 0
+
+        # Safely calculate anomaly rate
+        anomaly_rate = (total_anomalies / total_flows) if total_flows > 0 else 0
+
         # Display comprehensive summary
         console.print(Panel.fit(
             f"[bold cyan]System Report Summary[/bold cyan]\n"
             f"────────────────────────────\n"
             f"Period: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}\n"
             f"Total Flows Analyzed: [green]{total_flows:,}[/green]\n"
-            f"Total Anomalies: [yellow]{total_anomalies}[/yellow]\n"
-            f"Anomaly Rate: [magenta]{(total_anomalies/total_flows if total_flows>0 else 0):.2%}[/magenta]\n"
-            f"Avg False Positive Rate: [cyan]{self.calculate_avg_fpr(detection_summary):.2f}%[/cyan]\n",
+            f"Total Anomalies: [yellow]{total_anomalies:,}[/yellow]\n"
+            f"Anomaly Rate: [magenta]{anomaly_rate:.2%}[/magenta]\n",
             title="Report Summary",
             border_style="cyan"
         ))
-    
+
         # Display all detections
         if all_detections:
             det_table = Table(title=f"All Detections (Last {args.period})", box=ROUNDED)
@@ -784,20 +791,23 @@ Examples:
             det_table.add_column("Anomalies", justify="right")
             det_table.add_column("Model ID", justify="right")
         
-            for det in all_detections[:20]:  # Show first 20
-                det_table.add_row(
-                    str(det['id']),
-                    det.get('username', 'N/A'),
-                    det['created_at'].strftime('%Y-%m-%d %H:%M'),
-                    f"{det['total_flows']:,}",
-                    str(det['anomalies_detected']),
-                    str(det.get('model_id', 'N/A'))
-                )
+            for det in all_detections[:20]:
+                if det:
+                    created_at = det.get('created_at')
+                    date_str = created_at.strftime('%Y-%m-%d %H:%M') if created_at and hasattr(created_at, 'strftime') else 'N/A'
+                    det_table.add_row(
+                        str(det.get('id', 'N/A')),
+                        det.get('username', 'N/A'),
+                        date_str,
+                        f"{det.get('total_flows', 0):,}",
+                        str(det.get('anomalies_detected', 0)),
+                        str(det.get('model_id', 'N/A'))
+                    )
             console.print(det_table)
             console.print(f"[dim]Showing {min(20, len(all_detections))} of {len(all_detections)} detections[/dim]")
         else:
             console.print("[yellow]No detection data found for the specified period[/yellow]")
-    
+
         # Display all models
         if all_models:
             model_table = Table(title="All Models in System", box=ROUNDED)
@@ -810,15 +820,20 @@ Examples:
             model_table.add_column("Created", style="magenta")
         
             for model in all_models[:20]:
-                model_table.add_row(
-                    str(model['id']),
-                    model['name'][:30] + "..." if len(model['name']) > 30 else model['name'],
-                    model.get('username', 'N/A'),
-                    model.get('model_type', 'rnsa_knn'),
-                    f"{model.get('accuracy', 0):.2%}" if model.get('accuracy') else "N/A",
-                    f"{model.get('training_samples', 0):,}",
-                    model['created_at'].strftime('%Y-%m-%d')
-                )
+                if model:
+                    name = model.get('name', 'N/A')
+                    display_name = name[:30] + "..." if len(name) > 30 else name
+                    accuracy = model.get('accuracy')
+                    accuracy_str = f"{accuracy:.2%}" if accuracy else "N/A"
+                    model_table.add_row(
+                        str(model.get('id', 'N/A')),
+                        display_name,
+                        model.get('username', 'N/A'),
+                        model.get('model_type', 'rnsa_knn'),
+                        accuracy_str,
+                        f"{model.get('training_samples', 0):,}",
+                        model['created_at'].strftime('%Y-%m-%d') if model.get('created_at') and hasattr(model['created_at'], 'strftime') else 'N/A'
+                    )
             console.print(model_table)
         else:
             console.print("[yellow]No models found in the system[/yellow]")
@@ -846,12 +861,15 @@ Examples:
             anomaly_table.add_column("Severity")
         
             for anomaly in recent_anomalies[:10]:
-                anomaly_table.add_row(
-                    anomaly.get('detected_at', 'N/A').strftime('%Y-%m-%d %H:%M') if hasattr(anomaly.get('detected_at'), 'strftime') else str(anomaly.get('detected_at', 'N/A')),
-                    str(anomaly.get('index', 'N/A')),
-                    f"{anomaly.get('confidence', 0):.2f}",
-                    anomaly.get('severity', 'Medium')
-                )
+                if anomaly:
+                    detected_at = anomaly.get('detected_at')
+                    detected_str = detected_at.strftime('%Y-%m-%d %H:%M') if detected_at and hasattr(detected_at, 'strftime') else str(detected_at)
+                    anomaly_table.add_row(
+                        detected_str,
+                        str(anomaly.get('index', 'N/A')),
+                        f"{anomaly.get('confidence', 0):.2f}",
+                        anomaly.get('severity', 'Medium')
+                    )
             console.print(anomaly_table)
         else:
             console.print("[yellow]No anomalies detected in the specified period[/yellow]")
@@ -866,15 +884,14 @@ Examples:
             "detection_summary": {
                 "total_flows_analyzed": total_flows,
                 "total_anomalies_detected": total_anomalies,
-                "detection_rate": total_anomalies / total_flows if total_flows > 0 else 0,
-                "avg_false_positive_rate": self.calculate_avg_fpr(detection_summary),
+                "detection_rate": anomaly_rate,
             },
             "user_activity": user_activity,
             "recent_anomalies": recent_anomalies[:10],
             "all_models": all_models,
             "all_detections": all_detections
         }
-    
+
         # Generate PDF if requested
         if args.output:
             try:
@@ -884,7 +901,7 @@ Examples:
             except Exception as e:
                 console.print(f"[red]Failed to generate PDF: {e}[/red]")
                 # Fallback to JSON
-                json_output = args.output.replace('.pdf', '.json')
+                json_output = args.output.replace('.pdf', '.json') if args.output.endswith('.pdf') else args.output + '.json'
                 with open(json_output, 'w') as f:
                     json.dump(report_data, f, indent=2, default=str)
                 console.print(f"[yellow]JSON report saved to: {json_output}[/yellow]")
@@ -2141,15 +2158,6 @@ Examples:
         
         return "\n".join(explanation_parts)
 
-    # Utility Methods
-    def calculate_avg_fpr(self, detection_summary):
-        """Calculate average false positive rate"""
-        if not detection_summary:
-            return 0.0
-        
-        fpr_sum = sum(d.get('avg_false_positive_rate', 0) for d in detection_summary)
-        return fpr_sum / len(detection_summary) if detection_summary else 0.0
-    
     def calculate_severity(self, confidence):
         """Calculate severity based on confidence score (0-1 scale)"""
         if confidence >= 0.95:
