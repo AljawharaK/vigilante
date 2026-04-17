@@ -997,7 +997,7 @@ class VigilanteGUI:
                 ],
                 spacing=0,
                 expand=True,
-                scroll=ft.ScrollMode.AUTO,  # Move scroll to Column instead of Container
+                scroll=ft.ScrollMode.AUTO,
             ),
             expand=True,
         )
@@ -1136,9 +1136,10 @@ Path: {model.get('model_path', 'N/A')}
             ),
             expand=True,
         )
-
+    
+    # FIX 1: show_create_user_dialog with page.open/page.close
     def show_create_user_dialog(self, e):
-        """Show create user dialog"""
+        """Show create user dialog - Fixed for Flet 0.84.0+"""
         username_field = TextField(label="Username", width=300)
         email_field = TextField(label="Email", width=300)
         password_field = TextField(label="Password", password=True, can_reveal_password=True, width=300)
@@ -1162,7 +1163,10 @@ Path: {model.get('model_path', 'N/A')}
                 return
 
             try:
+                # Hash the password using the auth manager
                 password_hash = self.auth.hash_password(password_field.value)
+                
+                # Create user in database
                 self.db.create_user(
                     username=username_field.value,
                     password_hash=password_hash,
@@ -1172,7 +1176,8 @@ Path: {model.get('model_path', 'N/A')}
                     must_change_password=False
                 )
                 
-                self.close_dialog()
+                create_dialog.open = False
+                self.page.update()
                 self.show_dialog("User Created", f"User '{username_field.value}' created successfully!")
                 
                 # Refresh the view
@@ -1185,13 +1190,18 @@ Path: {model.get('model_path', 'N/A')}
         create_dialog = AlertDialog(
             title=Text("Create New User"),
             content=Column(
-                controls=[username_field, email_field, password_field, role_dropdown],
+                controls=[
+                    username_field,
+                    email_field,
+                    password_field,
+                    role_dropdown,
+                ],
                 width=350,
                 height=280,
                 tight=True,
             ),
             actions=[
-                TextButton("Cancel", on_click=lambda _: self.close_dialog()),
+                TextButton("Cancel", on_click=lambda _: self._close_dialog(create_dialog)),
                 TextButton("Create", on_click=create_user_click),
             ],
         )
@@ -1199,9 +1209,10 @@ Path: {model.get('model_path', 'N/A')}
         self.page.dialog = create_dialog
         create_dialog.open = True
         self.page.update()
-
+    
+    # FIX 2: show_edit_user_dialog with page.open/page.close
     def show_edit_user_dialog(self, user: Dict):
-        """Show edit user dialog"""
+        """Show edit user dialog - Fixed logic and UI refresh"""
         role_dropdown = Dropdown(
             label="Role",
             options=[
@@ -1229,9 +1240,11 @@ Path: {model.get('model_path', 'N/A')}
                     details={"new_role": role_dropdown.value}
                 )
                 
-                self.close_dialog()
-                self.show_dialog("Success", f"User '{user['username']}' updated")
+                edit_dialog.open = False
+                self.page.update()
+                self.show_dialog("Success", f"User '{user['username']}' updated to {role_dropdown.value}")
                 
+                # Force refresh table
                 self.content_container.content = self.create_manage_users_content()
                 self.page.update()
                 
@@ -1251,7 +1264,7 @@ Path: {model.get('model_path', 'N/A')}
                 tight=True,
             ),
             actions=[
-                TextButton("Cancel", on_click=lambda _: self.close_dialog()),
+                TextButton("Cancel", on_click=lambda _: self._close_dialog(edit_dialog)),
                 TextButton("Update", on_click=update_user_click),
             ],
         )
@@ -1259,96 +1272,56 @@ Path: {model.get('model_path', 'N/A')}
         self.page.dialog = edit_dialog
         edit_dialog.open = True
         self.page.update()
-
+    
+    def _close_dialog(self, dialog):
+        """Helper to close a dialog"""
+        if dialog:
+            dialog.open = False
+            self.page.update()
+    
     def deactivate_user(self, user: Dict):
         """Deactivate a user"""
+        
         def confirm_deactivate_click(e):
             try:
-                if user.get('role_name') == 'Administrator' and self.db.count_admins() <= 1:
-                    self.close_dialog()
-                    self.show_dialog("Error", "Cannot deactivate the last Administrator.")
-                    return
+                # Security check: Prevent deactivating the last admin
+                if user.get('role_name') == 'Administrator':
+                    admin_count = self.db.count_admins()
+                    if admin_count <= 1:
+                        deactivate_dialog.open = False
+                        self.page.update()
+                        self.show_dialog("Access Denied", "Cannot deactivate the only remaining Administrator.")
+                        return
                 
                 self.db.deactivate_user(user['id'], self.auth.current_user['id'])
                 self.db.invalidate_user_sessions(user['id'])
                 
-                self.close_dialog()
-                self.show_dialog("Success", f"User '{user['username']}' deactivated.")
+                deactivate_dialog.open = False
+                self.page.update()
+                self.show_dialog("User Deactivated", f"User '{user['username']}' has been disabled.")
                 
+                # Refresh table
                 self.content_container.content = self.create_manage_users_content()
                 self.page.update()
                 
             except Exception as ex:
-                self.close_dialog()
+                deactivate_dialog.open = False
+                self.page.update()
                 self.show_dialog("Error", f"Deactivation failed: {str(ex)}")
 
         deactivate_dialog = AlertDialog(
             title=Text("Confirm Deactivation"),
             content=Text(f"Are you sure you want to disable account: {user['username']}?"),
             actions=[
-                TextButton("Cancel", on_click=lambda _: self.close_dialog()),
-                TextButton("Deactivate", on_click=confirm_deactivate_click),
+                TextButton("Cancel", on_click=lambda _: self._close_dialog(deactivate_dialog)),
+                TextButton("Deactivate", icon=ft.Icons.DELETE, icon_color=AppTheme.ERROR, on_click=confirm_deactivate_click),
             ],
         )
         
         self.page.dialog = deactivate_dialog
         deactivate_dialog.open = True
         self.page.update()
-
-    def show_change_password_dialog_ui(self, e):
-        """Show change password dialog from settings"""
-        curr_pass = TextField(label="Current Password", password=True, can_reveal_password=True)
-        new_pass = TextField(label="New Password", password=True, can_reveal_password=True)
-        conf_pass = TextField(label="Confirm New Password", password=True, can_reveal_password=True)
-        
-        def change_click(e):
-            if not curr_pass.value or not new_pass.value:
-                self.show_dialog("Error", "All fields are required.")
-                return
-            if new_pass.value != conf_pass.value:
-                self.show_dialog("Error", "New passwords do not match.")
-                return
-            
-            try:
-                result = self.auth.change_password(self.auth.current_user['id'], curr_pass.value, new_pass.value)
-                if result.get('success'):
-                    self.close_dialog()
-                    self.show_dialog("Success", "Password updated successfully.")
-                else:
-                    self.show_dialog("Error", result.get('message', "Failed to change password."))
-            except Exception as ex:
-                self.show_dialog("Error", str(ex))
-
-        pass_dialog = AlertDialog(
-            title=Text("Change Password"),
-            content=Column([curr_pass, new_pass, conf_pass], width=350, height=250, tight=True),
-            actions=[
-                TextButton("Cancel", on_click=lambda _: self.close_dialog()),
-                TextButton("Update", on_click=change_click),
-            ],
-        )
-        
-        self.page.dialog = pass_dialog
-        pass_dialog.open = True
-        self.page.update()
-
-    def show_dialog(self, title: str, message: str):
-        """Legacy helper to show info dialogs"""
-        info_dialog = AlertDialog(
-            title=Text(title),
-            content=Text(message),
-            actions=[TextButton("OK", on_click=lambda _: self.close_dialog())],
-        )
-        self.page.dialog = info_dialog
-        info_dialog.open = True
-        self.page.update()
-
-    def close_dialog(self, e=None):
-        """Standardized close for version 0.82.0"""
-        if self.page.dialog:
-            self.page.dialog.open = False
-            self.page.update()
-
+    
     def delete_user_working(self, user: Dict):
         """Delete/deactivate a user with confirmation"""
         
@@ -1359,17 +1332,17 @@ Path: {model.get('model_path', 'N/A')}
                     admin_count = self.db.count_admins()
                     if admin_count <= 1:
                         self.show_dialog("Error", "Cannot delete the only Administrator")
-                        self.close_dialog()
+                        self._close_dialog(dialog)
                         return
                 
                 # Prevent self-deletion
                 if user['id'] == self.auth.current_user['id']:
                     self.show_dialog("Error", "You cannot delete your own account")
-                    self.close_dialog()
+                    self._close_dialog(dialog)
                     return
                 
                 # Deactivate user
-                self.deactivate_user(user['id'], self.auth.current_user['id'])
+                self.db.deactivate_user(user['id'], self.auth.current_user['id'])
                 
                 # Invalidate all sessions for this user
                 self.db.invalidate_user_sessions(user['id'])
@@ -1383,7 +1356,7 @@ Path: {model.get('model_path', 'N/A')}
                     status="success"
                 )
                 
-                self.close_dialog()
+                self._close_dialog(dialog)
                 self.show_dialog("Success", f"User '{user['username']}' has been deactivated")
                 
                 # Refresh the manage users page
@@ -1391,14 +1364,14 @@ Path: {model.get('model_path', 'N/A')}
                 self.page.update()
                 
             except Exception as e:
-                self.close_dialog()
+                self._close_dialog(dialog)
                 self.show_dialog("Error", f"Failed to delete user: {str(e)}")
         
         dialog = AlertDialog(
             title=Text("Confirm Deactivation"),
             content=Text(f"Are you sure you want to deactivate user '{user['username']}'?\n\nThis action can be reversed by an administrator."),
             actions=[
-                TextButton("Cancel", on_click=lambda e: self.close_dialog()),
+                TextButton("Cancel", on_click=lambda e: self._close_dialog(dialog)),
                 TextButton("Deactivate", on_click=confirm_delete, style=ButtonStyle(color=AppTheme.ERROR)),
             ],
         )
@@ -1406,11 +1379,78 @@ Path: {model.get('model_path', 'N/A')}
         self.page.dialog = dialog
         dialog.open = True
         self.page.update()
+    
+    # FIX 3: show_change_password_dialog_ui with page.open/page.close
+    def show_change_password_dialog_ui(self, e):
+        """Show change password dialog from settings - Fixed logic and fields"""
+        curr_pass = TextField(label="Current Password", password=True, can_reveal_password=True)
+        new_pass = TextField(label="New Password", password=True, can_reveal_password=True)
+        conf_pass = TextField(label="Confirm New Password", password=True, can_reveal_password=True)
+        
+        def change_click(e):
+            if not curr_pass.value or not new_pass.value:
+                self.show_dialog("Error", "All fields are required.")
+                return
+            if new_pass.value != conf_pass.value:
+                self.show_dialog("Error", "New passwords do not match.")
+                return
+            if len(new_pass.value) < 8:
+                self.show_dialog("Error", "Password must be at least 8 characters.")
+                return
+            
+            try:
+                result = self.auth.change_password(
+                    self.auth.current_user['id'],
+                    curr_pass.value,
+                    new_pass.value
+                )
+                
+                if result.get('success'):
+                    pass_dialog.open = False
+                    self.page.update()
+                    self.show_dialog("Success", "Your password has been updated successfully.")
+                else:
+                    self.show_dialog("Error", result.get('message', "Failed to change password."))
+            except Exception as ex:
+                self.show_dialog("Error", f"An error occurred: {str(ex)}")
 
-
-    # =====================================================================
-    # 3: SETTINGS VIEW
-    # =====================================================================
+        pass_dialog = AlertDialog(
+            title=Text("Security: Change Password"),
+            content=Column(
+                controls=[curr_pass, new_pass, conf_pass],
+                width=350,
+                height=250,
+                tight=True,
+            ),
+            actions=[
+                TextButton("Cancel", on_click=lambda _: self._close_dialog(pass_dialog)),
+                TextButton("Update Password", on_click=change_click),
+            ],
+        )
+        
+        self.page.dialog = pass_dialog
+        pass_dialog.open = True
+        self.page.update()
+    
+    def show_dialog(self, title: str, message: str):
+        """Show a dialog - Using page.dialog for Flet 0.84.0+"""
+        dialog = AlertDialog(
+            title=Text(title),
+            content=Text(message),
+            actions=[
+                TextButton("OK", on_click=lambda e: self.close_dialog()),
+            ],
+        )
+        
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+    
+    def close_dialog(self, e=None):
+        """Close the current dialog"""
+        if self.page.dialog:
+            self.page.dialog.open = False
+            self.page.update()
     
     def create_system_admin_content(self) -> Container:
         """Create system administration view"""
@@ -1450,12 +1490,12 @@ Path: {model.get('model_path', 'N/A')}
                         self.create_audit_logs_table(log_dicts[:10]),
                     ],
                     spacing=0,
-                    expand=True,  # Make Column expand
+                    expand=True,
                 ),
                 padding=ft.Padding.all(20),
-                expand=True,  # Make Container expand
+                expand=True,
             ),
-            expand=True,  # Make card expand to fill available space
+            expand=True,
         )
         
         return Container(
@@ -1476,7 +1516,7 @@ Path: {model.get('model_path', 'N/A')}
                             spacing=10,
                             expand=True,
                         ),
-                        height=120,  # Fixed height for stats cards
+                        height=120,
                     ),
                     
                     Container(height=20),
@@ -1484,7 +1524,7 @@ Path: {model.get('model_path', 'N/A')}
                     # Audit logs card - takes remaining space
                     Container(
                         content=audit_card,
-                        expand=True,  # This container expands to fill remaining space
+                        expand=True,
                     ),
                 ],
                 spacing=0,
@@ -1546,17 +1586,16 @@ Path: {model.get('model_path', 'N/A')}
             horizontal_lines=ft.BorderSide(0, "transparent"),
         )
         
-        # Make table scrollable - apply scroll to Column, not Container
         return Container(
             content=Column(
                 controls=[
                     Container(
                         content=table,
-                        height=300,  # Fixed height for scrollable area
+                        height=300,
                     ),
                 ],
                 spacing=0,
-                scroll=ft.ScrollMode.AUTO,  # Move scroll to Column
+                scroll=ft.ScrollMode.AUTO,
             ),
             expand=True,
         )
@@ -1722,26 +1761,6 @@ Path: {model.get('model_path', 'N/A')}
             border_radius=ft.BorderRadius.all(10),
             border=ft.Border.all(1, AppTheme.BORDER),
         )
-    
-    def close_dialog(self):
-        """Close the current dialog"""
-        if self.page.dialog:
-            self.page.dialog.open = False
-            self.page.update()
-    
-    def show_dialog(self, title: str, message: str):
-        """Show a dialog"""
-        dialog = AlertDialog(
-            title=Text(title),
-            content=Text(message),
-            actions=[
-                TextButton("OK", on_click=lambda e: self.close_dialog()),
-            ],
-        )
-        
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
     
     # =====================================================================
     # ASYNC HELPERS
