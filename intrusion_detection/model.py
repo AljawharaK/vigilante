@@ -586,6 +586,27 @@ class IntrusionDetectionModel:
     
         return available, mapping
     
+    def _normalize_name(self, name: str) -> str:
+        """Normalize feature name for comparison"""
+        if not isinstance(name, str):
+            return str(name)
+        
+        # Convert to lowercase and remove common patterns
+        normalized = name.lower()
+        
+        # Remove common prefixes/suffixes
+        patterns_to_remove = ['fwd', 'bwd', 'tot', 'init', 'flow', 'pkt', 'len', 'win', 'byts',
+                             'seg', 'size', 'length', 'packet', 'bytes', 'duration', 'rate',
+                             'mean', 'avg', 'total', 'initial', ' ', '_', '-', '/', '.', ',']
+        
+        for pattern in patterns_to_remove:
+            normalized = normalized.replace(pattern, '')
+        
+        # Remove any remaining non-alphanumeric characters
+        normalized = ''.join(c for c in normalized if c.isalnum())
+        
+        return normalized
+    
     def preprocess_data(self, df: pd.DataFrame, fit_scaler: bool = True) -> np.ndarray:
         """
         Robust preprocessing that handles different dataset formats
@@ -711,6 +732,64 @@ class IntrusionDetectionModel:
         print(f"Features used: {X_train.shape[1]}")
         
         return self
+    
+    def predict(self, X_test: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Make predictions on new data"""
+        if self.model is None:
+            raise ValueError("Model not trained. Call fit() first.")
+        
+        # Get predictions
+        predictions = self.model.predict(X_test)
+        
+        # Get probability scores
+        proba = self.model.predict_proba(X_test)
+        confidence_scores = proba[:, 1]  # Probability of being abnormal
+        
+        return predictions, confidence_scores
+    
+    def evaluate(self, X_test: np.ndarray, y_true: np.ndarray) -> Dict[str, Any]:
+        """Evaluate model performance"""
+        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+        from sklearn.metrics import roc_auc_score, confusion_matrix
+    
+        y_pred, confidence_scores = self.predict(X_test)
+    
+        # Calculate basic metrics
+        metrics = {
+            'accuracy': float(accuracy_score(y_true, y_pred)),
+            'precision': float(precision_score(y_true, y_pred, zero_division=0)),
+            'recall': float(recall_score(y_true, y_pred, zero_division=0)),
+            'f1_score': float(f1_score(y_true, y_pred, zero_division=0)),
+            'threshold': float(self.threshold)
+        }
+        
+        # Calculate ROC AUC
+        if confidence_scores is not None:
+            try:
+                metrics['roc_auc'] = float(roc_auc_score(y_true, confidence_scores))
+            except:
+                metrics['roc_auc'] = 0.0
+        
+        # Calculate confusion matrix metrics
+        try:
+            cm = confusion_matrix(y_true, y_pred)
+            TN, FP, FN, TP = cm.ravel()
+            
+            metrics['true_positive'] = int(TP)
+            metrics['false_positive'] = int(FP)
+            metrics['true_negative'] = int(TN)
+            metrics['false_negative'] = int(FN)
+            
+            # Detection Rate (Recall)
+            metrics['detection_rate'] = float(TP / (TP + FN)) if (TP + FN) > 0 else 0.0
+            
+            # False Alarm Rate (False Positive Rate)
+            metrics['false_alarm_rate'] = float(FP / (FP + TN)) if (FP + TN) > 0 else 0.0
+            
+        except:
+            pass
+    
+        return metrics
     
     def save(self, model_name: str):
         """Save complete model to disk"""
