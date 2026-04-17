@@ -960,7 +960,7 @@ class VigilanteGUI:
                         ft.DataCell(Text(m.get('model_type', 'rnsa_knn'), size=13)),
                         ft.DataCell(
                             Text(f"{m.get('accuracy', 0):.2%}" if m.get('accuracy') else "N/A", 
-                                size=13, color=AppTheme.SUCCESS if m.get('accuracy', 0) > 0.9 else AppTheme.WARNING)
+                                size=13, color=AppTheme.SUCCESS if m.get('accuracy', 0) > 0.6 else AppTheme.WARNING)
                         ),
                         ft.DataCell(Text(f"{m.get('precision', 0):.2%}" if m.get('precision') else "N/A", size=13)),
                         ft.DataCell(Text(f"{m.get('recall', 0):.2%}" if m.get('recall') else "N/A", size=13)),
@@ -977,9 +977,9 @@ class VigilanteGUI:
                 )
                 for m in user_models
             ],
-            heading_row_color=AppTheme.PRIMARY + "20",
+            heading_row_color=AppTheme.SURFACE,
             heading_row_height=45,
-            data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "10"},
+            data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "20"},
             column_spacing=30,
             divider_thickness=1,
             vertical_lines=ft.BorderSide(1, AppTheme.BORDER),
@@ -1425,177 +1425,54 @@ Path: {model.get('model_path', 'N/A')}
         self.page.update()
     
     def create_system_admin_content(self) -> Container:
-        """Create system administration view - FIXED layout"""
-        
-        # Get database stats
         db_stats = self.db.get_database_stats()
-        
-        # Get audit logs
         audit_logs = self.db.get_audit_logs(30)
         
-        # Convert tuple results to dict for each log if needed
         log_dicts = []
         for log in audit_logs:
             if isinstance(log, dict):
                 log_dict = log
             elif isinstance(log, tuple):
-                log_dict = {
-                    'id': log[0] if len(log) > 0 else '',
-                    'created_at': log[1] if len(log) > 1 else datetime.now(),
-                    'username': log[2] if len(log) > 2 else 'System',
-                    'action': log[3] if len(log) > 3 else '',
-                    'resource': log[4] if len(log) > 4 else '-',
-                    'status': log[5] if len(log) > 5 else 'success',
-                }
+                log_dict = {'id': log[0] if len(log) > 0 else '', 'created_at': log[1] if len(log) > 1 else datetime.now(), 'username': log[2] if len(log) > 2 else 'System', 'action': log[3] if len(log) > 3 else '', 'resource': log[4] if len(log) > 4 else '-', 'status': log[5] if len(log) > 5 else 'success'}
             else:
                 continue
             log_dicts.append(log_dict)
         
+        audit_card = Card(content=Container(content=Column(controls=[Text("Recent Audit Logs", size=18, weight=ft.FontWeight.BOLD), Container(height=10), self.create_audit_logs_table(log_dicts[:10])], spacing=0, expand=True), padding=ft.Padding.all(20), expand=True), expand=True)
+        
         return Container(
-            content=Column(
-                controls=[
-                    Text("System Administration", size=24, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                    Container(height=20),
-                    
-                    # Stats cards row - fixed height
-                    Container(
-                        content=Row(
-                            controls=[
-                                self.create_stat_card("Total Users", str(db_stats.get('counts', {}).get('user_count', 0)), ft.Icons.PEOPLE),
-                                self.create_stat_card("Total Models", str(db_stats.get('counts', {}).get('model_count', 0)), ft.Icons.MODEL_TRAINING),
-                                self.create_stat_card("Total Detections", str(db_stats.get('counts', {}).get('detection_count', 0)), ft.Icons.ANALYTICS),
-                                self.create_stat_card("Active Sessions", str(db_stats.get('counts', {}).get('active_sessions', 0)), ft.Icons.LOGIN),
-                            ],
-                            spacing=15,
-                            expand=True,
-                        ),
-                        height=130,
-                    ),
-                    
-                    Container(height=20),
-                    
-                    # Audit logs card - takes remaining space and fills width
-                    Container(
-                        content=Card(
-                            content=Container(
-                                content=self.create_audit_logs_table(log_dicts[:15]),
-                                padding=ft.Padding.all(20),
-                                expand=True,
-                            ),
-                            elevation=2,
-                            expand=True,
-                        ),
-                        expand=True,  # This makes the card fill remaining vertical space
-                    ),
-                ],
-                spacing=0,
-                expand=True,
-            ),
+            content=Column(controls=[
+                Text("System Administration", size=24, weight=ft.FontWeight.BOLD), Container(height=20),
+                Container(content=Row(controls=[self.create_stat_card("Total Users", str(db_stats.get('counts', {}).get('user_count', 0)), ft.Icons.PEOPLE), self.create_stat_card("Total Models", str(db_stats.get('counts', {}).get('model_count', 0)), ft.Icons.MODEL_TRAINING), self.create_stat_card("Total Detections", str(db_stats.get('counts', {}).get('detection_count', 0)), ft.Icons.ANALYTICS), self.create_stat_card("Active Sessions", str(db_stats.get('counts', {}).get('active_sessions', 0)), ft.Icons.LOGIN)], spacing=10, expand=True), height=120),
+                Container(height=20),
+                Container(content=audit_card, expand=True),
+            ], spacing=0, expand=True),
             expand=True,
         )
     
     def create_audit_logs_table(self, logs: List[Dict]) -> Container:
-        """Create audit logs table - FIXED to fill container width"""
-        
         if not logs:
-            return Container(
-                content=Text("No audit logs found", color=AppTheme.TEXT_SECONDARY),
-                padding=ft.Padding.all(20),
-                expand=True,
-            )
+            return Container(content=Text("No audit logs found", color=AppTheme.TEXT_SECONDARY), padding=ft.Padding.all(20))
         
-        # Filter out None values in logs
         filtered_logs = [log for log in logs if log is not None]
-        
         table = ft.DataTable(
-            columns=[
-                ft.DataColumn(Text("Time", size=13, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(Text("User", size=13, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(Text("Action", size=13, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(Text("Resource", size=13, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(Text("Status", size=13, weight=ft.FontWeight.BOLD)),
-            ],
-            rows=[
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(
-                            Text(
-                                log['created_at'].strftime("%Y-%m-%d %H:%M:%S") 
-                                if hasattr(log['created_at'], 'strftime') 
-                                else str(log.get('created_at', ''))[:19],
-                                size=12
-                            )
-                        ),
-                        ft.DataCell(
-                            Container(
-                                content=Text(log.get('username', 'System'), size=12),
-                                padding=ft.Padding.only(left=5, right=5),
-                            )
-                        ),
-                        ft.DataCell(
-                            Container(
-                                content=Text(log.get('action', ''), size=12),
-                                padding=ft.Padding.only(left=5, right=5),
-                            )
-                        ),
-                        ft.DataCell(
-                            Container(
-                                content=Text(
-                                    str(log.get('resource', '-'))[:40] if log.get('resource') else '-', 
-                                    size=12
-                                ),
-                                padding=ft.Padding.only(left=5, right=5),
-                            )
-                        ),
-                        ft.DataCell(
-                            Container(
-                                content=Text(log.get('status', 'success'), size=12, color=AppTheme.BACKGROUND),
-                                bgcolor=AppTheme.SUCCESS if log.get('status') == 'success' else AppTheme.ERROR,
-                                padding=ft.Padding.all(5),
-                                border_radius=ft.BorderRadius.all(5),
-                                width=70,
-                                alignment=Alignment.CENTER,
-                            )
-                        ),
-                    ]
-                )
-                for log in filtered_logs
-            ],
-            heading_row_color=AppTheme.PRIMARY + "20",
-            heading_row_height=40,
-            data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "10"},
-            column_spacing=20,
+            columns=[ft.DataColumn(Text("Time", size=12)), ft.DataColumn(Text("User", size=12)), ft.DataColumn(Text("Action", size=12)), ft.DataColumn(Text("Resource", size=12)), ft.DataColumn(Text("Status", size=12))],
+            rows=[ft.DataRow(cells=[
+                ft.DataCell(Text(log['created_at'].strftime("%Y-%m-%d %H:%M") if hasattr(log['created_at'], 'strftime') else str(log.get('created_at', ''))[:16], size=11)),
+                ft.DataCell(Text(log.get('username', 'System'), size=11)),
+                ft.DataCell(Text(log.get('action', ''), size=11)),
+                ft.DataCell(Text(str(log.get('resource', '-'))[:25] if log.get('resource') else '-', size=11)),
+                ft.DataCell(Container(content=Text(log.get('status', 'success'), size=11), bgcolor=AppTheme.SUCCESS if log.get('status') == 'success' else AppTheme.ERROR, padding=ft.Padding.all(3), border_radius=ft.BorderRadius.all(5))),
+            ]) for log in filtered_logs],
+            heading_row_color=AppTheme.SURFACE, 
+            heading_row_height=45, 
+            data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "20"},
+            column_spacing=30,
             divider_thickness=1,
             vertical_lines=ft.BorderSide(1, AppTheme.BORDER),
             horizontal_lines=ft.BorderSide(1, AppTheme.BORDER),
         )
-        
-        # Return a container that fills the entire width
-        return Container(
-            content=Column(
-                controls=[
-                    Row(
-                        controls=[
-                            Text("Recent Audit Logs", size=18, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                            Container(
-                                content=Text(f"Last 30 days • {len(filtered_logs)} entries", size=12, color=AppTheme.TEXT_SECONDARY),
-                                padding=ft.Padding.all(5),
-                            ),
-                        ],
-                        alignment=MainAxisAlignment.SPACE_BETWEEN,
-                    ),
-                    Container(height=15),
-                    Container(
-                        content=table,
-                        expand=True,
-                    ),
-                ],
-                spacing=0,
-                expand=True,
-            ),
-            expand=True,
-            padding=ft.Padding.all(10),
-        )
+        return Container(content=Column(controls=[Container(content=table, height=300)], spacing=0, scroll=ft.ScrollMode.AUTO), expand=True)
     
     # =====================================================================
     # SETTINGS VIEW
