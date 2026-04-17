@@ -100,6 +100,7 @@ class DatabaseManager:
                         training_samples INTEGER,
                         features JSONB,
                         features_count INTEGER,
+                        features_used JSONB,
                         parameters JSONB,
                         metrics JSONB,
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -470,10 +471,10 @@ class DatabaseManager:
         except Exception as e:
             print(f"❌ Error getting all detections: {e}")
             return []
-    
+   
     def save_model(self, user_id: int, model_name: str, model_path: str, 
-               dataset_name: str = None, metrics: Dict[str, Any] = None,
-               features: List[str] = None, parameters: Dict[str, Any] = None) -> int:
+                dataset_name: str = None, metrics: Dict[str, Any] = None,
+                features: List[str] = None, parameters: Dict[str, Any] = None) -> int:
         """Save model metadata to database"""
         try:
             # Get training_samples from multiple possible locations in metrics
@@ -496,14 +497,36 @@ class DatabaseManager:
                 elif 'features_count' in metrics.get('metrics', {}):
                     features_count = metrics['metrics'].get('features_count')
             
+            # Determine if custom features were used
+            custom_features_used = False
+            if parameters and parameters.get('custom_features'):
+                custom_features_used = True
+            elif features and features != ['dur', 'spkts', 'dpkts', 'sbytes', 'dbytes', 'rate', 'smean', 'dmean', 'swin', 'dwin']:
+                custom_features_used = True
+            
+            # Prepare features_used for storage (JSON)
+            features_used_data = {
+                'features_list': features if features else [],
+                'custom_features_used': custom_features_used,
+                'feature_count': len(features) if features else 0
+            }
+            
             with self.conn.cursor() as cursor:
+                # Check if features_used column exists, if not add it
+                cursor.execute("""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = 'models' AND column_name = 'features_used'
+                """)
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE models ADD COLUMN features_used JSONB")
+                
                 cursor.execute("""
                     INSERT INTO models (
                         user_id, name, model_path, dataset_name,
                         accuracy, precision, recall, f1_score,
-                        training_samples, features_count,
-                        features, parameters, metrics, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        training_samples, features, features_count,
+                        features_used, parameters, metrics, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                     RETURNING id
                 """, (
                     user_id, model_name, model_path, dataset_name,
@@ -512,14 +535,15 @@ class DatabaseManager:
                     metrics.get('recall') if metrics else None,
                     metrics.get('f1_score') if metrics else None,
                     training_samples,
-                    features_count,
                     json.dumps(features) if features else None,
+                    features_count,
+                    json.dumps(features_used_data) if features_used_data else None,
                     json.dumps(parameters) if parameters else None,
                     json.dumps(metrics) if metrics else None
                 ))
                 model_id = cursor.fetchone()[0]
                 self.conn.commit()
-                print(f"✅ Model '{model_name}' saved with ID: {model_id} (training_samples: {training_samples})")
+                print(f"✅ Model '{model_name}' saved with ID: {model_id} (training_samples: {training_samples}, custom_features: {custom_features_used})")
                 return model_id
         except Exception as e:
             self.conn.rollback()
@@ -544,7 +568,7 @@ class DatabaseManager:
         except Exception as e:
             print(f"❌ Error getting models for user {user_id}: {e}")
             return []
-    
+
     def get_model(self, model_id: int, user_id: Optional[int] = None) -> Optional[Dict]:
         """Get model by ID"""
         try:
@@ -564,7 +588,14 @@ class DatabaseManager:
                         WHERE m.id = %s AND m.is_active = TRUE
                     """, (model_id,))
                 model = cursor.fetchone()
-                return dict(model) if model else None
+                if model:
+                    model_dict = dict(model)
+                    # Parse features_used if it exists
+                    if model_dict.get('features_used'):
+                        if isinstance(model_dict['features_used'], str):
+                            model_dict['features_used'] = json.loads(model_dict['features_used'])
+                    return model_dict
+                return None
         except Exception as e:
             print(f"❌ Error getting model {model_id}: {e}")
             return None
