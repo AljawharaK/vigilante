@@ -10,7 +10,7 @@ from flet import (
     TextField, Dropdown, dropdown,
     AlertDialog, TextButton, ProgressRing,
     Card, Icon, MainAxisAlignment, CrossAxisAlignment,
-    Alignment, ThemeMode, ProgressBar, ElevatedButton, FilledButton,
+    Alignment, ThemeMode, ProgressBar,
     ButtonStyle, RoundedRectangleBorder, Animation, AnimationCurve,
     ControlState,
 )
@@ -199,7 +199,7 @@ class VigilanteGUI:
             visible=False,
         )
         
-        self.login_button = ft.FilledButton(
+        self.login_button = ft.TextButton(
             content="Login",
             icon=ft.Icons.LOGIN,
             on_click=self.handle_login,
@@ -212,7 +212,7 @@ class VigilanteGUI:
             height=45,
         )
         
-        self.verify_otp_button = ft.FilledButton(
+        self.verify_otp_button = ft.TextButton(
             content="Verify OTP",
             icon=ft.Icons.VERIFIED,
             on_click=self.handle_verify_otp,
@@ -1099,7 +1099,7 @@ Path: {model.get('model_path', 'N/A')}
         )
         
         # Create new user button
-        create_user_button = ft.FilledButton(
+        create_user_button = ft.TextButton(
             content="Create New User",
             icon=ft.Icons.PERSON_ADD,
             on_click=self.show_create_user_dialog,
@@ -1627,7 +1627,7 @@ Path: {model.get('model_path', 'N/A')}
                                     
                                     Container(height=20),
                                     
-                                    ft.FilledButton(
+                                    ft.TextButton(
                                         content="Change Password",
                                         icon=ft.Icons.LOCK_RESET,
                                         on_click=self.show_change_password_dialog_ui,
@@ -1654,12 +1654,12 @@ Path: {model.get('model_path', 'N/A')}
                                     
                                     self.create_list_tile(
                                         leading=Icon(ft.Icons.COMPUTER, color=AppTheme.PRIMARY),
-                                        title=Text("System: Vigilante IDS"),
+                                        title=Text("System: Vigilante"),
                                     ),
                                     
                                     self.create_list_tile(
                                         leading=Icon(ft.Icons.DATASET, color=AppTheme.PRIMARY),
-                                        title=Text("Database: PostgreSQL (Neon)"),
+                                        title=Text("Database: PostgreSQL"),
                                     ),
                                     
                                     self.create_list_tile(
