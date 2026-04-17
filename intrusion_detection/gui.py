@@ -921,7 +921,7 @@ class VigilanteGUI:
     # =====================================================================
     
     def create_models_content(self) -> Container:
-        """Create models list view - FIXED to fill container space"""
+        """Create models list view"""
         
         # Get user's models
         user_models = self.db.get_user_models(self.auth.current_user['id'])
@@ -982,7 +982,6 @@ class VigilanteGUI:
             data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "10"},
             column_spacing=30,
             divider_thickness=1,
-            divider_color=AppTheme.BORDER,
             vertical_lines=ft.BorderSide(1, AppTheme.BORDER),
             horizontal_lines=ft.BorderSide(1, AppTheme.BORDER),
         )
@@ -1006,13 +1005,13 @@ class VigilanteGUI:
                     Container(height=20),
                     Container(
                         content=models_table,
-                        expand=True,  # This makes the table expand to fill available space
+                        expand=True,
                     ),
                 ],
                 spacing=0,
-                expand=True,  # This makes the Column expand to fill container
+                expand=True,
             ),
-            expand=True,  # This makes the Container expand to fill parent
+            expand=True,
         )
     
     def show_model_details(self, model: Dict):
@@ -1508,7 +1507,6 @@ Path: {model.get('model_path', 'N/A')}
         # Filter out None values in logs
         filtered_logs = [log for log in logs if log is not None]
         
-        # Calculate column widths proportionally
         table = ft.DataTable(
             columns=[
                 ft.DataColumn(Text("Time", size=13, weight=ft.FontWeight.BOLD)),
@@ -1568,7 +1566,6 @@ Path: {model.get('model_path', 'N/A')}
             data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "10"},
             column_spacing=20,
             divider_thickness=1,
-            divider_color=AppTheme.BORDER,
             vertical_lines=ft.BorderSide(1, AppTheme.BORDER),
             horizontal_lines=ft.BorderSide(1, AppTheme.BORDER),
         )
@@ -1590,7 +1587,7 @@ Path: {model.get('model_path', 'N/A')}
                     Container(height=15),
                     Container(
                         content=table,
-                        expand=True,  # Make table expand to fill width
+                        expand=True,
                     ),
                 ],
                 spacing=0,
