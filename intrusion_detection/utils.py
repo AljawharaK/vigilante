@@ -324,7 +324,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         if total_count == 0:
             pass  # No message needed since we show "No anomalies detected" below
         elif total_count <= 10:
-            story.append(Paragraph(f"Showing {min(20, len(anomalies))} of {len(total_count)} anomalies", 
+            story.append(Paragraph(f"Showing {min(10, len(anomalies))} of {total_count} anomalies", 
                               ParagraphStyle('Footnote', parent=styles['Normal'], fontSize=8, textColor=colors.gray)))
         else:
             story.append(Paragraph(
