@@ -921,7 +921,7 @@ class VigilanteGUI:
     # =====================================================================
     
     def create_models_content(self) -> Container:
-        """Create models list view"""
+        """Create models list view - FIXED to fill container space"""
         
         # Get user's models
         user_models = self.db.get_user_models(self.auth.current_user['id'])
@@ -940,66 +940,79 @@ class VigilanteGUI:
                 expand=True,
             )
         
-        # Create models table (Actions column removed)
+        # Create models table with proper width
         models_table = ft.DataTable(
             columns=[
-                ft.DataColumn(Text("ID")),
-                ft.DataColumn(Text("Name")),
-                ft.DataColumn(Text("Type")),
-                ft.DataColumn(Text("Accuracy")),
-                ft.DataColumn(Text("Precision")),
-                ft.DataColumn(Text("Recall")),
-                ft.DataColumn(Text("F1")),
-                ft.DataColumn(Text("Created")),
+                ft.DataColumn(Text("ID", size=14, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(Text("Name", size=14, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(Text("Type", size=14, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(Text("Accuracy", size=14, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(Text("Precision", size=14, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(Text("Recall", size=14, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(Text("F1", size=14, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(Text("Created", size=14, weight=ft.FontWeight.BOLD)),
             ],
             rows=[
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(Text(str(m.get('id', '')))),
-                        ft.DataCell(Text(m.get('name', 'N/A')[:20])),
-                        ft.DataCell(Text(m.get('model_type', 'rnsa_knn'))),
-                        ft.DataCell(Text(f"{m.get('accuracy', 0):.2%}" if m.get('accuracy') else "N/A")),
-                        ft.DataCell(Text(f"{m.get('precision', 0):.2%}" if m.get('precision') else "N/A")),
-                        ft.DataCell(Text(f"{m.get('recall', 0):.2%}" if m.get('recall') else "N/A")),
-                        ft.DataCell(Text(f"{m.get('f1_score', 0):.2%}" if m.get('f1_score') else "N/A")),
+                        ft.DataCell(Text(str(m.get('id', '')), size=13)),
+                        ft.DataCell(Text(m.get('name', 'N/A')[:25], size=13)),
+                        ft.DataCell(Text(m.get('model_type', 'rnsa_knn'), size=13)),
+                        ft.DataCell(
+                            Text(f"{m.get('accuracy', 0):.2%}" if m.get('accuracy') else "N/A", 
+                                size=13, color=AppTheme.SUCCESS if m.get('accuracy', 0) > 0.9 else AppTheme.WARNING)
+                        ),
+                        ft.DataCell(Text(f"{m.get('precision', 0):.2%}" if m.get('precision') else "N/A", size=13)),
+                        ft.DataCell(Text(f"{m.get('recall', 0):.2%}" if m.get('recall') else "N/A", size=13)),
+                        ft.DataCell(Text(f"{m.get('f1_score', 0):.2%}" if m.get('f1_score') else "N/A", size=13)),
                         ft.DataCell(
                             Text(
                                 m['created_at'].strftime("%Y-%m-%d")
                                 if hasattr(m['created_at'], 'strftime')
-                                else "N/A"
+                                else "N/A",
+                                size=13
                             )
                         ),
                     ]
                 )
                 for m in user_models
             ],
-            heading_row_color=AppTheme.SURFACE,
-            heading_row_height=40,
-            data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "20"},
-            column_spacing=20,
-            divider_thickness=0,
+            heading_row_color=AppTheme.PRIMARY + "20",
+            heading_row_height=45,
+            data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "10"},
+            column_spacing=30,
+            divider_thickness=1,
+            divider_color=AppTheme.BORDER,
+            vertical_lines=ft.BorderSide(1, AppTheme.BORDER),
+            horizontal_lines=ft.BorderSide(1, AppTheme.BORDER),
         )
         
+        # Return a container that fills the entire space with the table
         return Container(
             content=Column(
                 controls=[
                     Row(
                         controls=[
-                            Text("My Models", size=24, weight=ft.FontWeight.BOLD),
+                            Text("My Models", size=24, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                            Container(
+                                content=Text(f"Total: {len(user_models)} models", size=14, color=AppTheme.TEXT_SECONDARY),
+                                padding=ft.Padding.all(5),
+                                bgcolor=AppTheme.SURFACE,
+                                border_radius=ft.BorderRadius.all(15),
+                            ),
                         ],
                         alignment=MainAxisAlignment.SPACE_BETWEEN,
                     ),
                     Container(height=20),
-                    
                     Container(
                         content=models_table,
+                        expand=True,  # This makes the table expand to fill available space
                     ),
                 ],
                 spacing=0,
-                expand=True,
-                scroll=ft.ScrollMode.AUTO,
+                expand=True,  # This makes the Column expand to fill container
             ),
-            expand=True,
+            expand=True,  # This makes the Container expand to fill parent
         )
     
     def show_model_details(self, model: Dict):
@@ -1140,8 +1153,6 @@ Path: {model.get('model_path', 'N/A')}
     # show_create_user_dialog
     def show_create_user_dialog(self, e):
         """Show create user dialog"""
-        print("Create button clicked")  # Debug print
-        
         username_field = TextField(label="Username", width=300)
         email_field = TextField(label="Email", width=300)
         password_field = TextField(label="Password", password=True, can_reveal_password=True, width=300)
@@ -1215,8 +1226,6 @@ Path: {model.get('model_path', 'N/A')}
     # show_edit_user_dialog
     def show_edit_user_dialog(self, user: Dict):
         """Show edit user dialog"""
-        print(f"Edit clicked: {user['username']}")  # Debug print
-        
         role_dropdown = Dropdown(
             label="Role",
             options=[
@@ -1286,8 +1295,6 @@ Path: {model.get('model_path', 'N/A')}
     # Delete button - Pass user dict correctly
     def delete_user_working(self, user: Dict):
         """Delete/deactivate a user with confirmation"""
-        print(f"Delete clicked: {user['username']}")  # Debug print
-        
         def confirm_delete(e):
             try:
                 # Prevent deleting the only admin
@@ -1346,8 +1353,6 @@ Path: {model.get('model_path', 'N/A')}
     # show_change_password_dialog_ui
     def show_change_password_dialog_ui(self, e):
         """Show change password dialog from settings"""
-        print("Change Password button clicked")  # Debug print
-        
         curr_pass = TextField(label="Current Password", password=True, can_reveal_password=True)
         new_pass = TextField(label="New Password", password=True, can_reveal_password=True)
         conf_pass = TextField(label="Confirm New Password", password=True, can_reveal_password=True)
@@ -1421,7 +1426,7 @@ Path: {model.get('model_path', 'N/A')}
         self.page.update()
     
     def create_system_admin_content(self) -> Container:
-        """Create system administration view"""
+        """Create system administration view - FIXED layout"""
         
         # Get database stats
         db_stats = self.db.get_database_stats()
@@ -1435,7 +1440,6 @@ Path: {model.get('model_path', 'N/A')}
             if isinstance(log, dict):
                 log_dict = log
             elif isinstance(log, tuple):
-                # Convert tuple to dict using expected structure
                 log_dict = {
                     'id': log[0] if len(log) > 0 else '',
                     'created_at': log[1] if len(log) > 1 else datetime.now(),
@@ -1448,31 +1452,13 @@ Path: {model.get('model_path', 'N/A')}
                 continue
             log_dicts.append(log_dict)
         
-        # Create audit logs card with proper sizing
-        audit_card = Card(
-            content=Container(
-                content=Column(
-                    controls=[
-                        Text("Recent Audit Logs", size=18, weight=ft.FontWeight.BOLD),
-                        Container(height=10),
-                        self.create_audit_logs_table(log_dicts[:10]),
-                    ],
-                    spacing=0,
-                    expand=True,
-                ),
-                padding=ft.Padding.all(20),
-                expand=True,
-            ),
-            expand=True,
-        )
-        
         return Container(
             content=Column(
                 controls=[
-                    Text("System Administration", size=24, weight=ft.FontWeight.BOLD),
+                    Text("System Administration", size=24, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
                     Container(height=20),
                     
-                    # Stats cards row
+                    # Stats cards row - fixed height
                     Container(
                         content=Row(
                             controls=[
@@ -1481,18 +1467,26 @@ Path: {model.get('model_path', 'N/A')}
                                 self.create_stat_card("Total Detections", str(db_stats.get('counts', {}).get('detection_count', 0)), ft.Icons.ANALYTICS),
                                 self.create_stat_card("Active Sessions", str(db_stats.get('counts', {}).get('active_sessions', 0)), ft.Icons.LOGIN),
                             ],
-                            spacing=10,
+                            spacing=15,
                             expand=True,
                         ),
-                        height=120,
+                        height=130,
                     ),
                     
                     Container(height=20),
                     
-                    # Audit logs card - takes remaining space
+                    # Audit logs card - takes remaining space and fills width
                     Container(
-                        content=audit_card,
-                        expand=True,
+                        content=Card(
+                            content=Container(
+                                content=self.create_audit_logs_table(log_dicts[:15]),
+                                padding=ft.Padding.all(20),
+                                expand=True,
+                            ),
+                            elevation=2,
+                            expand=True,
+                        ),
+                        expand=True,  # This makes the card fill remaining vertical space
                     ),
                 ],
                 spacing=0,
@@ -1502,70 +1496,108 @@ Path: {model.get('model_path', 'N/A')}
         )
     
     def create_audit_logs_table(self, logs: List[Dict]) -> Container:
-        """Create audit logs table"""
+        """Create audit logs table - FIXED to fill container width"""
         
         if not logs:
             return Container(
                 content=Text("No audit logs found", color=AppTheme.TEXT_SECONDARY),
                 padding=ft.Padding.all(20),
+                expand=True,
             )
         
         # Filter out None values in logs
         filtered_logs = [log for log in logs if log is not None]
         
+        # Calculate column widths proportionally
         table = ft.DataTable(
             columns=[
-                ft.DataColumn(Text("Time", size=12)),
-                ft.DataColumn(Text("User", size=12)),
-                ft.DataColumn(Text("Action", size=12)),
-                ft.DataColumn(Text("Resource", size=12)),
-                ft.DataColumn(Text("Status", size=12)),
+                ft.DataColumn(Text("Time", size=13, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(Text("User", size=13, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(Text("Action", size=13, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(Text("Resource", size=13, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(Text("Status", size=13, weight=ft.FontWeight.BOLD)),
             ],
             rows=[
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(Text(
-                            log['created_at'].strftime("%Y-%m-%d %H:%M") 
-                            if hasattr(log['created_at'], 'strftime') 
-                            else str(log.get('created_at', ''))[:16],
-                            size=11
-                        )),
-                        ft.DataCell(Text(log.get('username', 'System'), size=11)),
-                        ft.DataCell(Text(log.get('action', ''), size=11)),
-                        ft.DataCell(Text(str(log.get('resource', '-'))[:25] if log.get('resource') else '-', size=11)),
+                        ft.DataCell(
+                            Text(
+                                log['created_at'].strftime("%Y-%m-%d %H:%M:%S") 
+                                if hasattr(log['created_at'], 'strftime') 
+                                else str(log.get('created_at', ''))[:19],
+                                size=12
+                            )
+                        ),
                         ft.DataCell(
                             Container(
-                                content=Text(log.get('status', 'success'), size=11),
+                                content=Text(log.get('username', 'System'), size=12),
+                                padding=ft.Padding.only(left=5, right=5),
+                            )
+                        ),
+                        ft.DataCell(
+                            Container(
+                                content=Text(log.get('action', ''), size=12),
+                                padding=ft.Padding.only(left=5, right=5),
+                            )
+                        ),
+                        ft.DataCell(
+                            Container(
+                                content=Text(
+                                    str(log.get('resource', '-'))[:40] if log.get('resource') else '-', 
+                                    size=12
+                                ),
+                                padding=ft.Padding.only(left=5, right=5),
+                            )
+                        ),
+                        ft.DataCell(
+                            Container(
+                                content=Text(log.get('status', 'success'), size=12, color=AppTheme.BACKGROUND),
                                 bgcolor=AppTheme.SUCCESS if log.get('status') == 'success' else AppTheme.ERROR,
-                                padding=ft.Padding.all(3),
+                                padding=ft.Padding.all(5),
                                 border_radius=ft.BorderRadius.all(5),
+                                width=70,
+                                alignment=Alignment.CENTER,
                             )
                         ),
                     ]
                 )
                 for log in filtered_logs
             ],
-            heading_row_color=AppTheme.SURFACE,
-            heading_row_height=35,
-            data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "20"},
-            column_spacing=15,
-            divider_thickness=0,
-            vertical_lines=ft.BorderSide(0, "transparent"),
-            horizontal_lines=ft.BorderSide(0, "transparent"),
+            heading_row_color=AppTheme.PRIMARY + "20",
+            heading_row_height=40,
+            data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "10"},
+            column_spacing=20,
+            divider_thickness=1,
+            divider_color=AppTheme.BORDER,
+            vertical_lines=ft.BorderSide(1, AppTheme.BORDER),
+            horizontal_lines=ft.BorderSide(1, AppTheme.BORDER),
         )
         
+        # Return a container that fills the entire width
         return Container(
             content=Column(
                 controls=[
+                    Row(
+                        controls=[
+                            Text("Recent Audit Logs", size=18, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                            Container(
+                                content=Text(f"Last 30 days • {len(filtered_logs)} entries", size=12, color=AppTheme.TEXT_SECONDARY),
+                                padding=ft.Padding.all(5),
+                            ),
+                        ],
+                        alignment=MainAxisAlignment.SPACE_BETWEEN,
+                    ),
+                    Container(height=15),
                     Container(
                         content=table,
-                        height=300,
+                        expand=True,  # Make table expand to fill width
                     ),
                 ],
                 spacing=0,
-                scroll=ft.ScrollMode.AUTO,
+                expand=True,
             ),
             expand=True,
+            padding=ft.Padding.all(10),
         )
     
     # =====================================================================
