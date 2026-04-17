@@ -23,7 +23,6 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
-import traceback
 from importlib import resources
 from pathlib import Path
 
@@ -1060,28 +1059,11 @@ Path: {model.get('model_path', 'N/A')}
     def create_manage_users_content(self) -> Container:
         """Create user management view (Admin only)"""
         
-        # Get all users
-        users = self.get_all_users()
+        # Add missing import for RealDictCursor
+        from psycopg2.extras import RealDictCursor
         
-        # Convert tuple results to dict for each user
-        user_dicts = []
-        for user in users:
-            if isinstance(user, dict):
-                user_dict = user
-            elif isinstance(user, tuple):
-                # Convert tuple to dict using column names from cursor description
-                # This is a simplified version - in reality you'd get column names from cursor
-                user_dict = {
-                    'id': user[0] if len(user) > 0 else '',
-                    'username': user[1] if len(user) > 1 else '',
-                    'email': user[2] if len(user) > 2 else '',
-                    'role_name': user[3] if len(user) > 3 else 'Analyst',
-                    'is_active': user[4] if len(user) > 4 else True,
-                    'last_login': user[5] if len(user) > 5 else None,
-                }
-            else:
-                continue
-            user_dicts.append(user_dict)
+        # Get all users
+        users = self.db.get_all_users()
         
         # Create users table
         users_table = ft.DataTable(
@@ -1137,7 +1119,7 @@ Path: {model.get('model_path', 'N/A')}
                         ),
                     ]
                 )
-                for u in user_dicts
+                for u in users
             ],
             heading_row_color=AppTheme.SURFACE,
             heading_row_height=40,
@@ -1184,24 +1166,6 @@ Path: {model.get('model_path', 'N/A')}
             ),
             expand=True,
         )
-    
-    def get_all_users(self) -> List[Dict]:
-        """Get all users from database"""
-        try:
-            with self.db.conn.cursor() as cursor:
-                cursor.execute("""
-                    SELECT u.*, r.name as role_name
-                    FROM users u
-                    LEFT JOIN roles r ON u.role_id = r.id
-                    ORDER BY u.id
-                """)
-                # Convert to list of dicts
-                columns = [desc[0] for desc in cursor.description]
-                rows = cursor.fetchall()
-                return [dict(zip(columns, row)) for row in rows]
-        except Exception as e:
-            print(f"Error getting users: {e}")
-            return []
     
     def show_create_user_dialog(self, e):
         """Show create user dialog"""
@@ -1392,38 +1356,49 @@ Path: {model.get('model_path', 'N/A')}
                 continue
             log_dicts.append(log_dict)
         
+        # Create audit logs card with proper sizing - FIXED to fit container
+        audit_card = Card(
+            content=Container(
+                content=Column(
+                    controls=[
+                        Text("Recent Audit Logs", size=18, weight=ft.FontWeight.BOLD),
+                        Container(height=10),
+                        self.create_audit_logs_table(log_dicts[:10]),
+                    ],
+                    spacing=0,
+                ),
+                padding=ft.Padding.all(20),
+            ),
+            expand=True,  # Make card expand to fill available space
+        )
+        
         return Container(
             content=Column(
                 controls=[
                     Text("System Administration", size=24, weight=ft.FontWeight.BOLD),
                     Container(height=20),
                     
-                    # Stats cards
-                    Row(
-                        controls=[
-                            self.create_stat_card("Total Users", str(db_stats.get('counts', {}).get('user_count', 0)), ft.Icons.PEOPLE),
-                            self.create_stat_card("Total Models", str(db_stats.get('counts', {}).get('model_count', 0)), ft.Icons.MODEL_TRAINING),
-                            self.create_stat_card("Total Detections", str(db_stats.get('counts', {}).get('detection_count', 0)), ft.Icons.ANALYTICS),
-                            self.create_stat_card("Active Sessions", str(db_stats.get('counts', {}).get('active_sessions', 0)), ft.Icons.LOGIN),
-                        ],
-                        spacing=10,
+                    # Stats cards row - fixed height
+                    Container(
+                        content=Row(
+                            controls=[
+                                self.create_stat_card("Total Users", str(db_stats.get('counts', {}).get('user_count', 0)), ft.Icons.PEOPLE),
+                                self.create_stat_card("Total Models", str(db_stats.get('counts', {}).get('model_count', 0)), ft.Icons.MODEL_TRAINING),
+                                self.create_stat_card("Total Detections", str(db_stats.get('counts', {}).get('detection_count', 0)), ft.Icons.ANALYTICS),
+                                self.create_stat_card("Active Sessions", str(db_stats.get('counts', {}).get('active_sessions', 0)), ft.Icons.LOGIN),
+                            ],
+                            spacing=10,
+                            expand=True,
+                        ),
+                        height=120,  # Fixed height for stats cards
                     ),
                     
                     Container(height=20),
                     
-                    # Recent audit logs
-                    Card(
-                        content=Container(
-                            content=Column(
-                                controls=[
-                                    Text("Recent Audit Logs", size=18, weight=ft.FontWeight.BOLD),
-                                    Container(height=10),
-                                    self.create_audit_logs_table(log_dicts[:10]),
-                                ],
-                                spacing=0,
-                            ),
-                            padding=ft.Padding.all(20),
-                        ),
+                    # Audit logs card - takes remaining space
+                    Container(
+                        content=audit_card,
+                        expand=True,  # This container expands to fill remaining space
                     ),
                 ],
                 spacing=0,
@@ -1446,24 +1421,29 @@ Path: {model.get('model_path', 'N/A')}
         
         table = ft.DataTable(
             columns=[
-                ft.DataColumn(Text("Time")),
-                ft.DataColumn(Text("User")),
-                ft.DataColumn(Text("Action")),
-                ft.DataColumn(Text("Resource")),
-                ft.DataColumn(Text("Status")),
+                ft.DataColumn(Text("Time", size=12)),
+                ft.DataColumn(Text("User", size=12)),
+                ft.DataColumn(Text("Action", size=12)),
+                ft.DataColumn(Text("Resource", size=12)),
+                ft.DataColumn(Text("Status", size=12)),
             ],
             rows=[
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(Text(log['created_at'].strftime("%Y-%m-%d %H:%M") if hasattr(log['created_at'], 'strftime') else str(log.get('created_at', ''))[:16])),
-                        ft.DataCell(Text(log.get('username', 'System'))),
-                        ft.DataCell(Text(log.get('action', ''))),
-                        ft.DataCell(Text(str(log.get('resource', '-'))[:20] if log.get('resource') else '-')),
+                        ft.DataCell(Text(
+                            log['created_at'].strftime("%Y-%m-%d %H:%M") 
+                            if hasattr(log['created_at'], 'strftime') 
+                            else str(log.get('created_at', ''))[:16],
+                            size=11
+                        )),
+                        ft.DataCell(Text(log.get('username', 'System'), size=11)),
+                        ft.DataCell(Text(log.get('action', ''), size=11)),
+                        ft.DataCell(Text(str(log.get('resource', '-'))[:25] if log.get('resource') else '-', size=11)),
                         ft.DataCell(
                             Container(
-                                content=Text(log.get('status', 'success')),
+                                content=Text(log.get('status', 'success'), size=11),
                                 bgcolor=AppTheme.SUCCESS if log.get('status') == 'success' else AppTheme.ERROR,
-                                padding=ft.Padding.all(5),
+                                padding=ft.Padding.all(3),
                                 border_radius=ft.BorderRadius.all(5),
                             )
                         ),
@@ -1472,18 +1452,27 @@ Path: {model.get('model_path', 'N/A')}
                 for log in filtered_logs
             ],
             heading_row_color=AppTheme.SURFACE,
-            heading_row_height=40,
+            heading_row_height=35,
             data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "20"},
-            column_spacing=20,
+            column_spacing=15,
             divider_thickness=0,
+            vertical_lines=ft.BorderSide(0, "transparent"),
+            horizontal_lines=ft.BorderSide(0, "transparent"),
         )
         
+        # Make table scrollable
         return Container(
             content=Column(
-                controls=[table],
-                scroll=ft.ScrollMode.AUTO,
+                controls=[
+                    Container(
+                        content=table,
+                        scroll=ft.ScrollMode.AUTO,
+                        height=300,  # Fixed height for scrollable area
+                    ),
+                ],
+                spacing=0,
             ),
-            height=300,
+            expand=True,
         )
     
     # =====================================================================
@@ -1493,10 +1482,29 @@ Path: {model.get('model_path', 'N/A')}
     def create_settings_content(self) -> Container:
         """Create settings interface"""
         
-        # Safely get user info
-        username = self.auth.current_user.get('username', 'Unknown') if self.auth.current_user else 'Unknown'
-        email = self.auth.current_user.get('email', 'Not available') if self.auth.current_user else 'Not available'
-        role = self.auth.current_role or 'Analyst'
+        # Get fresh user data from database to ensure email is available
+        user_id = self.auth.current_user.get('id') if self.auth.current_user else None
+        email_display = "Not available"
+        username_display = "Unknown"
+        role_display = self.auth.current_role or 'Analyst'
+        
+        if user_id:
+            try:
+                # Get fresh user data from database
+                user_data = self.db.get_user_by_id(user_id)
+                if user_data:
+                    email_display = user_data.get('email', 'Not available')
+                    username_display = user_data.get('username', 'Unknown')
+            except Exception as e:
+                print(f"Error getting user email: {e}")
+                # Fallback to current_user data
+                if self.auth.current_user:
+                    email_display = self.auth.current_user.get('email', 'Not available')
+                    username_display = self.auth.current_user.get('username', 'Unknown')
+        else:
+            if self.auth.current_user:
+                username_display = self.auth.current_user.get('username', 'Unknown')
+                email_display = self.auth.current_user.get('email', 'Not available')
         
         return Container(
             content=Column(
@@ -1513,17 +1521,17 @@ Path: {model.get('model_path', 'N/A')}
                                     
                                     self.create_list_tile(
                                         leading=Icon(ft.Icons.PERSON, color=AppTheme.PRIMARY),
-                                        title=Text(f"Username: {username}"),
+                                        title=Text(f"Username: {username_display}"),
                                     ),
                                     
                                     self.create_list_tile(
                                         leading=Icon(ft.Icons.EMAIL, color=AppTheme.PRIMARY),
-                                        title=Text(f"Email: {email}"),
+                                        title=Text(f"Email: {email_display}"),
                                     ),
                                     
                                     self.create_list_tile(
                                         leading=Icon(ft.Icons.ADMIN_PANEL_SETTINGS, color=AppTheme.PRIMARY),
-                                        title=Text(f"Role: {role}"),
+                                        title=Text(f"Role: {role_display}"),
                                     ),
                                     
                                     Container(height=20),

@@ -131,7 +131,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         Paragraph(title_text, title_style),
     ]]
     
-    title_box = Table(title_cell_data, colWidths=[420])
+    title_box = Table(title_cell_data, colWidths=[430])
     title_box.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), NAVY_BLUE),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -163,7 +163,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         ["Detection Rate", f"{detection_summary.get('detection_rate', 0):.2%}"],
     ]
     
-    detection_table = Table(detection_data, colWidths=[200, 200])
+    detection_table = Table(detection_data, colWidths=[215, 215])
     detection_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
         ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
@@ -282,7 +282,8 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     if anomalies:
         anomaly_data = [["Detected At", "Flow ID", "Confidence", "Severity"]]
         
-        for anomaly in anomalies[:10]:
+        displayed_anomalies = anomalies[:10]  # Store for reference
+        for anomaly in displayed_anomalies:
             if anomaly:
                 detected_at = anomaly.get('detected_at')
                 if detected_at and hasattr(detected_at, 'strftime'):
@@ -301,7 +302,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
                     severity
                 ])
         
-        anomaly_table = Table(anomaly_data, colWidths=[120, 80, 80, 80])
+        anomaly_table = Table(anomaly_data, colWidths=[130, 100, 100, 100])
         anomaly_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
             ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
@@ -314,6 +315,22 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
             ('FONTSIZE', (0, 1), (-1, -1), 9)
         ]))
         story.append(anomaly_table)
+        story.append(Spacer(1, 5))
+        
+        # Show appropriate message based on count
+        total_count = len(anomalies)
+        displayed_count = len(displayed_anomalies)
+        
+        if total_count == 0:
+            pass  # No message needed since we show "No anomalies detected" below
+        elif total_count <= 10:
+            story.append(Paragraph(f"Showing {min(20, len(anomalies))} of {len(total_count)} anomalies", 
+                              ParagraphStyle('Footnote', parent=styles['Normal'], fontSize=8, textColor=colors.gray)))
+        else:
+            story.append(Paragraph(
+                f"Showing {displayed_count} of {total_count} anomalies (most recent)", 
+                ParagraphStyle('Footnote', parent=styles['Normal'], fontSize=8, textColor=colors.gray)
+            ))
     else:
         story.append(Paragraph("No anomalies detected in the period.", styles['Normal']))
     

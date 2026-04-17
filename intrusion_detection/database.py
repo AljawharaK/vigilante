@@ -275,6 +275,23 @@ class DatabaseManager:
             print(f"❌ Error getting user '{username}': {e}")
             return None
     
+    def get_all_users(self) -> List[Dict]:
+        """Get all users from database"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT u.id, u.username, u.email, r.name as role_name, u.is_active, u.last_login
+                    FROM users u
+                    LEFT JOIN roles r ON u.role_id = r.id
+                    ORDER BY u.id
+                """)
+                rows = cursor.fetchall()
+                # rows are already dictionaries when using RealDictCursor
+                return [dict(row) for row in rows]
+        except Exception as e:
+            print(f"Error getting users: {e}")
+            return []
+        
     def get_user_by_id(self, user_id: int) -> Optional[Dict]:
         """Get user by ID"""
         try:
