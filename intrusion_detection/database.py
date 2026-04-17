@@ -322,6 +322,29 @@ class DatabaseManager:
             print(f"Error getting user by email: {e}")
             return None
     
+    def get_all_audit_logs(self) -> List[Dict]:
+        """Get all audit logs from database"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT 
+                        al.id,
+                        al.created_at,
+                        al.username,
+                        al.action,
+                        al.resource,
+                        al.status,
+                        al.details
+                    FROM audit_logs al
+                    ORDER BY al.created_at DESC
+                """)
+                rows = cursor.fetchall()
+                # rows are already dictionaries when using RealDictCursor
+                return [dict(row) for row in rows]
+        except Exception as e:
+            print(f"Error getting audit logs: {e}")
+            return []
+    
     def update_user_last_login(self, user_id: int):
         """Update user's last login timestamp"""
         try:

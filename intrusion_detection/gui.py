@@ -1426,7 +1426,7 @@ Path: {model.get('model_path', 'N/A')}
     
     def create_system_admin_content(self) -> Container:
         db_stats = self.db.get_database_stats()
-        audit_logs = self.db.get_audit_logs(30)
+        audit_logs = self.db.get_all_audit_logs()
         
         log_dicts = []
         for log in audit_logs:
@@ -1452,7 +1452,7 @@ Path: {model.get('model_path', 'N/A')}
                     controls=[
                         Text("Recent Audit Logs", size=18, weight=ft.FontWeight.BOLD), 
                         Container(height=10), 
-                        self.create_audit_logs_table(log_dicts[:10])
+                        self.create_audit_logs_table(log_dicts)
                     ], 
                     spacing=0, 
                     expand=True
