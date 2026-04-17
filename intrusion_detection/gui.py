@@ -10,7 +10,7 @@ from flet import (
     TextField, Dropdown, dropdown,
     AlertDialog, TextButton, ProgressRing,
     Card, Icon, MainAxisAlignment, CrossAxisAlignment,
-    Alignment, ThemeMode, ProgressBar,
+    Alignment, ThemeMode, ProgressBar, ElevatedButton, FilledButton,
     ButtonStyle, RoundedRectangleBorder, Animation, AnimationCurve,
     ControlState,
 )
@@ -199,8 +199,8 @@ class VigilanteGUI:
             visible=False,
         )
         
-        self.login_button = ft.Button(
-            "Login",
+        self.login_button = ft.FilledButton(
+            content="Login",
             icon=ft.Icons.LOGIN,
             on_click=self.handle_login,
             style=ButtonStyle(
@@ -212,8 +212,8 @@ class VigilanteGUI:
             height=45,
         )
         
-        self.verify_otp_button = ft.Button(
-            "Verify OTP",
+        self.verify_otp_button = ft.FilledButton(
+            content="Verify OTP",
             icon=ft.Icons.VERIFIED,
             on_click=self.handle_verify_otp,
             style=ButtonStyle(
@@ -940,7 +940,7 @@ class VigilanteGUI:
                 expand=True,
             )
         
-        # Create models table
+        # Create models table (Actions column removed)
         models_table = ft.DataTable(
             columns=[
                 ft.DataColumn(Text("ID")),
@@ -1099,8 +1099,8 @@ Path: {model.get('model_path', 'N/A')}
         )
         
         # Create new user button
-        create_user_button = ft.Button(
-            "Create New User",
+        create_user_button = ft.FilledButton(
+            content="Create New User",
             icon=ft.Icons.PERSON_ADD,
             on_click=self.show_create_user_dialog,
             style=ButtonStyle(
@@ -1137,9 +1137,11 @@ Path: {model.get('model_path', 'N/A')}
             expand=True,
         )
     
-    # FIX 1: show_create_user_dialog with page.open/page.close
+    # FIX 1: show_create_user_dialog with page.dialog
     def show_create_user_dialog(self, e):
         """Show create user dialog - Fixed for Flet 0.84.0+"""
+        print("Create button clicked")  # Debug print
+        
         username_field = TextField(label="Username", width=300)
         email_field = TextField(label="Email", width=300)
         password_field = TextField(label="Password", password=True, can_reveal_password=True, width=300)
@@ -1210,9 +1212,11 @@ Path: {model.get('model_path', 'N/A')}
         create_dialog.open = True
         self.page.update()
     
-    # FIX 2: show_edit_user_dialog with page.open/page.close
+    # FIX 2: show_edit_user_dialog with page.dialog
     def show_edit_user_dialog(self, user: Dict):
         """Show edit user dialog - Fixed logic and UI refresh"""
+        print(f"Edit clicked: {user['username']}")  # Debug print
+        
         role_dropdown = Dropdown(
             label="Role",
             options=[
@@ -1279,51 +1283,10 @@ Path: {model.get('model_path', 'N/A')}
             dialog.open = False
             self.page.update()
     
-    def deactivate_user(self, user: Dict):
-        """Deactivate a user"""
-        
-        def confirm_deactivate_click(e):
-            try:
-                # Security check: Prevent deactivating the last admin
-                if user.get('role_name') == 'Administrator':
-                    admin_count = self.db.count_admins()
-                    if admin_count <= 1:
-                        deactivate_dialog.open = False
-                        self.page.update()
-                        self.show_dialog("Access Denied", "Cannot deactivate the only remaining Administrator.")
-                        return
-                
-                self.db.deactivate_user(user['id'], self.auth.current_user['id'])
-                self.db.invalidate_user_sessions(user['id'])
-                
-                deactivate_dialog.open = False
-                self.page.update()
-                self.show_dialog("User Deactivated", f"User '{user['username']}' has been disabled.")
-                
-                # Refresh table
-                self.content_container.content = self.create_manage_users_content()
-                self.page.update()
-                
-            except Exception as ex:
-                deactivate_dialog.open = False
-                self.page.update()
-                self.show_dialog("Error", f"Deactivation failed: {str(ex)}")
-
-        deactivate_dialog = AlertDialog(
-            title=Text("Confirm Deactivation"),
-            content=Text(f"Are you sure you want to disable account: {user['username']}?"),
-            actions=[
-                TextButton("Cancel", on_click=lambda _: self._close_dialog(deactivate_dialog)),
-                TextButton("Deactivate", icon=ft.Icons.DELETE, icon_color=AppTheme.ERROR, on_click=confirm_deactivate_click),
-            ],
-        )
-        
-        self.page.dialog = deactivate_dialog
-        deactivate_dialog.open = True
-        self.page.update()
-    
+    # FIX: Delete button - Pass user dict correctly
     def delete_user_working(self, user: Dict):
         """Delete/deactivate a user with confirmation"""
+        print(f"Delete clicked: {user['username']}")  # Debug print
         
         def confirm_delete(e):
             try:
@@ -1341,7 +1304,7 @@ Path: {model.get('model_path', 'N/A')}
                     self._close_dialog(dialog)
                     return
                 
-                # Deactivate user
+                # Deactivate user - Pass the user dict, not separate parameters
                 self.db.deactivate_user(user['id'], self.auth.current_user['id'])
                 
                 # Invalidate all sessions for this user
@@ -1380,9 +1343,11 @@ Path: {model.get('model_path', 'N/A')}
         dialog.open = True
         self.page.update()
     
-    # FIX 3: show_change_password_dialog_ui with page.open/page.close
+    # FIX 3: show_change_password_dialog_ui with page.dialog
     def show_change_password_dialog_ui(self, e):
         """Show change password dialog from settings - Fixed logic and fields"""
+        print("Change Password button clicked")  # Debug print
+        
         curr_pass = TextField(label="Current Password", password=True, can_reveal_password=True)
         new_pass = TextField(label="New Password", password=True, can_reveal_password=True)
         conf_pass = TextField(label="Confirm New Password", password=True, can_reveal_password=True)
@@ -1432,6 +1397,7 @@ Path: {model.get('model_path', 'N/A')}
         pass_dialog.open = True
         self.page.update()
     
+    # SINGLE show_dialog method (removed duplicate)
     def show_dialog(self, title: str, message: str):
         """Show a dialog - Using page.dialog for Flet 0.84.0+"""
         dialog = AlertDialog(
@@ -1661,8 +1627,8 @@ Path: {model.get('model_path', 'N/A')}
                                     
                                     Container(height=20),
                                     
-                                    ft.Button(
-                                        "Change Password",
+                                    ft.FilledButton(
+                                        content="Change Password",
                                         icon=ft.Icons.LOCK_RESET,
                                         on_click=self.show_change_password_dialog_ui,
                                         style=ButtonStyle(
