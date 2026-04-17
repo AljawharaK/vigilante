@@ -19,5 +19,5 @@ cryptography>=41.0.0
 kagglehub>=0.4.2
 psutil>=5.9.0
 torch>=2.10.0
-flet>=0.20.0
+flet>=0.82.0
 plotly>=5.17.0

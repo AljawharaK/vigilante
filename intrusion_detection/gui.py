@@ -1138,7 +1138,7 @@ Path: {model.get('model_path', 'N/A')}
         )
 
     def show_create_user_dialog(self, e):
-        """Show create user dialog - Fixed for Flet 0.84.0+"""
+        """Show create user dialog"""
         username_field = TextField(label="Username", width=300)
         email_field = TextField(label="Email", width=300)
         password_field = TextField(label="Password", password=True, can_reveal_password=True, width=300)
@@ -1162,10 +1162,7 @@ Path: {model.get('model_path', 'N/A')}
                 return
 
             try:
-                # Hash the password using the auth manager
                 password_hash = self.auth.hash_password(password_field.value)
-                
-                # Create user in database
                 self.db.create_user(
                     username=username_field.value,
                     password_hash=password_hash,
@@ -1175,7 +1172,7 @@ Path: {model.get('model_path', 'N/A')}
                     must_change_password=False
                 )
                 
-                self.page.close(create_dialog)
+                self.close_dialog()
                 self.show_dialog("User Created", f"User '{username_field.value}' created successfully!")
                 
                 # Refresh the view
@@ -1188,26 +1185,23 @@ Path: {model.get('model_path', 'N/A')}
         create_dialog = AlertDialog(
             title=Text("Create New User"),
             content=Column(
-                controls=[
-                    username_field,
-                    email_field,
-                    password_field,
-                    role_dropdown,
-                ],
+                controls=[username_field, email_field, password_field, role_dropdown],
                 width=350,
                 height=280,
                 tight=True,
             ),
             actions=[
-                TextButton("Cancel", on_click=lambda _: self.page.close(create_dialog)),
+                TextButton("Cancel", on_click=lambda _: self.close_dialog()),
                 TextButton("Create", on_click=create_user_click),
             ],
         )
         
-        self.page.open(create_dialog)
+        self.page.dialog = create_dialog
+        create_dialog.open = True
+        self.page.update()
 
     def show_edit_user_dialog(self, user: Dict):
-        """Show edit user dialog - Fixed logic and UI refresh"""
+        """Show edit user dialog"""
         role_dropdown = Dropdown(
             label="Role",
             options=[
@@ -1235,10 +1229,9 @@ Path: {model.get('model_path', 'N/A')}
                     details={"new_role": role_dropdown.value}
                 )
                 
-                self.page.close(edit_dialog)
-                self.show_dialog("Success", f"User '{user['username']}' updated to {role_dropdown.value}")
+                self.close_dialog()
+                self.show_dialog("Success", f"User '{user['username']}' updated")
                 
-                # Force refresh table
                 self.content_container.content = self.create_manage_users_content()
                 self.page.update()
                 
@@ -1258,51 +1251,103 @@ Path: {model.get('model_path', 'N/A')}
                 tight=True,
             ),
             actions=[
-                TextButton("Cancel", on_click=lambda _: self.page.close(edit_dialog)),
+                TextButton("Cancel", on_click=lambda _: self.close_dialog()),
                 TextButton("Update", on_click=update_user_click),
             ],
         )
         
-        self.page.open(edit_dialog)
+        self.page.dialog = edit_dialog
+        edit_dialog.open = True
+        self.page.update()
 
     def deactivate_user(self, user: Dict):
         """Deactivate a user"""
-        
         def confirm_deactivate_click(e):
             try:
-                # Security check: Prevent deactivating the last admin
-                if user.get('role_name') == 'Administrator':
-                    admin_count = self.db.count_admins()
-                    if admin_count <= 1:
-                        self.page.close(deactivate_dialog)
-                        self.show_dialog("Access Denied", "Cannot deactivate the only remaining Administrator.")
-                        return
+                if user.get('role_name') == 'Administrator' and self.db.count_admins() <= 1:
+                    self.close_dialog()
+                    self.show_dialog("Error", "Cannot deactivate the last Administrator.")
+                    return
                 
                 self.db.deactivate_user(user['id'], self.auth.current_user['id'])
                 self.db.invalidate_user_sessions(user['id'])
                 
-                self.page.close(deactivate_dialog)
-                self.show_dialog("User Deactivated", f"User '{user['username']}' has been disabled.")
+                self.close_dialog()
+                self.show_dialog("Success", f"User '{user['username']}' deactivated.")
                 
-                # Refresh table
                 self.content_container.content = self.create_manage_users_content()
                 self.page.update()
                 
             except Exception as ex:
-                self.page.close(deactivate_dialog)
+                self.close_dialog()
                 self.show_dialog("Error", f"Deactivation failed: {str(ex)}")
 
         deactivate_dialog = AlertDialog(
             title=Text("Confirm Deactivation"),
             content=Text(f"Are you sure you want to disable account: {user['username']}?"),
             actions=[
-                TextButton("Cancel", on_click=lambda _: self.page.close(deactivate_dialog)),
-                TextButton("Deactivate", icon=ft.Icons.DELETE, icon_color=AppTheme.ERROR, on_click=confirm_deactivate_click),
+                TextButton("Cancel", on_click=lambda _: self.close_dialog()),
+                TextButton("Deactivate", on_click=confirm_deactivate_click),
             ],
         )
         
-        self.page.open(deactivate_dialog)
+        self.page.dialog = deactivate_dialog
+        deactivate_dialog.open = True
+        self.page.update()
 
+    def show_change_password_dialog_ui(self, e):
+        """Show change password dialog from settings"""
+        curr_pass = TextField(label="Current Password", password=True, can_reveal_password=True)
+        new_pass = TextField(label="New Password", password=True, can_reveal_password=True)
+        conf_pass = TextField(label="Confirm New Password", password=True, can_reveal_password=True)
+        
+        def change_click(e):
+            if not curr_pass.value or not new_pass.value:
+                self.show_dialog("Error", "All fields are required.")
+                return
+            if new_pass.value != conf_pass.value:
+                self.show_dialog("Error", "New passwords do not match.")
+                return
+            
+            try:
+                result = self.auth.change_password(self.auth.current_user['id'], curr_pass.value, new_pass.value)
+                if result.get('success'):
+                    self.close_dialog()
+                    self.show_dialog("Success", "Password updated successfully.")
+                else:
+                    self.show_dialog("Error", result.get('message', "Failed to change password."))
+            except Exception as ex:
+                self.show_dialog("Error", str(ex))
+
+        pass_dialog = AlertDialog(
+            title=Text("Change Password"),
+            content=Column([curr_pass, new_pass, conf_pass], width=350, height=250, tight=True),
+            actions=[
+                TextButton("Cancel", on_click=lambda _: self.close_dialog()),
+                TextButton("Update", on_click=change_click),
+            ],
+        )
+        
+        self.page.dialog = pass_dialog
+        pass_dialog.open = True
+        self.page.update()
+
+    def show_dialog(self, title: str, message: str):
+        """Legacy helper to show info dialogs"""
+        info_dialog = AlertDialog(
+            title=Text(title),
+            content=Text(message),
+            actions=[TextButton("OK", on_click=lambda _: self.close_dialog())],
+        )
+        self.page.dialog = info_dialog
+        info_dialog.open = True
+        self.page.update()
+
+    def close_dialog(self, e=None):
+        """Standardized close for version 0.82.0"""
+        if self.page.dialog:
+            self.page.dialog.open = False
+            self.page.update()
 
     def delete_user_working(self, user: Dict):
         """Delete/deactivate a user with confirmation"""
@@ -1324,7 +1369,7 @@ Path: {model.get('model_path', 'N/A')}
                     return
                 
                 # Deactivate user
-                self.db.deactivate_user(user['id'], self.auth.current_user['id'])
+                self.deactivate_user(user['id'], self.auth.current_user['id'])
                 
                 # Invalidate all sessions for this user
                 self.db.invalidate_user_sessions(user['id'])
@@ -1366,69 +1411,6 @@ Path: {model.get('model_path', 'N/A')}
     # =====================================================================
     # 3: SETTINGS VIEW
     # =====================================================================
-
-    def show_change_password_dialog_ui(self, e):
-        """Show change password dialog from settings - Fixed logic and fields"""
-        curr_pass = TextField(label="Current Password", password=True, can_reveal_password=True)
-        new_pass = TextField(label="New Password", password=True, can_reveal_password=True)
-        conf_pass = TextField(label="Confirm New Password", password=True, can_reveal_password=True)
-        
-        def change_click(e):
-            if not curr_pass.value or not new_pass.value:
-                self.show_dialog("Error", "All fields are required.")
-                return
-            if new_pass.value != conf_pass.value:
-                self.show_dialog("Error", "New passwords do not match.")
-                return
-            if len(new_pass.value) < 8:
-                self.show_dialog("Error", "Password must be at least 8 characters.")
-                return
-            
-            try:
-                result = self.auth.change_password(
-                    self.auth.current_user['id'],
-                    curr_pass.value,
-                    new_pass.value
-                )
-                
-                if result.get('success'):
-                    self.page.close(pass_dialog)
-                    self.show_dialog("Success", "Your password has been updated successfully.")
-                else:
-                    self.show_dialog("Error", result.get('message', "Failed to change password."))
-            except Exception as ex:
-                self.show_dialog("Error", f"An error occurred: {str(ex)}")
-
-        pass_dialog = AlertDialog(
-            title=Text("Security: Change Password"),
-            content=Column(
-                controls=[curr_pass, new_pass, conf_pass],
-                width=350,
-                height=250,
-                tight=True,
-            ),
-            actions=[
-                TextButton("Cancel", on_click=lambda _: self.page.close(pass_dialog)),
-                TextButton("Update Password", on_click=change_click),
-            ],
-        )
-        
-        self.page.open(pass_dialog)
-
-    def show_dialog(self, title: str, message: str):
-        """Generic helper to show info dialogs using page.open"""
-        info_dialog = AlertDialog(
-            title=Text(title),
-            content=Text(message),
-            actions=[TextButton("OK", on_click=lambda _: self.page.close(info_dialog))],
-        )
-        self.page.open(info_dialog)
-
-    def close_dialog(self, e=None):
-        """Standardized close for any open dialog"""
-        if self.page.dialog:
-            self.page.dialog.open = False
-            self.page.update()
     
     def create_system_admin_content(self) -> Container:
         """Create system administration view"""
