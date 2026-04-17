@@ -277,7 +277,11 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     
     # Recent Anomalies
     story.append(Paragraph("Recent Anomalies", styles['Heading2']))
-    
+
+    # Correct way to access total_anomalies_detected
+    detection_summary = report_data.get('detection_summary', {})
+    total_anomalies = detection_summary.get('total_anomalies_detected', 0)
+
     anomalies = report_data.get('recent_anomalies', [])
     if anomalies:
         anomaly_data = [["Detected At", "Flow ID", "Confidence", "Severity"]]
@@ -318,22 +322,22 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         story.append(Spacer(1, 5))
         
         # Show appropriate message based on count
-        total_count = len(anomalies)
         displayed_count = len(displayed_anomalies)
         
-        if total_count == 0:
-            pass  # No message needed since we show "No anomalies detected" below
-        elif total_count <= 10:
-            story.append(Paragraph(f"Showing {min(10, len(anomalies))} of {total_count} anomalies", 
-                              ParagraphStyle('Footnote', parent=styles['Normal'], fontSize=8, textColor=colors.gray)))
-        else:
-            story.append(Paragraph(
-                f"Showing {displayed_count} of {total_count} anomalies (most recent)", 
-                ParagraphStyle('Footnote', parent=styles['Normal'], fontSize=8, textColor=colors.gray)
-            ))
+        if total_anomalies > 0:
+            if total_anomalies <= 10:
+                story.append(Paragraph(
+                    f"Showing {total_anomalies:,} total anomalies detected in this period", 
+                    ParagraphStyle('Footnote', parent=styles['Normal'], fontSize=8, textColor=colors.gray)
+                ))
+            else:
+                story.append(Paragraph(
+                    f"Showing {displayed_count} most recent of {total_anomalies:,} total anomalies detected in this period", 
+                    ParagraphStyle('Footnote', parent=styles['Normal'], fontSize=8, textColor=colors.gray)
+                ))
     else:
         story.append(Paragraph("No anomalies detected in the period.", styles['Normal']))
-    
+
     # Footer
     story.append(Spacer(1, 40))
     footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=1, textColor=colors.gray)

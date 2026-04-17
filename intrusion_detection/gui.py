@@ -469,7 +469,6 @@ class VigilanteGUI:
         """Create application header with role badge"""
         
         # Determine role badge color
-        # role_color = AppTheme.PRIMARY if self.auth.is_admin() else AppTheme.INFO # تعديل بشاير
         role_icon = ft.Icons.ADMIN_PANEL_SETTINGS if self.auth.is_admin() else ft.Icons.VISIBILITY
         
         # Safely get username
@@ -594,11 +593,6 @@ class VigilanteGUI:
                 controls=[
                     # Logo/Icon at top
                     Container(
-                        # content=Icon( # تعديل بشاير
-                        #     ft.Icons.SECURITY,
-                        #     color=AppTheme.PRIMARY,
-                        #     size=40,
-                        # ),
                         padding=ft.Padding.all(15),
                     ),
                     # Navigation buttons
@@ -958,7 +952,6 @@ class VigilanteGUI:
                 ft.DataColumn(Text("F1")),
                 ft.DataColumn(Text("Detectors")),
                 ft.DataColumn(Text("Created")),
-                ft.DataColumn(Text("Actions")),
             ],
             rows=[
                 ft.DataRow(
@@ -976,19 +969,6 @@ class VigilanteGUI:
                                 m['created_at'].strftime("%Y-%m-%d")
                                 if hasattr(m['created_at'], 'strftime')
                                 else "N/A"
-                            )
-                        ),
-                        ft.DataCell(
-                            Row(
-                                controls=[
-                                    ft.IconButton(
-                                        icon=ft.Icons.INFO,
-                                        icon_color=AppTheme.PRIMARY,
-                                        tooltip="View Details",
-                                        on_click=lambda e, model=m: self.show_model_details(model),
-                                    ),
-                                ],
-                                spacing=5,
                             )
                         ),
                     ]
@@ -1014,16 +994,12 @@ class VigilanteGUI:
                     Container(height=20),
                     
                     Container(
-                        content=Column(
-                            controls=[models_table],
-                            scroll=ft.ScrollMode.AUTO,
-                            expand=True,
-                        ),
-                        expand=True,
+                        content=models_table,
                     ),
                 ],
                 spacing=0,
                 expand=True,
+                scroll=ft.ScrollMode.AUTO,  # Move scroll to Column instead of Container
             ),
             expand=True,
         )
@@ -1058,9 +1034,6 @@ Path: {model.get('model_path', 'N/A')}
     
     def create_manage_users_content(self) -> Container:
         """Create user management view (Admin only)"""
-        
-        # Add missing import for RealDictCursor
-        from psycopg2.extras import RealDictCursor
         
         # Get all users
         users = self.db.get_all_users()
@@ -1171,6 +1144,7 @@ Path: {model.get('model_path', 'N/A')}
         """Show create user dialog"""
         username = TextField(label="Username", width=300)
         email = TextField(label="Email", width=300)
+        password = TextField(label="Password", password=True, can_reveal_password=True, width=300)
         role = Dropdown(
             label="Role",
             options=[
@@ -1182,14 +1156,17 @@ Path: {model.get('model_path', 'N/A')}
         )
         
         def create_user(e):
-            if not username.value or not email.value:
+            if not username.value or not email.value or not password.value:
                 self.show_dialog("Error", "Please fill in all fields")
                 return
             
+            if len(password.value) < 8:
+                self.show_dialog("Error", "Password must be at least 8 characters")
+                return
+            
             try:
-                # Generate temporary password
-                temp_password = "temp123"
-                password_hash = self.auth.hash_password(temp_password)
+                # Hash the password
+                password_hash = self.auth.hash_password(password.value)
                 
                 # Create user
                 user_id = self.db.create_user(
@@ -1197,18 +1174,17 @@ Path: {model.get('model_path', 'N/A')}
                     password_hash=password_hash,
                     email=email.value,
                     role=role.value,
-                    created_by=self.auth.current_user['id']
+                    created_by=self.auth.current_user['id'],
+                    must_change_password=False
                 )
                 
                 self.close_dialog()
                 self.show_dialog(
                     "User Created",
-                    f"User '{username.value}' created successfully!\n"
-                    f"Temporary password: {temp_password}\n"
-                    f"User must change password on first login."
+                    f"User '{username.value}' created successfully!"
                 )
                 
-                # Refresh page
+                # Refresh the manage users page
                 self.content_container.content = self.create_manage_users_content()
                 self.page.update()
                 
@@ -1223,10 +1199,12 @@ Path: {model.get('model_path', 'N/A')}
                     Container(height=10),
                     email,
                     Container(height=10),
+                    password,
+                    Container(height=10),
                     role,
                 ],
                 width=350,
-                height=200,
+                height=280,
             ),
             actions=[
                 TextButton("Cancel", on_click=lambda e: self.close_dialog()),
@@ -1258,10 +1236,20 @@ Path: {model.get('model_path', 'N/A')}
                     self.auth.current_user['id']
                 )
                 
+                # Log the action
+                self.db.log_audit_event(
+                    user_id=self.auth.current_user['id'],
+                    username=self.auth.current_user['username'],
+                    action="user_role_update",
+                    resource=user['username'],
+                    status="success",
+                    details={"new_role": role.value}
+                )
+                
                 self.close_dialog()
                 self.show_dialog("Success", f"User '{user['username']}' updated")
                 
-                # Refresh page
+                # Refresh the manage users page
                 self.content_container.content = self.create_manage_users_content()
                 self.page.update()
                 
@@ -1300,19 +1288,33 @@ Path: {model.get('model_path', 'N/A')}
                     admin_count = self.db.count_admins()
                     if admin_count <= 1:
                         self.show_dialog("Error", "Cannot deactivate the only Administrator")
+                        self.close_dialog()
                         return
                 
+                # Deactivate user
                 self.db.deactivate_user(user['id'], self.auth.current_user['id'])
+                
+                # Invalidate all sessions
                 self.db.invalidate_user_sessions(user['id'])
+                
+                # Log the action
+                self.db.log_audit_event(
+                    user_id=self.auth.current_user['id'],
+                    username=self.auth.current_user['username'],
+                    action="user_deactivate",
+                    resource=user['username'],
+                    status="success"
+                )
                 
                 self.close_dialog()
                 self.show_dialog("Success", f"User '{user['username']}' deactivated")
                 
-                # Refresh page
+                # Refresh the manage users page
                 self.content_container.content = self.create_manage_users_content()
                 self.page.update()
                 
             except Exception as e:
+                self.close_dialog()
                 self.show_dialog("Error", f"Failed to deactivate user: {str(e)}")
         
         dialog = AlertDialog(
@@ -1356,7 +1358,7 @@ Path: {model.get('model_path', 'N/A')}
                 continue
             log_dicts.append(log_dict)
         
-        # Create audit logs card with proper sizing - FIXED to fit container
+        # Create audit logs card with proper sizing
         audit_card = Card(
             content=Container(
                 content=Column(
@@ -1366,8 +1368,10 @@ Path: {model.get('model_path', 'N/A')}
                         self.create_audit_logs_table(log_dicts[:10]),
                     ],
                     spacing=0,
+                    expand=True,  # Make Column expand
                 ),
                 padding=ft.Padding.all(20),
+                expand=True,  # Make Container expand
             ),
             expand=True,  # Make card expand to fill available space
         )
@@ -1460,17 +1464,17 @@ Path: {model.get('model_path', 'N/A')}
             horizontal_lines=ft.BorderSide(0, "transparent"),
         )
         
-        # Make table scrollable
+        # Make table scrollable - apply scroll to Column, not Container
         return Container(
             content=Column(
                 controls=[
                     Container(
                         content=table,
-                        scroll=ft.ScrollMode.AUTO,
                         height=300,  # Fixed height for scrollable area
                     ),
                 ],
                 spacing=0,
+                scroll=ft.ScrollMode.AUTO,  # Move scroll to Column
             ),
             expand=True,
         )
@@ -1590,21 +1594,33 @@ Path: {model.get('model_path', 'N/A')}
     
     def show_change_password_dialog_ui(self, e):
         """Show change password dialog from settings"""
-        old_pass = TextField(label="Current Password", password=True, width=300)
-        new_pass = TextField(label="New Password", password=True, width=300)
-        confirm_pass = TextField(label="Confirm Password", password=True, width=300)
+        old_pass = TextField(label="Current Password", password=True, can_reveal_password=True, width=300)
+        new_pass = TextField(label="New Password", password=True, can_reveal_password=True, width=300)
+        confirm_pass = TextField(label="Confirm Password", password=True, can_reveal_password=True, width=300)
         
         def change_password(e):
-            if new_pass.value != confirm_pass.value:
-                self.show_dialog("Error", "Passwords do not match")
+            if not old_pass.value:
+                self.show_dialog("Error", "Please enter your current password")
                 return
+            
+            if not new_pass.value:
+                self.show_dialog("Error", "Please enter a new password")
+                return
+            
+            if new_pass.value != confirm_pass.value:
+                self.show_dialog("Error", "New passwords do not match")
+                return
+            
             if len(new_pass.value) < 8:
                 self.show_dialog("Error", "Password must be at least 8 characters")
                 return
             
+            # Get user ID
+            user_id = self.auth.current_user['id']
+            
             # Change password
             result = self.auth.change_password(
-                self.auth.current_user['id'],
+                user_id,
                 old_pass.value,
                 new_pass.value
             )
@@ -1612,6 +1628,10 @@ Path: {model.get('model_path', 'N/A')}
             if result['success']:
                 self.close_dialog()
                 self.show_dialog("Success", "Password changed successfully")
+                
+                # Optional: Log out user after password change for security
+                # Uncomment if you want to force re-login
+                # self.handle_logout()
             else:
                 self.show_dialog("Error", result['message'])
         
