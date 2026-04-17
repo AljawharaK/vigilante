@@ -420,7 +420,7 @@ class VigilanteGUI:
             ],
         )
         
-        self.page.dialog = dialog
+        self.page.overlay.append(dialog)
         dialog.open = True
         self.page.update()
     
@@ -1137,9 +1137,9 @@ Path: {model.get('model_path', 'N/A')}
             expand=True,
         )
     
-    # FIX 1: show_create_user_dialog with page.dialog
+    # show_create_user_dialog
     def show_create_user_dialog(self, e):
-        """Show create user dialog - Fixed for Flet 0.84.0+"""
+        """Show create user dialog"""
         print("Create button clicked")  # Debug print
         
         username_field = TextField(label="Username", width=300)
@@ -1208,13 +1208,13 @@ Path: {model.get('model_path', 'N/A')}
             ],
         )
         
-        self.page.dialog = create_dialog
+        self.page.overlay.append(create_dialog)
         create_dialog.open = True
         self.page.update()
     
-    # FIX 2: show_edit_user_dialog with page.dialog
+    # show_edit_user_dialog
     def show_edit_user_dialog(self, user: Dict):
-        """Show edit user dialog - Fixed logic and UI refresh"""
+        """Show edit user dialog"""
         print(f"Edit clicked: {user['username']}")  # Debug print
         
         role_dropdown = Dropdown(
@@ -1273,7 +1273,7 @@ Path: {model.get('model_path', 'N/A')}
             ],
         )
         
-        self.page.dialog = edit_dialog
+        self.page.overlay.append(edit_dialog)
         edit_dialog.open = True
         self.page.update()
     
@@ -1283,7 +1283,7 @@ Path: {model.get('model_path', 'N/A')}
             dialog.open = False
             self.page.update()
     
-    # FIX: Delete button - Pass user dict correctly
+    # Delete button - Pass user dict correctly
     def delete_user_working(self, user: Dict):
         """Delete/deactivate a user with confirmation"""
         print(f"Delete clicked: {user['username']}")  # Debug print
@@ -1339,13 +1339,13 @@ Path: {model.get('model_path', 'N/A')}
             ],
         )
         
-        self.page.dialog = dialog
+        self.page.overlay.append(dialog)
         dialog.open = True
         self.page.update()
     
-    # FIX 3: show_change_password_dialog_ui with page.dialog
+    # show_change_password_dialog_ui
     def show_change_password_dialog_ui(self, e):
-        """Show change password dialog from settings - Fixed logic and fields"""
+        """Show change password dialog from settings"""
         print("Change Password button clicked")  # Debug print
         
         curr_pass = TextField(label="Current Password", password=True, can_reveal_password=True)
@@ -1393,13 +1393,13 @@ Path: {model.get('model_path', 'N/A')}
             ],
         )
         
-        self.page.dialog = pass_dialog
+        self.page.overlay.append(pass_dialog)
         pass_dialog.open = True
         self.page.update()
     
-    # SINGLE show_dialog method (removed duplicate)
+    # SINGLE show_dialog method
     def show_dialog(self, title: str, message: str):
-        """Show a dialog - Using page.dialog for Flet 0.84.0+"""
+        """Show a dialog"""
         dialog = AlertDialog(
             title=Text(title),
             content=Text(message),
@@ -1408,15 +1408,17 @@ Path: {model.get('model_path', 'N/A')}
             ],
         )
         
-        self.page.dialog = dialog
+        self.page.overlay.append(dialog)
         dialog.open = True
         self.page.update()
     
     def close_dialog(self, e=None):
         """Close the current dialog"""
-        if self.page.dialog:
-            self.page.dialog.open = False
-            self.page.update()
+        # Find and close all open dialogs in overlay
+        for control in self.page.overlay:
+            if isinstance(control, AlertDialog) and control.open:
+                control.open = False
+        self.page.update()
     
     def create_system_admin_content(self) -> Container:
         """Create system administration view"""
