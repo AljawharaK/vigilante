@@ -1433,20 +1433,64 @@ Path: {model.get('model_path', 'N/A')}
             if isinstance(log, dict):
                 log_dict = log
             elif isinstance(log, tuple):
-                log_dict = {'id': log[0] if len(log) > 0 else '', 'created_at': log[1] if len(log) > 1 else datetime.now(), 'username': log[2] if len(log) > 2 else 'System', 'action': log[3] if len(log) > 3 else '', 'resource': log[4] if len(log) > 4 else '-', 'status': log[5] if len(log) > 5 else 'success'}
+                log_dict = {
+                    'id': log[0] if len(log) > 0 else '', 
+                    'created_at': log[1] if len(log) > 1 else datetime.now(), 
+                    'username': log[2] if len(log) > 2 else 'System', 
+                    'action': log[3] if len(log) > 3 else '', 
+                    'resource': log[4] if len(log) > 4 else '-', 
+                    'status': log[5] if len(log) > 5 else 'success'
+                }
             else:
                 continue
             log_dicts.append(log_dict)
         
-        audit_card = Card(content=Container(content=Column(controls=[Text("Recent Audit Logs", size=18, weight=ft.FontWeight.BOLD), Container(height=10), self.create_audit_logs_table(log_dicts[:10])], spacing=0, expand=True), padding=ft.Padding.all(20), expand=True), expand=True)
+        # Create audit card with proper expand
+        audit_card = Card(
+            content=Container(
+                content=Column(
+                    controls=[
+                        Text("Recent Audit Logs", size=18, weight=ft.FontWeight.BOLD), 
+                        Container(height=10), 
+                        self.create_audit_logs_table(log_dicts[:10])
+                    ], 
+                    spacing=0, 
+                    expand=True
+                ), 
+                padding=ft.Padding.all(20), 
+                expand=True
+            ), 
+            expand=True
+        )
         
         return Container(
-            content=Column(controls=[
-                Text("System Administration", size=24, weight=ft.FontWeight.BOLD), Container(height=20),
-                Container(content=Row(controls=[self.create_stat_card("Total Users", str(db_stats.get('counts', {}).get('user_count', 0)), ft.Icons.PEOPLE), self.create_stat_card("Total Models", str(db_stats.get('counts', {}).get('model_count', 0)), ft.Icons.MODEL_TRAINING), self.create_stat_card("Total Detections", str(db_stats.get('counts', {}).get('detection_count', 0)), ft.Icons.ANALYTICS), self.create_stat_card("Active Sessions", str(db_stats.get('counts', {}).get('active_sessions', 0)), ft.Icons.LOGIN)], spacing=10, expand=True), height=120),
-                Container(height=20),
-                Container(content=audit_card, expand=True),
-            ], spacing=0, expand=True),
+            content=Column(
+                controls=[
+                    Text("System Administration", size=24, weight=ft.FontWeight.BOLD), 
+                    Container(height=20),
+                    Container(
+                        content=Row(
+                            controls=[
+                                self.create_stat_card("Total Users", str(db_stats.get('counts', {}).get('user_count', 0)), ft.Icons.PEOPLE), 
+                                self.create_stat_card("Total Models", str(db_stats.get('counts', {}).get('model_count', 0)), ft.Icons.MODEL_TRAINING), 
+                                self.create_stat_card("Total Detections", str(db_stats.get('counts', {}).get('detection_count', 0)), ft.Icons.ANALYTICS), 
+                                self.create_stat_card("Active Sessions", str(db_stats.get('counts', {}).get('active_sessions', 0)), ft.Icons.LOGIN)
+                            ], 
+                            spacing=10, 
+                            expand=True
+                        ), 
+                        height=120
+                    ),
+                    Container(height=20),
+                    # Let audit_card expand naturally without fixed height
+                    Container(
+                        content=audit_card, 
+                        expand=True
+                    ),
+                ], 
+                spacing=0, 
+                expand=True
+            ),
             expand=True,
         )
     
@@ -1456,14 +1500,27 @@ Path: {model.get('model_path', 'N/A')}
         
         filtered_logs = [log for log in logs if log is not None]
         table = ft.DataTable(
-            columns=[ft.DataColumn(Text("Time", size=12)), ft.DataColumn(Text("User", size=12)), ft.DataColumn(Text("Action", size=12)), ft.DataColumn(Text("Resource", size=12)), ft.DataColumn(Text("Status", size=12))],
-            rows=[ft.DataRow(cells=[
-                ft.DataCell(Text(log['created_at'].strftime("%Y-%m-%d %H:%M") if hasattr(log['created_at'], 'strftime') else str(log.get('created_at', ''))[:16], size=11)),
-                ft.DataCell(Text(log.get('username', 'System'), size=11)),
-                ft.DataCell(Text(log.get('action', ''), size=11)),
-                ft.DataCell(Text(str(log.get('resource', '-'))[:25] if log.get('resource') else '-', size=11)),
-                ft.DataCell(Container(content=Text(log.get('status', 'success'), size=11), bgcolor=AppTheme.SUCCESS if log.get('status') == 'success' else AppTheme.ERROR, padding=ft.Padding.all(3), border_radius=ft.BorderRadius.all(5))),
-            ]) for log in filtered_logs],
+            columns=[
+                ft.DataColumn(Text("Time", size=12)), 
+                ft.DataColumn(Text("User", size=12)), 
+                ft.DataColumn(Text("Action", size=12)), 
+                ft.DataColumn(Text("Resource", size=12)), 
+                ft.DataColumn(Text("Status", size=12))
+            ],
+            rows=[
+                ft.DataRow(cells=[
+                    ft.DataCell(Text(log['created_at'].strftime("%Y-%m-%d %H:%M") if hasattr(log['created_at'], 'strftime') else str(log.get('created_at', ''))[:16], size=11)),
+                    ft.DataCell(Text(log.get('username', 'System'), size=11)),
+                    ft.DataCell(Text(log.get('action', ''), size=11)),
+                    ft.DataCell(Text(str(log.get('resource', '-'))[:25] if log.get('resource') else '-', size=11)),
+                    ft.DataCell(Container(
+                        content=Text(log.get('status', 'success'), size=11), 
+                        bgcolor=AppTheme.SUCCESS if log.get('status') == 'success' else AppTheme.ERROR, 
+                        padding=ft.Padding.all(3), 
+                        border_radius=ft.BorderRadius.all(5)
+                    )),
+                ]) for log in filtered_logs
+            ],
             heading_row_color=AppTheme.SURFACE, 
             heading_row_height=45, 
             data_row_color={ControlState.HOVERED: AppTheme.PRIMARY + "20"},
@@ -1472,7 +1529,17 @@ Path: {model.get('model_path', 'N/A')}
             vertical_lines=ft.BorderSide(1, AppTheme.BORDER),
             horizontal_lines=ft.BorderSide(1, AppTheme.BORDER),
         )
-        return Container(content=Column(controls=[Container(content=table, height=300)], spacing=0, scroll=ft.ScrollMode.AUTO), expand=True)
+        
+        # Let Column handle scrolling
+        return Container(
+            content=Column(
+                controls=[table],
+                spacing=0, 
+                scroll=ft.ScrollMode.AUTO,  # Scroll on Column
+                expand=True,  # Column expands to fill Container
+            ),
+            expand=True,  # Container expands to fill parent
+        )
     
     # =====================================================================
     # SETTINGS VIEW
