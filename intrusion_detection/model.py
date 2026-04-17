@@ -509,14 +509,16 @@ register_custom_classes()
 # ========================
 # Complete Model Class
 # ========================
+# intrusion_detection/model.py - Modified IntrusionDetectionModel class
+
 class IntrusionDetectionModel:
     """Complete intrusion detection model using RNSA + KNN with feature alignment"""
     
-    # Core features required by the model (10 features)
+    # Core features required by the model (10 features) - used as fallback
     CORE_FEATURES = ['dur', 'spkts', 'dpkts', 'sbytes', 'dbytes', 
                      'rate', 'smean', 'dmean', 'swin', 'dwin']
     
-    def __init__(self, model_dir="saved_models"):
+    def __init__(self, model_dir="saved_models", custom_features=None):
         self.model_dir = model_dir
         os.makedirs(model_dir, exist_ok=True)
         
@@ -526,10 +528,20 @@ class IntrusionDetectionModel:
         self.metrics = {}
         self.threshold = 0.5
         self.feature_mapping = {}  # Stores mapping from model features to data features
+        
+        # Allow custom features to override CORE_FEATURES
+        if custom_features:
+            self.CORE_FEATURES = custom_features
+            print(f"[INFO] Using custom features: {self.CORE_FEATURES}")
+    
+    def set_custom_features(self, features: List[str]):
+        """Set custom features for the model"""
+        self.CORE_FEATURES = features
+        print(f"[INFO] Features set to: {self.CORE_FEATURES}")
     
     def _find_features_in_data(self, df: pd.DataFrame) -> Tuple[List[str], Dict[str, str]]:
         """
-        Find which of the core features are available in the dataframe
+        Find which of the required features are available in the dataframe
         Returns (available_features, feature_mapping)
         """
         available = []
@@ -540,6 +552,7 @@ class IntrusionDetectionModel:
     
         print("\n[Feature Matching]")
         print(f"DataFrame has {len(df_columns)} columns")
+        print(f"Looking for features: {self.CORE_FEATURES}")
     
         for feature in self.CORE_FEATURES:
             matched = None
@@ -550,8 +563,8 @@ class IntrusionDetectionModel:
             # Try case-insensitive match
             elif feature.lower() in [col.lower() for col in df_columns]:
                 matched = next(col for col in df_columns if col.lower() == feature.lower())
-            # Try mapping from alignment dictionary
-            else:
+            # Try mapping from alignment dictionary (for core features only)
+            elif feature in FEATURE_ALIGNMENT_MAP:
                 for possible_name in FEATURE_ALIGNMENT_MAP.get(feature, []):
                     if possible_name in df_columns:
                         matched = possible_name
@@ -566,38 +579,17 @@ class IntrusionDetectionModel:
                 mapping[feature] = matched
                 print(f"  ✓ '{feature}' → '{matched}'")
             else:
-                print(f"  ✓ '{feature}' → '0 (filling with zeros)'")
-                # Still add to available for core features, but mapping will be None
+                print(f"  ✗ '{feature}' not found - will use zeros")
+                # Still add to available, but mapping will be None
                 available.append(feature)
                 mapping[feature] = None
     
         return available, mapping
     
-    def _normalize_name(self, name: str) -> str:
-        """Normalize feature name for comparison"""
-        if not isinstance(name, str):
-            return str(name)
-        
-        # Convert to lowercase and remove common patterns
-        normalized = name.lower()
-        
-        # Remove common prefixes/suffixes
-        patterns_to_remove = ['fwd', 'bwd', 'tot', 'init', 'flow', 'pkt', 'len', 'win', 'byts', 
-                             'seg', 'size', 'length', 'packet', 'bytes', 'duration', 'rate',
-                             'mean', 'avg', 'total', 'initial', ' ', '_', '-', '/', '.', ',']
-        
-        for pattern in patterns_to_remove:
-            normalized = normalized.replace(pattern, '')
-        
-        # Remove any remaining non-alphanumeric characters
-        normalized = ''.join(c for c in normalized if c.isalnum())
-        
-        return normalized
-    
     def preprocess_data(self, df: pd.DataFrame, fit_scaler: bool = True) -> np.ndarray:
         """
         Robust preprocessing that handles different dataset formats
-        Aligns features to the 10 core features required by the model
+        Aligns features to the required features (either custom or core)
         """
         print("\n" + "="*60)
         print("PREPROCESSING DATA")
@@ -606,15 +598,19 @@ class IntrusionDetectionModel:
         # Make a copy to avoid modifying original
         df_processed = df.copy()
         
+        # Find which required features are available
+        required_features = self.CORE_FEATURES
+        print(f"Required features ({len(required_features)}): {required_features}")
+        
         # Remove non-numeric columns that shouldn't be used as features
         columns_to_drop = []
         for col in df_processed.columns:
             col_lower = col.lower()
-            # Drop common non-feature columns
-            if any(x in col_lower for x in ['label', 'attack', 'class', 'timestamp', 'time', 
-                                           'date', 'id', 'flow id', 'srcip', 'dstip', 'src_ip', 
-                                           'dst_ip', 'source', 'destination']):
-                if col_lower not in [f.lower() for f in self.CORE_FEATURES]:
+            # Drop common non-feature columns (unless they're in required features)
+            if any(x in col_lower for x in ['label', 'Label', ' Label', 'attack_type', 
+                    'class', 'Label.1', 'LABEL', 'attack', 'Attack',
+                    'attack_cat', 'attack', 'class', 'timestamp', 'time', 'date']):
+                if col_lower not in [f.lower() for f in required_features]:
                     columns_to_drop.append(col)
         
         if columns_to_drop:
@@ -630,22 +626,24 @@ class IntrusionDetectionModel:
         # Store feature mapping for later use
         self.feature_mapping = feature_mapping
         
-        # Create aligned dataframe with exactly the core features
+        # Create aligned dataframe with exactly the required features
         aligned_data = {}
-        for feature in self.CORE_FEATURES:
+        for feature in required_features:
             if feature in feature_mapping and feature_mapping[feature] is not None:
                 # Use the mapped column
                 try:
                     # Ensure we're getting numeric values
                     aligned_data[feature] = pd.to_numeric(df_processed[feature_mapping[feature]], errors='coerce')
-                except:
+                except Exception as e:
+                    print(f"  Warning: Could not convert '{feature}': {e}")
                     aligned_data[feature] = 0
             else:
                 # Feature not found, fill with zeros
                 aligned_data[feature] = 0
+                print(f"  Feature '{feature}' not found, using zeros")
         
         # Convert to DataFrame with correct column order
-        X_aligned = pd.DataFrame(aligned_data)[self.CORE_FEATURES]
+        X_aligned = pd.DataFrame(aligned_data)[required_features]
         
         print(f"\nAligned data shape: {X_aligned.shape}")
         
@@ -669,7 +667,7 @@ class IntrusionDetectionModel:
             X_scaled = self.scaler.transform(X_array)
         
         # Store feature names
-        self.feature_names = self.CORE_FEATURES
+        self.feature_names = required_features
         
         print(f"Preprocessing complete: {X_scaled.shape[0]} samples, {X_scaled.shape[1]} features")
         
@@ -682,6 +680,7 @@ class IntrusionDetectionModel:
         print("\n" + "="*60)
         print("TRAINING RNSA+KNN MODEL")
         print("="*60)
+        print(f"Training with {X_train.shape[1]} features")
         
         # Initialize and train model
         self.model = ProposedRNSA_KNN(
@@ -690,7 +689,7 @@ class IntrusionDetectionModel:
             k=k
         )
         
-        self.model.fit(X_train, y_train, dataset_name=dataset_name)
+        self.model.fit(X_train, y_train, dataset_name=dataset_name, feature_names=self.feature_names)
         
         # Set threshold
         self.threshold = 0.5
@@ -703,7 +702,8 @@ class IntrusionDetectionModel:
             'r_s': r_s,
             'max_detectors': max_detectors,
             'k': k,
-            'dataset_name': dataset_name
+            'dataset_name': dataset_name,
+            'features_used': self.feature_names
         }
         
         print(f"\nRNSA+KNN training complete!")
@@ -711,64 +711,6 @@ class IntrusionDetectionModel:
         print(f"Features used: {X_train.shape[1]}")
         
         return self
-    
-    def predict(self, X_test: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """Make predictions on new data"""
-        if self.model is None:
-            raise ValueError("Model not trained. Call fit() first.")
-        
-        # Get predictions
-        predictions = self.model.predict(X_test)
-        
-        # Get probability scores
-        proba = self.model.predict_proba(X_test)
-        confidence_scores = proba[:, 1]  # Probability of being abnormal
-        
-        return predictions, confidence_scores
-    
-    def evaluate(self, X_test: np.ndarray, y_true: np.ndarray) -> Dict[str, Any]:
-        """Evaluate model performance"""
-        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-        from sklearn.metrics import roc_auc_score, confusion_matrix
-    
-        y_pred, confidence_scores = self.predict(X_test)
-    
-        # Calculate basic metrics
-        metrics = {
-            'accuracy': float(accuracy_score(y_true, y_pred)),
-            'precision': float(precision_score(y_true, y_pred, zero_division=0)),
-            'recall': float(recall_score(y_true, y_pred, zero_division=0)),
-            'f1_score': float(f1_score(y_true, y_pred, zero_division=0)),
-            'threshold': float(self.threshold)
-        }
-        
-        # Calculate ROC AUC
-        if confidence_scores is not None:
-            try:
-                metrics['roc_auc'] = float(roc_auc_score(y_true, confidence_scores))
-            except:
-                metrics['roc_auc'] = 0.0
-        
-        # Calculate confusion matrix metrics
-        try:
-            cm = confusion_matrix(y_true, y_pred)
-            TN, FP, FN, TP = cm.ravel()
-            
-            metrics['true_positive'] = int(TP)
-            metrics['false_positive'] = int(FP)
-            metrics['true_negative'] = int(TN)
-            metrics['false_negative'] = int(FN)
-            
-            # Detection Rate (Recall)
-            metrics['detection_rate'] = float(TP / (TP + FN)) if (TP + FN) > 0 else 0.0
-            
-            # False Alarm Rate (False Positive Rate)
-            metrics['false_alarm_rate'] = float(FP / (FP + TN)) if (FP + TN) > 0 else 0.0
-            
-        except:
-            pass
-    
-        return metrics
     
     def save(self, model_name: str):
         """Save complete model to disk"""
@@ -787,7 +729,7 @@ class IntrusionDetectionModel:
             'model_type': 'rnsa_knn',
             'scaler': self.scaler if hasattr(self, 'scaler') else None,
             'feature_mapping': self.feature_mapping,
-            'core_features': self.CORE_FEATURES
+            'core_features': self.CORE_FEATURES  # Save the features used
         }
         
         joblib.dump(model_data, model_path)
@@ -815,8 +757,9 @@ class IntrusionDetectionModel:
             
             # If model_data is a dict with 'model' key (our save format)
             if isinstance(model_data, dict) and 'model' in model_data:
-                # Create model instance
-                model = cls(model_dir=os.path.dirname(model_path))
+                # Create model instance with stored core features
+                core_features = model_data.get('core_features', cls.CORE_FEATURES)
+                model = cls(model_dir=os.path.dirname(model_path), custom_features=core_features)
                 
                 # Restore components
                 model.model = model_data['model']
@@ -831,10 +774,6 @@ class IntrusionDetectionModel:
                 elif hasattr(model.model, 'scaler'):
                     model.scaler = model.model.scaler
                 
-                # Set core features
-                if 'core_features' in model_data:
-                    model.CORE_FEATURES = model_data['core_features']
-                
                 return model
             else:
                 # Legacy format - model_data is the model directly
@@ -843,20 +782,19 @@ class IntrusionDetectionModel:
                 # Try to extract attributes
                 if hasattr(model_data, 'feature_names'):
                     model.feature_names = model_data.feature_names
+                    model.CORE_FEATURES = model_data.feature_names
                 if hasattr(model_data, 'threshold'):
                     model.threshold = model_data.threshold
                 if hasattr(model_data, 'scaler'):
                     model.scaler = model_data.scaler
                 if hasattr(model_data, 'feature_mapping'):
                     model.feature_mapping = model_data.feature_mapping
-                if hasattr(model_data, 'CORE_FEATURES'):
-                    model.CORE_FEATURES = model_data.CORE_FEATURES
                 return model
                 
         except Exception as e:
             print(f"Error loading model: {e}")
             raise
-        
+
     def get_feature_summary(self) -> Dict[str, Any]:
         """Get summary of features used by the model"""
         # Try to get core features from model.model if available

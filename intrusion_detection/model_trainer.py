@@ -107,8 +107,9 @@ class ModelTrainer:
         return result
     
     def train_model(self, data_path: str, model_name: str, 
-               r_s: float = 0.05, max_detectors: int = 1000, 
-               k: int = 5, dataset_name: str = None) -> Dict[str, Any]:
+                r_s: float = 0.05, max_detectors: int = 1000, 
+                k: int = 5, dataset_name: str = None, 
+                custom_features: List[str] = None) -> Dict[str, Any]:
         """Train a complete intrusion detection model using RNSA+KNN with feature alignment"""
         print("\n" + "="*80)
         print(f"RNSA+KNN MODEL TRAINING: {model_name}")
@@ -120,17 +121,32 @@ class ModelTrainer:
         if y_train is None:
             raise ValueError("Training data must have labels")
         
-        # Analyze dataset features
-        feature_analysis = self.analyze_dataset_features(df)
+        # Initialize model with custom features if provided
+        from .model import IntrusionDetectionModel
         
-        # Initialize model
-        model = IntrusionDetectionModel()
+        if custom_features:
+            print(f"\n[INFO] Using user-specified features: {custom_features}")
+            model = IntrusionDetectionModel(custom_features=custom_features)
+            
+            # Verify that custom features exist in the data
+            missing_features = [f for f in custom_features if f not in df.columns]
+            if missing_features:
+                print(f"[WARNING] These features not found in data: {missing_features}")
+                print("They will be filled with zeros during preprocessing.")
+        else:
+            # Use default core features (will try to find matches)
+            print("\n[INFO] No custom features specified. Using core features with mapping.")
+            model = IntrusionDetectionModel()
+            # Analyze dataset features
+            feature_analysis = self.analyze_dataset_features(df)
+            print(f"Found {len(feature_analysis['available_features'])} out of {len(model.CORE_FEATURES)} core features")
         
         # Preprocess data (this will align features automatically)
         X_train = model.preprocess_data(df, fit_scaler=True)
         
         print(f"\nTraining data shape: {X_train.shape}")
         print(f"Class distribution: Normal: {np.sum(y_train == 0)}, Attack: {np.sum(y_train == 1)}")
+        print(f"Features used: {model.CORE_FEATURES}")
         
         # Balance classes if needed (optional)
         if np.sum(y_train == 0) > 0 and np.sum(y_train == 1) > 0:
@@ -184,13 +200,24 @@ class ModelTrainer:
         # Save model
         model_path = model.save(unique_name)
         
+        # Prepare feature analysis result
+        feature_analysis_result = {
+            'total_columns': len(df.columns),
+            'available_features': model.feature_names,
+            'missing_features': [],
+            'feature_mapping': model.feature_mapping,
+            'coverage': 100.0 if custom_features else (len([f for f in model.CORE_FEATURES if model.feature_mapping.get(f)]) / len(model.CORE_FEATURES) * 100),
+            'custom_features_used': custom_features is not None
+        }
+        
         # Prepare result with all metrics
         result = {
             'model_path': model_path,
             'model_name': unique_name,
-            'training_samples': len(X_train_split),  # ADD THIS - actual training samples used
+            'training_samples': len(X_train_split),
             'validation_samples': len(X_val),
             'features_count': X_train.shape[1],
+            'features_used': model.feature_names,
             'metrics': {
                 'train_accuracy': float(train_accuracy),
                 'test_accuracy': float(val_metrics.get('accuracy', 0)),
@@ -203,16 +230,17 @@ class ModelTrainer:
                 'detectors': len(model.model.detectors) if model.model else 0,
                 'optimal_dr': float(val_metrics.get('detection_rate', 0)),
                 'optimal_far': float(val_metrics.get('false_alarm_rate', 0)),
-                'training_samples': len(X_train_split),  # ADD THIS to metrics too
-                'features_count': X_train.shape[1]  # ADD THIS to metrics too
+                'training_samples': len(X_train_split),
+                'features_count': X_train.shape[1]
             },
-            'feature_analysis': feature_analysis,
+            'feature_analysis': feature_analysis_result,
             'parameters': {
                 'r_s': r_s,
                 'max_detectors': max_detectors,
                 'k': k,
                 'model_type': 'rnsa_knn',
-                'training_samples': len(X_train_split)  # ADD THIS
+                'training_samples': len(X_train_split),
+                'custom_features': custom_features if custom_features else None
             },
             'dataset_name': dataset_name or os.path.basename(data_path),
             'timestamp': timestamp
@@ -228,6 +256,7 @@ class ModelTrainer:
         print("="*60)
         print(f"Model saved: {model_path}")
         print(f"Training samples: {len(X_train_split):,}")
+        print(f"Features used: {len(model.feature_names)} - {model.feature_names}")
         print(f"Detectors generated: {result['metrics']['detectors']}")
         print(f"Train accuracy: {result['metrics']['train_accuracy']:.4f}")
         print(f"Test accuracy: {result['metrics']['test_accuracy']:.4f}")

@@ -65,10 +65,11 @@ vigilante logout
 vigilante --version
 vigilante reset-pass
 vigilante status
-vigilante explain (without --detection-id for file input)
+vigilante explain --detection-id 1
 vigilante -v or vigilante --verbose
 vigilante -h
 vigilante --help
+vigilante uninstall --force
 
 # Interactive GUI dashboard for both users
 vigilante interactive-gui
@@ -92,6 +93,6 @@ vigilante train --input training_data.csv --model-name "Network Traffic Model"
 # 2. List available models to get the ID
 vigilante list-models
 # 3. Run detection on new traffic
-vigilante detect --input new_traffic.csv --model-id 1 --explain --output results.json
+vigilante detect --input new_traffic.csv --model-id 1 --output results.json
 # 4. Check summary of detections
 vigilante summary --period 7d

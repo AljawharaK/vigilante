@@ -49,12 +49,12 @@ class VigilanteCLI:
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  vigilante --login                                      # Interactive login
-  vigilante --train --input traffic.csv                  # Train model
-  vigilante --detect --input test.csv --model-id 1       # Detect anomalies
-  vigilante --admin --user-create --username analyst1    # Create user (admin only)
-  vigilante --summary --period 7d                        # Weekly summary
-  vigilante --explain --detection-id 1                   # Explain detection
+  vigilante login                                      # Interactive login
+  vigilante train --input training_data.csv --model-name "Network Traffic Model"              # Train model
+  vigilante detect --input new_traffic.csv --model-id 1 --output results.json                 # Detect anomalies
+  vigilante admin user-create --username analyst1 --email analyst@company.com --role Analyst  # Create user (admin only)
+  vigilante summary --period 7d                        # Weekly summary
+  vigilante explain --detection-id 1                   # Explain detection
             """
         )
         
@@ -67,6 +67,8 @@ Examples:
         auth_parser.add_argument('--password', help='Password (not recommended)')
         
         subparsers.add_parser('logout', help='Logout from system')
+        uninstall_parser = subparsers.add_parser('uninstall', help='Completely remove Vigilante from system')
+        uninstall_parser.add_argument('--force', action='store_true', help='Force uninstall without confirmation')
         
         reset_parser = subparsers.add_parser('reset-pass', help='Reset password')
         reset_parser.add_argument('--username', help='Username')
@@ -104,13 +106,12 @@ Examples:
         detect_parser.add_argument('--input', required=True, help='Input CSV file')
         detect_parser.add_argument('--model-id', type=int, help='Model ID from database')
         detect_parser.add_argument('--model-path', help='Path to model file')
+        detect_parser.add_argument('--threshold', type=float, help='Override model threshold (0.0-1.0)')
         detect_parser.add_argument('--output', help='Output JSON file')
-        detect_parser.add_argument('--explain', action='store_true', help='Generate explanations')
         
         # Training commands (available to both Admin and Analyst)
         train_parser = subparsers.add_parser('train', help='Train model')
         train_parser.add_argument('--input', required=True, help='Training data CSV')
-        train_parser.add_argument('--threshold', type=float, default=0.8, help='Anomaly threshold')
         train_parser.add_argument('--features', help='Comma-separated features')
         train_parser.add_argument('--model-name', help='Model name')
         train_parser.add_argument('--output', help='Output model path')
@@ -315,6 +316,277 @@ Examples:
         else:
             console.print("[yellow]Not logged in[/yellow]")
     
+    def handle_uninstall(self, args):
+        """Completely remove Vigilante from the system"""
+        console.print("[bold red]VIGILANTE UNINSTALLATION[/bold red]")
+        console.print("[yellow]This will permanently remove:[/yellow]")
+        console.print("  • Vigilante executable from ~/.local/bin/vigilante.exe")
+        console.print("  • Pipx/venv installations")
+        console.print("  • Session files")
+        console.print("  • Saved models")
+        console.print("  • Configuration files")
+        console.print("  • All user data from the system\n")
+        
+        # Force confirmation
+        console.print("[bold red]⚠️  WARNING: This action is IRREVERSIBLE! ⚠️[/bold red]")
+        confirm = input("Type 'DELETE VIGILANTE' to confirm uninstallation: ").strip()
+        
+        if confirm != "DELETE VIGILANTE":
+            console.print("[green]Uninstallation cancelled.[/green]")
+            return
+        
+        console.print("\n[cyan]Starting uninstallation...[/cyan]")
+        
+        results = {
+            "success": [],
+            "failed": [],
+            "skipped": []
+        }
+        
+        # 1. Clear session and logout
+        console.print("[cyan]→ Clearing active session...[/cyan]")
+        try:
+            if self.auth.is_authenticated():
+                self.auth.logout()
+            self.clear_session()
+            results["success"].append("Cleared session")
+            console.print("[green]  ✓ Session cleared[/green]")
+        except Exception as e:
+            results["failed"].append(f"Session clear: {e}")
+            console.print(f"[red]  ✗ Failed to clear session: {e}[/red]")
+        
+        # 2. Remove session file
+        console.print("[cyan]→ Removing session file...[/cyan]")
+        try:
+            session_file = Path.home() / ".vigilante_session"
+            if session_file.exists():
+                session_file.unlink()
+                results["success"].append("Removed session file")
+                console.print("[green]  ✓ Session file removed[/green]")
+            else:
+                results["skipped"].append("Session file not found")
+                console.print("[yellow]  ! Session file not found[/yellow]")
+        except Exception as e:
+            results["failed"].append(f"Session file: {e}")
+            console.print(f"[red]  ✗ Failed to remove session file: {e}[/red]")
+        
+        # 3. Remove ~/.local/bin/vigilante.exe
+        console.print("[cyan]→ Removing vigilante executable...[/cyan]")
+        local_bin = Path.home() / ".local" / "bin" / "vigilante.exe"
+        try:
+            if local_bin.exists():
+                local_bin.unlink()
+                results["success"].append("Removed ~/.local/bin/vigilante.exe")
+                console.print("[green]  ✓ ~/.local/bin/vigilante.exe removed[/green]")
+            else:
+                # Also check for non-.exe version
+                local_bin_no_exe = Path.home() / ".local" / "bin" / "vigilante"
+                if local_bin_no_exe.exists():
+                    local_bin_no_exe.unlink()
+                    results["success"].append("Removed ~/.local/bin/vigilante")
+                    console.print("[green]  ✓ ~/.local/bin/vigilante removed[/green]")
+                else:
+                    results["skipped"].append("Executable not found in ~/.local/bin")
+                    console.print("[yellow]  ! Executable not found in ~/.local/bin[/yellow]")
+        except Exception as e:
+            results["failed"].append(f"Executable removal: {e}")
+            console.print(f"[red]  ✗ Failed to remove executable: {e}[/red]")
+        
+        # 4. Remove pipx installation
+        console.print("[cyan]→ Removing pipx installation...[/cyan]")
+        try:
+            import subprocess
+            # Check if installed via pipx
+            result = subprocess.run(["pipx", "list"], capture_output=True, text=True)
+            if "vigilante" in result.stdout:
+                subprocess.run(["pipx", "uninstall", "vigilante"], capture_output=True, text=True)
+                results["success"].append("Uninstalled via pipx")
+                console.print("[green]  ✓ Pipx uninstallation completed[/green]")
+            else:
+                results["skipped"].append("Not installed via pipx")
+                console.print("[yellow]  ! Not installed via pipx[/yellow]")
+        except FileNotFoundError:
+            results["skipped"].append("pipx not installed")
+            console.print("[yellow]  ! pipx not found on system[/yellow]")
+        except Exception as e:
+            results["failed"].append(f"Pipx uninstall: {e}")
+            console.print(f"[red]  ✗ Pipx uninstall failed: {e}[/red]")
+        
+        # 5. Remove venv if exists in current directory
+        console.print("[cyan]→ Removing virtual environment...[/cyan]")
+        venv_path = Path.cwd() / ".venv"
+        try:
+            if venv_path.exists() and venv_path.is_dir():
+                import shutil
+                shutil.rmtree(venv_path)
+                results["success"].append("Removed .venv directory")
+                console.print("[green]  ✓ Virtual environment removed[/green]")
+            else:
+                # Check parent directory
+                parent_venv = Path.cwd().parent / ".venv"
+                if parent_venv.exists() and parent_venv.is_dir():
+                    shutil.rmtree(parent_venv)
+                    results["success"].append("Removed parent .venv directory")
+                    console.print("[green]  ✓ Parent virtual environment removed[/green]")
+                else:
+                    results["skipped"].append(".venv not found")
+                    console.print("[yellow]  ! Virtual environment not found[/yellow]")
+        except Exception as e:
+            results["failed"].append(f"Venv removal: {e}")
+            console.print(f"[red]  ✗ Failed to remove virtual environment: {e}[/red]")
+        
+        # 6. Remove saved_models directory
+        console.print("[cyan]→ Removing saved models...[/cyan]")
+        models_dir = Path.cwd() / "saved_models"
+        try:
+            if models_dir.exists() and models_dir.is_dir():
+                import shutil
+                shutil.rmtree(models_dir)
+                results["success"].append("Removed saved_models directory")
+                console.print("[green]  ✓ Saved models removed[/green]")
+            else:
+                results["skipped"].append("saved_models directory not found")
+                console.print("[yellow]  ! saved_models directory not found[/yellow]")
+        except Exception as e:
+            results["failed"].append(f"Models removal: {e}")
+            console.print(f"[red]  ✗ Failed to remove saved models: {e}[/red]")
+        
+        # 7. Remove .env file
+        console.print("[cyan]→ Removing environment configuration...[/cyan]")
+        env_file = Path.cwd() / ".env"
+        try:
+            if env_file.exists():
+                env_file.unlink()
+                results["success"].append("Removed .env file")
+                console.print("[green]  ✓ .env file removed[/green]")
+            else:
+                results["skipped"].append(".env file not found")
+                console.print("[yellow]  ! .env file not found[/yellow]")
+        except Exception as e:
+            results["failed"].append(f".env removal: {e}")
+            console.print(f"[red]  ✗ Failed to remove .env file: {e}[/red]")
+        
+        # 8. Remove detections directory (if exists)
+        console.print("[cyan]→ Removing detection history...[/cyan]")
+        detections_dir = Path.cwd() / "detections"
+        try:
+            if detections_dir.exists() and detections_dir.is_dir():
+                import shutil
+                shutil.rmtree(detections_dir)
+                results["success"].append("Removed detections directory")
+                console.print("[green]  ✓ Detection history removed[/green]")
+            else:
+                results["skipped"].append("detections directory not found")
+                console.print("[yellow]  ! detections directory not found[/yellow]")
+        except Exception as e:
+            results["failed"].append(f"Detections removal: {e}")
+            console.print(f"[red]  ✗ Failed to remove detections: {e}[/red]")
+        
+        # 9. Remove evaluations directory (if exists)
+        console.print("[cyan]→ Removing evaluation history...[/cyan]")
+        evaluations_dir = Path.cwd() / "evaluations"
+        try:
+            if evaluations_dir.exists() and evaluations_dir.is_dir():
+                import shutil
+                shutil.rmtree(evaluations_dir)
+                results["success"].append("Removed evaluations directory")
+                console.print("[green]  ✓ Evaluation history removed[/green]")
+            else:
+                results["skipped"].append("evaluations directory not found")
+                console.print("[yellow]  ! evaluations directory not found[/yellow]")
+        except Exception as e:
+            results["failed"].append(f"Evaluations removal: {e}")
+            console.print(f"[red]  ✗ Failed to remove evaluations: {e}[/red]")
+        
+        # 10. Uninstall Python package
+        console.print("[cyan]→ Uninstalling Python package...[/cyan]")
+        try:
+            import subprocess
+            result = subprocess.run(["pip", "uninstall", "vigilante", "-y"], 
+                                capture_output=True, text=True)
+            if result.returncode == 0:
+                results["success"].append("Uninstalled Python package")
+                console.print("[green]  ✓ Python package uninstalled[/green]")
+            else:
+                # Try pip3
+                result = subprocess.run(["pip3", "uninstall", "vigilante", "-y"], 
+                                    capture_output=True, text=True)
+                if result.returncode == 0:
+                    results["success"].append("Uninstalled Python package (pip3)")
+                    console.print("[green]  ✓ Python package uninstalled (pip3)[/green]")
+                else:
+                    results["skipped"].append("Package not found in pip")
+                    console.print("[yellow]  ! Package not found in pip[/yellow]")
+        except Exception as e:
+            results["failed"].append(f"Pip uninstall: {e}")
+            console.print(f"[red]  ✗ Pip uninstall failed: {e}[/red]")
+        
+        # 11. Remove .vigilante directory in home (if exists)
+        console.print("[cyan]→ Removing user configuration...[/cyan]")
+        vigilante_config = Path.home() / ".vigilante"
+        try:
+            if vigilante_config.exists():
+                if vigilante_config.is_dir():
+                    import shutil
+                    shutil.rmtree(vigilante_config)
+                else:
+                    vigilante_config.unlink()
+                results["success"].append("Removed ~/.vigilante")
+                console.print("[green]  ✓ ~/.vigilante removed[/green]")
+            else:
+                results["skipped"].append("~/.vigilante not found")
+                console.print("[yellow]  ! ~/.vigilante not found[/yellow]")
+        except Exception as e:
+            results["failed"].append(f"Config removal: {e}")
+            console.print(f"[red]  ✗ Failed to remove ~/.vigilante: {e}[/red]")
+        
+        # 12. Optional: Database cleanup warning
+        console.print("\n[bold yellow]Database Notice:[/bold yellow]")
+        console.print("Your Vigilante data in the PostgreSQL database (Neon) has NOT been deleted.")
+        console.print("This includes user accounts, models, detection history, and audit logs.")
+        console.print("\nTo remove database data:")
+        console.print("  1. Log into your Neon PostgreSQL console")
+        console.print("  2. Drop the vigilante tables manually if desired")
+        console.print("  3. Or contact your database administrator")
+        
+        # 13. Optional: Remove logs
+        console.print("\n[cyan]→ Removing log files...[/cyan]")
+        log_file = Path.cwd() / "viglante.log"
+        try:
+            if log_file.exists():
+                log_file.unlink()
+                results["success"].append("Removed viglante.log")
+                console.print("[green]  ✓ Log file removed[/green]")
+            else:
+                results["skipped"].append("Log file not found")
+                console.print("[yellow]  ! Log file not found[/yellow]")
+        except Exception as e:
+            results["failed"].append(f"Log removal: {e}")
+            console.print(f"[red]  ✗ Failed to remove log: {e}[/red]")
+        
+        # Print summary
+        console.print("\n" + "="*60)
+        console.print("[bold]UNINSTALLATION SUMMARY[/bold]")
+        console.print("="*60)
+        
+        console.print(f"\n[green]✓ Successfully removed ({len(results['success'])} items):[/green]")
+        for item in results["success"]:
+            console.print(f"  • {item}")
+        
+        if results["skipped"]:
+            console.print(f"\n[yellow]! Skipped ({len(results['skipped'])} items):[/yellow]")
+            for item in results["skipped"]:
+                console.print(f"  • {item}")
+        
+        if results["failed"]:
+            console.print(f"\n[red]✗ Failed ({len(results['failed'])} items):[/red]")
+            for item in results["failed"]:
+                console.print(f"  • {item}")
+        
+        console.print("\n[bold green]Vigilante has been mostly removed from your system.[/bold green]")
+        console.print("[yellow]Note: Database data remains on Neon PostgreSQL server.[/yellow]")
+        console.print("To completely remove, you may need to delete the vigilante directory manually.")
+        
     def handle_reset_password(self, args):
         """Handle password reset"""
         username = args.username or input("Username: ").strip()
@@ -979,7 +1251,7 @@ Examples:
                 console.print(f"[red]Failed to generate PDF: {e}[/red]")
                 import traceback
                 console.print(traceback.format_exc())
-                
+         
     def handle_detect(self, args):
         """Handle anomaly detection with feature alignment - exactly like RNSA_KNN_training"""
         
@@ -1052,6 +1324,12 @@ Examples:
         feature_info = model.get_feature_summary()
         console.print(f"[cyan]Model expects {feature_info['features_count']} core features[/cyan]")
 
+        # Apply custom threshold if provided
+        if hasattr(args, 'threshold') and args.threshold is not None:
+            original_threshold = model.threshold
+            model.threshold = args.threshold
+            console.print(f"[cyan]Using custom threshold: {args.threshold} (default was {original_threshold})[/cyan]")
+
         # Perform detection
         import time
         start_time = time.time()
@@ -1086,17 +1364,17 @@ Examples:
                     if col in df.columns:
                         has_labels = True
                         label_column_name = col
-            
+                
                         # Get original labels first
                         original_labels = df[col].values
-            
+                
                         console.print(f"[green]✓ Found label column: '{col}'[/green]")
                         console.print(f"  Original labels: {np.unique(original_labels)}")
 
                         # Convert string labels to binary (0 for normal/benign, 1 for attack/malicious)
                         if original_labels.dtype == 'object' or isinstance(original_labels[0], str):
                             normal_terms = ['benign', 'Benign', 'BENIGN', 'normal', 'Normal', '0', 'false', 'no', 'legitimate']
-                
+                    
                             y_true_binary = []
                             for val in original_labels:
                                 val_str = str(val).lower().strip()
@@ -1105,12 +1383,12 @@ Examples:
                                     if term in val_str:
                                         is_normal = True
                                         break
-                        
+                            
                                 if is_normal:
                                     y_true_binary.append(0)
                                 else:
                                     y_true_binary.append(1)
-                
+                    
                             y_true = np.array(y_true_binary)
                             console.print(f"  Converted to binary: 0=normal, 1=attack")
                             console.print(f"  Class distribution: Normal={np.sum(y_true==0)}, Attack={np.sum(y_true==1)}")
@@ -1125,7 +1403,7 @@ Examples:
                     y_true = None
                 else:
                     df_features = df.drop(columns=[label_column_name])
-            
+                
                 # Use model's preprocessing
                 df_features.replace([np.inf, -np.inf], np.nan, inplace=True)
                 df_features.dropna(inplace=True)
@@ -1135,9 +1413,8 @@ Examples:
                 # Detect anomalies
                 predictions, confidence_scores = model.predict(X)
         
-                # Apply threshold
-                threshold = args.threshold if hasattr(args, 'threshold') and args.threshold else model.threshold
-                thresholded_predictions = (confidence_scores >= threshold).astype(int)
+                # Apply threshold (using model's threshold which may have been updated)
+                thresholded_predictions = (confidence_scores >= model.threshold).astype(int)
         
                 # Calculate execution time
                 execution_time = time.time() - start_time
@@ -1199,7 +1476,8 @@ Examples:
                     "total_flows": total_flows,
                     "anomalies_detected": anomalies_count,
                     "execution_time_seconds": execution_time,
-                    "detection_id": detection_id
+                    "detection_id": detection_id,
+                    "threshold_used": model.threshold
                 }
             )
             
@@ -1218,7 +1496,11 @@ Examples:
                 console.print(traceback.format_exc())
             return
 
-        # Display results
+        # Restore original threshold if changed
+        if hasattr(args, 'threshold') and args.threshold is not None:
+            model.threshold = original_threshold
+
+        # Display results (rest of the method remains the same...)
         console.print(f"[green]✓ Detection analysis completed[/green]")
         console.print(f"[yellow]⚠️ Anomalies detected: {results['anomalies_detected']} / {results['total_flows']}[/yellow]")
         
@@ -1326,7 +1608,7 @@ Examples:
         if detection_id:
             console.print(f"\n[yellow]For full explanations, use:[/yellow]")
             console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
-    
+
     def prepare_detection_results(self, df, predictions, confidence_scores, model, execution_time=None):
         """Prepare detection results in structured format with JSON serializable types - NO reconstruction errors"""
         anomalies = []
@@ -1777,7 +2059,6 @@ Examples:
         else:
             return obj
     
-    # Training Command
     def handle_train(self, args):
         """Handle model training with feature alignment"""
         if not self.check_permission('train_models'):
@@ -1788,9 +2069,10 @@ Examples:
             return
 
         # Process features (optional, model will use core features)
-        features = None
+        custom_features = None
         if args.features:
-            features = [f.strip() for f in args.features.split(',')]
+            custom_features = [f.strip() for f in args.features.split(',')]
+            console.print(f"[cyan]Using specified features: {custom_features}[/cyan]")
 
         with Progress(
             SpinnerColumn(),
@@ -1803,31 +2085,47 @@ Examples:
                 # Analyze dataset first
                 console.print("[cyan]Analyzing dataset features...[/cyan]")
                 df_preview = pd.read_csv(args.input, nrows=1000)
+                
                 from .model import IntrusionDetectionModel
-                temp_model = IntrusionDetectionModel()
-                available_features, feature_mapping = temp_model._find_features_in_data(df_preview)
                 
                 # Load full data to get training samples count
                 df_full = pd.read_csv(args.input)
                 total_samples = len(df_full)
                 
-                console.print(f"\n[cyan]Feature Analysis:[/cyan]")
-                console.print(f"  Core features required: {len(temp_model.CORE_FEATURES)}")
-                console.print(f"  Features found: {len(available_features)}")
-                console.print(f"  Total training samples: {total_samples:,}")
-                if feature_mapping:
-                    console.print(f"  Feature mapping:")
-                    for k, v in list(feature_mapping.items())[:5]:
-                        console.print(f"    {k} → {v}")
+                if custom_features:
+                    console.print(f"\n[cyan]Feature Analysis (Custom):[/cyan]")
+                    console.print(f"  Custom features specified: {len(custom_features)}")
+                    console.print(f"  Features: {custom_features}")
+                    
+                    # Check which custom features exist in the data
+                    available_in_data = [f for f in custom_features if f in df_preview.columns]
+                    missing_in_data = [f for f in custom_features if f not in df_preview.columns]
+                    
+                    console.print(f"  Features found in data: {len(available_in_data)}")
+                    if missing_in_data:
+                        console.print(f"  [yellow]Missing features (will use zeros): {missing_in_data}[/yellow]")
+                else:
+                    temp_model = IntrusionDetectionModel()
+                    available_features, feature_mapping = temp_model._find_features_in_data(df_preview)
+                    console.print(f"\n[cyan]Feature Analysis (Core):[/cyan]")
+                    console.print(f"  Core features required: {len(temp_model.CORE_FEATURES)}")
+                    console.print(f"  Features found: {len(available_features)}")
+                    if feature_mapping:
+                        console.print(f"  Feature mapping:")
+                        for k, v in list(feature_mapping.items())[:5]:
+                            console.print(f"    {k} → {v}")
                 
-                # Train model
+                console.print(f"  Total training samples: {total_samples:,}")
+                
+                # Train model with custom features if provided
                 result = self.trainer.train_model(
                     data_path=args.input,
                     model_name=args.model_name or f"model_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                     r_s=0.05,
                     max_detectors=1000,
                     k=5,
-                    dataset_name=os.path.basename(args.input)
+                    dataset_name=os.path.basename(args.input),
+                    custom_features=custom_features  # Pass custom features to trainer
                 )
                 
                 # Create a fresh database connection for saving the model
@@ -1836,7 +2134,7 @@ Examples:
                 # Prepare metrics with training_samples properly set
                 save_metrics = result.get('metrics', {}).copy()
                 save_metrics['training_samples'] = result.get('training_samples', total_samples)
-                save_metrics['features_count'] = result.get('features_count', len(temp_model.CORE_FEATURES))
+                save_metrics['features_count'] = result.get('features_count', len(result.get('features_used', [])))
                 
                 # Save model to database using fresh connection
                 model_id = fresh_db.save_model(
@@ -1845,14 +2143,14 @@ Examples:
                     model_path=result['model_path'],
                     dataset_name=os.path.basename(args.input),
                     metrics=save_metrics,
-                    features=result.get('feature_analysis', {}).get('available_features', features),
+                    features=result.get('features_used', custom_features),
                     parameters={
                         'model_type': 'rnsa_knn',
                         'r_s': 0.05,
                         'max_detectors': 1000,
                         'k': 5,
-                        'core_features': temp_model.CORE_FEATURES,
-                        'training_samples': total_samples
+                        'training_samples': total_samples,
+                        'custom_features': custom_features if custom_features else None
                     }
                 )
                 
@@ -1870,7 +2168,8 @@ Examples:
                         "model_id": model_id, 
                         "model_name": result['model_name'], 
                         "training_samples": total_samples,
-                        "features_used": len(available_features),
+                        "features_used": len(result.get('features_used', [])),
+                        "custom_features": custom_features is not None,
                         "accuracy": result['metrics'].get('test_accuracy', 0)
                     }
                 )
@@ -1896,6 +2195,7 @@ Examples:
         console.print(f"Model ID: [cyan]{model_id}[/cyan]")
         console.print(f"Model saved to: [cyan]{result['model_path']}[/cyan]")
         console.print(f"Training samples: [cyan]{total_samples:,}[/cyan]")
+        console.print(f"Features used: [cyan]{len(result.get('features_used', []))}[/cyan]")
 
         # Show metrics
         self.display_training_metrics(result['metrics'])
@@ -1904,9 +2204,12 @@ Examples:
         if 'feature_analysis' in result:
             fa = result['feature_analysis']
             console.print(f"\n[cyan]Feature Summary:[/cyan]")
-            console.print(f"  Features used: {fa.get('coverage', 0):.1f}% coverage")
-            console.print(f"  Features found: {len(fa.get('available_features', []))}")
-            console.print(f"  Missing features: {len(fa.get('missing_features', []))}")
+            if fa.get('custom_features_used'):
+                console.print(f"  Custom features mode: enabled")
+                console.print(f"  Features used: {fa.get('available_features', [])}")
+            else:
+                console.print(f"  Coverage: {fa.get('coverage', 0):.1f}%")
+                console.print(f"  Features found: {len(fa.get('available_features', []))}")
 
     # Show RNSA+KNN specific metrics
     def display_training_metrics(self, metrics):
@@ -2328,6 +2631,7 @@ Examples:
             command_handlers = {
                 'login': self.handle_login,
                 'logout': self.handle_logout,
+                'uninstall': self.handle_uninstall,
                 'reset-pass': self.handle_reset_password,
                 'detect': self.handle_detect,
                 'train': self.handle_train,
