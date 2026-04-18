@@ -1796,7 +1796,7 @@ Examples:
             console.print(f"[cyan]  vigilante explain --detection-id {detection_id}[/cyan]")
 
     def prepare_detection_results(self, df, predictions, confidence_scores, model, execution_time=None):
-        """Prepare detection results in structured format with JSON serializable types - NO reconstruction errors"""
+        """Prepare detection results in structured format with JSON serializable types"""
         anomalies = []
         anomaly_indices = np.where(predictions == 1)[0]
         
@@ -1815,8 +1815,8 @@ Examples:
                 top_features = {}
                 feature_names = model.feature_names if model.feature_names else []
             
-                # Get all core features
-                for i, feat in enumerate(feature_names[:10]):  # Show all 10 core features
+                # Get all features (custom or core)
+                for i, feat in enumerate(feature_names):
                     if i < len(row):
                         val = row.iloc[i] if hasattr(row, 'iloc') else row[i]
                         if isinstance(val, (int, float)):
@@ -1832,6 +1832,9 @@ Examples:
         anomalies_detected = int(len(anomalies))
         detection_rate = float(anomalies_detected / total_flows) if total_flows > 0 else 0.0
 
+        # Get features used from model
+        features_used = model.feature_names if model.feature_names else model.CORE_FEATURES
+        
         result = {
             'total_flows': total_flows,
             'anomalies_detected': anomalies_detected,
@@ -1841,7 +1844,8 @@ Examples:
             'std_confidence': float(np.std(confidence_scores)) if len(confidence_scores) > 0 else 0,
             'threshold': float(model.threshold),
             'detectors_used': len(model.model.detectors) if hasattr(model.model, 'detectors') else 0,
-            'features_used': model.feature_names,
+            'features_used': features_used,
+            'features_count': len(features_used),
             'metrics': model.metrics if hasattr(model, 'metrics') else {}
         }
 
@@ -1853,7 +1857,7 @@ Examples:
         return result
 
     def prepare_detection_results_with_labels(self, df, predictions, confidence_scores, y_true, model, execution_time=None):
-        """Prepare detection results with full metrics using ground truth labels - CASE-INSENSITIVE like RNSA_KNN_training"""
+        """Prepare detection results with full metrics using ground truth labels"""
         from sklearn.metrics import (accuracy_score, precision_score, recall_score, 
                                     f1_score, confusion_matrix)
         
@@ -1910,10 +1914,10 @@ Examples:
             if idx < len(df):
                 row = df.iloc[idx] if hasattr(df, 'iloc') else df[idx]
                 top_features = {}
-                feature_names = model.feature_names if model.feature_names else []
+                feature_names = model.feature_names if model.feature_names else model.CORE_FEATURES
             
-                # Get all core features
-                for i, feat in enumerate(feature_names[:10]):  # Show all 10 core features
+                # Get all features (custom or core)
+                for i, feat in enumerate(feature_names):
                     if i < len(row):
                         val = row.iloc[i] if hasattr(row, 'iloc') else row[i]
                         if isinstance(val, (int, float)):
@@ -1950,6 +1954,9 @@ Examples:
         total_flows = int(len(predictions))
         anomalies_detected = int(len(anomalies))
 
+        # Get features used from model
+        features_used = model.feature_names if model.feature_names else model.CORE_FEATURES
+
         result = {
             'total_flows': total_flows,
             'anomalies_detected': anomalies_detected,
@@ -1970,6 +1977,10 @@ Examples:
             'true_negatives': int(TN),
             'false_negatives': int(FN),
         
+            # Features information
+            'features_used': features_used,
+            'features_count': len(features_used),
+            
             # Model metrics
             'metrics': model.metrics if hasattr(model, 'metrics') else {}
         }
@@ -2564,7 +2575,8 @@ Examples:
         self.original_data = None
         self.original_features = None
         self.feature_stats = None
-        model_features = None  # Store the features used by the model
+        detection_features = None
+        custom_features_used = False
 
         if args.detection_id:
             # Load from database
@@ -2575,24 +2587,38 @@ Examples:
             
             detection_data = detection['results']
             
-            # Get model info to know which features were used
-            model_id = detection.get('model_id')
-            if model_id:
-                model_info = self.db.get_model(model_id, self.auth.current_user['id'])
-                if model_info:
-                    # Check for features_used first
-                    if model_info.get('features_used'):
-                        features_data = model_info['features_used']
-                        if isinstance(features_data, dict):
-                            model_features = features_data.get('features_list', [])
-                            console.print(f"[cyan]Model was trained with {len(model_features)} features: {model_features}[/cyan]")
-                        elif isinstance(features_data, list):
-                            model_features = features_data
-                    elif model_info.get('features'):
-                        model_features = model_info['features']
-                        if isinstance(model_features, str):
-                            model_features = json.loads(model_features)
-                        console.print(f"[cyan]Model features: {model_features}[/cyan]")
+            # FIRST: Try to get features from detection results metrics
+            if detection_data and isinstance(detection_data, dict):
+                # Check for features_used in the detection results
+                if 'features_used' in detection_data:
+                    detection_features = detection_data['features_used']
+                    console.print(f"[cyan]Detection used {len(detection_features)} features: {detection_features}[/cyan]")
+                elif 'metrics' in detection_data and detection_data['metrics']:
+                    metrics_data = detection_data['metrics']
+                    if isinstance(metrics_data, dict) and 'features_used' in metrics_data:
+                        detection_features = metrics_data['features_used']
+                        console.print(f"[cyan]Detection used {len(detection_features)} features: {detection_features}[/cyan]")
+            
+            # SECOND: If not found in detection results, check model info
+            if not detection_features:
+                model_id = detection.get('model_id')
+                if model_id:
+                    model_info = self.db.get_model(model_id, self.auth.current_user['id'])
+                    if model_info:
+                        # Check for features_used first
+                        if model_info.get('features_used'):
+                            features_data = model_info['features_used']
+                            if isinstance(features_data, dict):
+                                detection_features = features_data.get('features_list', [])
+                                custom_features_used = features_data.get('custom_features_used', False)
+                                console.print(f"[cyan]Model was trained with {len(detection_features)} features: {detection_features}[/cyan]")
+                            elif isinstance(features_data, list):
+                                detection_features = features_data
+                        elif model_info.get('features'):
+                            detection_features = model_info['features']
+                            if isinstance(detection_features, str):
+                                detection_features = json.loads(detection_features)
+                            console.print(f"[cyan]Model features: {detection_features}[/cyan]")
             
             # Load original data to get IP addresses and feature values
             original_file = detection.get('input_file')
@@ -2601,36 +2627,88 @@ Examples:
                     original_df = pd.read_csv(original_file)
                     self.original_data = original_df  # Full data for IPs
                     
-                    # Use model features if available, otherwise fall back to core features
-                    if model_features and len(model_features) > 0:
-                        # Use the actual features from the model
-                        console.print(f"[cyan]Using model's features for explanation: {model_features}[/cyan]")
-                        self.original_features = pd.DataFrame()
-                        self.feature_mapping = {}
-                        missing_features = []
+                    # Use detection features if available
+                    if detection_features and len(detection_features) > 0:
+                        # Check if this is a custom feature model (not the 10 core features)
+                        core_features_set = set(['dur', 'spkts', 'dpkts', 'sbytes', 'dbytes', 'rate', 'smean', 'dmean', 'swin', 'dwin'])
+                        is_custom = set(detection_features) != core_features_set
                         
-                        for feature in model_features:
-                            if feature in original_df.columns:
-                                self.original_features[feature] = pd.to_numeric(original_df[feature], errors='coerce')
-                                self.feature_mapping[feature] = feature
-                                console.print(f"[dim]  ✓ Found '{feature}'[/dim]")
-                            else:
-                                # Try case-insensitive match
-                                matching_col = next((col for col in original_df.columns if col.lower() == feature.lower()), None)
-                                if matching_col:
-                                    self.original_features[feature] = pd.to_numeric(original_df[matching_col], errors='coerce')
-                                    self.feature_mapping[feature] = matching_col
-                                    console.print(f"[dim]  ✓ Mapped '{feature}' → '{matching_col}'[/dim]")
+                        if is_custom:
+                            # For custom features, use direct matching
+                            console.print(f"[cyan]Using custom features for explanation: {detection_features}[/cyan]")
+                            self.original_features = pd.DataFrame()
+                            self.feature_mapping = {}
+                            missing_features = []
+                            
+                            for feature in detection_features:
+                                if feature in original_df.columns:
+                                    self.original_features[feature] = pd.to_numeric(original_df[feature], errors='coerce')
+                                    self.feature_mapping[feature] = feature
+                                    console.print(f"[dim]  ✓ Found '{feature}'[/dim]")
                                 else:
-                                    self.original_features[feature] = 0
-                                    missing_features.append(feature)
-                        
-                        # Only show missing features message if there are actual missing features
-                        if missing_features:
-                            console.print(f"[dim] ✗ {len(missing_features)} feature(s) not found, using zeros as placeholders[/dim]")
+                                    # Try case-insensitive match
+                                    matching_col = next((col for col in original_df.columns if col.lower() == feature.lower()), None)
+                                    if matching_col:
+                                        self.original_features[feature] = pd.to_numeric(original_df[matching_col], errors='coerce')
+                                        self.feature_mapping[feature] = matching_col
+                                        console.print(f"[dim]  ✓ Mapped '{feature}' → '{matching_col}'[/dim]")
+                                    else:
+                                        self.original_features[feature] = 0
+                                        missing_features.append(feature)
+                            
+                            if missing_features:
+                                console.print(f"[dim]  ℹ️ {len(missing_features)} feature(s) not found, using zeros as placeholders[/dim]")
+                        else:
+                            # For core features, use feature mapping (this is what you want!)
+                            console.print(f"[cyan]Using core features with mapping for explanation[/cyan]")
+                            feature_variations = {
+                                'dur': ['dur', 'Flow Duration', ' Flow Duration', 'flow_duration', 'Duration', 'Dur', ' duration', 'Flow Duration'],
+                                'spkts': ['spkts', 'Tot Fwd Pkts', ' Total Fwd Packets', 'Total Fwd Packets', 'fwd_pkts', 'Fwd Packets', 'Fwd Pkts'],
+                                'dpkts': ['dpkts', 'Tot Bwd Pkts', ' Total Backward Packets', 'Total Bwd Packets', 'bwd_pkts', 'Bwd Packets', 'Bwd Pkts'],
+                                'sbytes': ['sbytes', 'TotLen Fwd Pkts', 'Total Length of Fwd Packets', 'fwd_bytes', 'Fwd Bytes'],
+                                'dbytes': ['dbytes', 'TotLen Bwd Pkts', ' Total Length of Bwd Packets' ,'Total Length of Bwd Packets', 'bwd_bytes', 'Bwd Bytes'],
+                                'rate': ['rate', 'Flow Byts/s', 'Flow Bytes/s', 'flow_bytes_per_sec', 'Bytes/s'],
+                                'smean': ['smean', 'Fwd Pkt Len Mean', ' Fwd Packet Length Mean', 'Fwd Packet Length Mean', 'fwd_pkt_len_mean'],
+                                'dmean': ['dmean', 'Bwd Pkt Len Mean', ' Bwd Packet Length Mean', 'Bwd Packet Length Mean', 'bwd_pkt_len_mean'],
+                                'swin': ['swin', 'Init Fwd Win Byts', 'Init_Win_bytes_forward', 'Init Fwd Window Bytes', 'fwd_win'],
+                                'dwin': ['dwin', 'Init Bwd Win Byts', ' Init_Win_bytes_backward', 'Init Bwd Window Bytes', 'bwd_win']
+                            }
+                            
+                            self.feature_mapping = {}
+                            self.original_features = pd.DataFrame()
+                            found_count = 0
+                            missing_features = []
+                            
+                            for core_feature, variations in feature_variations.items():
+                                found = False
+                                for var in variations:
+                                    if var in original_df.columns:
+                                        self.feature_mapping[core_feature] = var
+                                        self.original_features[core_feature] = pd.to_numeric(original_df[var], errors='coerce')
+                                        found = True
+                                        found_count += 1
+                                        console.print(f"[dim]  ✓ Mapped '{core_feature}' → '{var}'[/dim]")
+                                        break
+                                    elif var.lower() in [col.lower() for col in original_df.columns]:
+                                        actual_col = next(col for col in original_df.columns if col.lower() == var.lower())
+                                        self.feature_mapping[core_feature] = actual_col
+                                        self.original_features[core_feature] = pd.to_numeric(original_df[actual_col], errors='coerce')
+                                        found = True
+                                        found_count += 1
+                                        console.print(f"[dim]  ✓ Mapped '{core_feature}' → '{actual_col}'[/dim]")
+                                        break
+                                
+                                if not found:
+                                    self.original_features[core_feature] = 0
+                                    missing_features.append(core_feature)
+                            
+                            # Show a summary instead of individual messages
+                            if missing_features:
+                                console.print(f"[dim]  ℹ️ {len(missing_features)} core feature(s) not found (using zeros): {', '.join(missing_features[:5])}{'...' if len(missing_features) > 5 else ''}[/dim]")
+                            console.print(f"[dim]  ✓ Found {found_count} out of 10 core features[/dim]")
                     else:
-                        # Fall back to core features with mapping
-                        console.print(f"[cyan]Using core features with mapping for explanation[/cyan]")
+                        # No feature info, fall back to core features with mapping
+                        console.print(f"[cyan]No feature info found, using core features with mapping[/cyan]")
                         feature_variations = {
                             'dur': ['dur', 'Flow Duration', ' Flow Duration', 'flow_duration', 'Duration', 'Dur', ' duration', 'Flow Duration'],
                             'spkts': ['spkts', 'Tot Fwd Pkts', ' Total Fwd Packets', 'Total Fwd Packets', 'fwd_pkts', 'Fwd Packets', 'Fwd Pkts'],
@@ -2672,9 +2750,8 @@ Examples:
                                 self.original_features[core_feature] = 0
                                 missing_features.append(core_feature)
                         
-                        # Show a summary instead of individual messages
                         if missing_features:
-                            console.print(f"[dim] ✗ {len(missing_features)} core feature(s) not found (using zeros): {', '.join(missing_features[:5])}{'...' if len(missing_features) > 5 else ''}[/dim]")
+                            console.print(f"[dim]  ℹ️ {len(missing_features)} core feature(s) not found (using zeros): {', '.join(missing_features[:5])}{'...' if len(missing_features) > 5 else ''}[/dim]")
                         console.print(f"[dim]  ✓ Found {found_count} out of 10 core features[/dim]")
                     
                     # Fill NaN values
