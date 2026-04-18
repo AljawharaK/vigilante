@@ -16,19 +16,30 @@ import sys
 from importlib import resources
 from pathlib import Path
 import re
-import magic
 import hashlib
 import tempfile
 import shutil
-import os
-import os
-import json
 import base64
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
-from pathlib import Path
 from typing import Optional, Dict, Any
+
+# ========================
+# Handle python-magic import gracefully on Windows
+# ========================
+_magic_available = False
+try:
+    import magic
+    _magic_available = True
+except ImportError:
+    # python-magic not installed, will use fallback
+    print("⚠️ python-magic not installed. MIME detection disabled. Install with: pip install python-magic-bin")
+except Exception as e:
+    # libmagic not found on Windows
+    print(f"⚠️ libmagic not found: {e}. MIME detection disabled.")
+    print("   On Windows, install with: pip install python-magic-bin")
+    _magic_available = False
 
 console = Console()
 
@@ -315,6 +326,7 @@ class SecureSessionManager:
             print(f"⚠️ Key rotation failed: {e}")
             return False
 
+
 class SessionInvalidator:
     """Handle session invalidation on security events"""
     
@@ -337,13 +349,13 @@ class SessionInvalidator:
             
             # Clear local session file if it belongs to this user
             session_data = SecureSessionManager.load_session_secure()
-            if session_data and session_data.get('username') == auth_manager.current_user.get('username'):
+            if session_data and auth_manager.current_user and session_data.get('username') == auth_manager.current_user.get('username'):
                 SecureSessionManager.clear_session_secure()
             
             # Log the invalidation
             db_manager.log_audit_event(
                 user_id=user_id,
-                username=auth_manager.current_user.get('username', 'unknown'),
+                username=auth_manager.current_user.get('username', 'unknown') if auth_manager.current_user else 'unknown',
                 action="session_invalidation",
                 resource="all_sessions",
                 status="success",
@@ -375,13 +387,13 @@ class SessionInvalidator:
             count = db_manager.invalidate_user_sessions(user_id)
             
             # Clear local session if it's the current user
-            if user_id == auth_manager.current_user.get('id'):
+            if auth_manager.current_user and user_id == auth_manager.current_user.get('id'):
                 SecureSessionManager.clear_session_secure()
             
             # Log the invalidation
             db_manager.log_audit_event(
-                user_id=auth_manager.current_user.get('id', user_id),
-                username=auth_manager.current_user.get('username', 'system'),
+                user_id=auth_manager.current_user.get('id', user_id) if auth_manager.current_user else user_id,
+                username=auth_manager.current_user.get('username', 'system') if auth_manager.current_user else 'system',
                 action="session_invalidation",
                 resource="user_sessions",
                 status="success",
@@ -415,6 +427,7 @@ class SessionInvalidator:
         except Exception as e:
             print(f"❌ Session invalidation on deactivation failed: {e}")
             return False
+
 
 # ========================
 # SECURITY: Input Validation
@@ -485,21 +498,22 @@ class SecurityValidator:
         if file_ext not in cls.ALLOWED_EXTENSIONS:
             return False, f"Invalid file extension '{file_ext}'. Allowed: {', '.join(cls.ALLOWED_EXTENSIONS)}"
         
-        # Check file content using python-magic (MIME type detection)
-        try:
-            mime = magic.from_file(file_path, mime=True)
-            allowed_mime_types = [
-                'text/csv', 'text/plain', 'application/csv',
-                'application/json', 'text/json', 'application/octet-stream'
-            ]
-            
-            if mime not in allowed_mime_types:
-                return False, f"Suspicious MIME type detected: {mime}"
-        except ImportError:
-            # Fallback if python-magic not installed
-            print("⚠️ python-magic not installed, MIME checking disabled")
-        except Exception as e:
-            print(f"⚠️ MIME detection failed: {e}")
+        # Check file content using python-magic (MIME type detection) - FIXED with fallback
+        if _magic_available:
+            try:
+                mime = magic.from_file(file_path, mime=True)
+                allowed_mime_types = [
+                    'text/csv', 'text/plain', 'application/csv',
+                    'application/json', 'text/json', 'application/octet-stream'
+                ]
+                
+                if mime not in allowed_mime_types:
+                    return False, f"Suspicious MIME type detected: {mime}"
+            except Exception as e:
+                print(f"⚠️ MIME detection failed: {e}")
+        else:
+            # Fallback: check file extension only
+            print("ℹ️ python-magic not available, MIME checking skipped")
         
         return True, "OK"
     
