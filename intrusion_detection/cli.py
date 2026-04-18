@@ -2674,7 +2674,7 @@ Examples:
                         
                         # Show a summary instead of individual messages
                         if missing_features:
-                            console.print(f"[dim]  ℹ️ {len(missing_features)} core feature(s) not found (using zeros): {', '.join(missing_features[:5])}{'...' if len(missing_features) > 5 else ''}[/dim]")
+                            console.print(f"[dim] ✗ {len(missing_features)} core feature(s) not found (using zeros): {', '.join(missing_features[:5])}{'...' if len(missing_features) > 5 else ''}[/dim]")
                         console.print(f"[dim]  ✓ Found {found_count} out of 10 core features[/dim]")
                     
                     # Fill NaN values

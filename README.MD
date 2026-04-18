@@ -68,7 +68,7 @@ vigilante status
 vigilante explain --detection-id 1
 vigilante -v or vigilante --verbose
 vigilante -h
-vigilante --help
+vigilante [command] --help # There is a help message to every command (train, detect, etc..)
 vigilante uninstall --force
 
 # Interactive GUI dashboard for both users
