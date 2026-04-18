@@ -1068,6 +1068,37 @@ class DatabaseManager:
             print(f"❌ Error getting database stats: {e}")
             return {}
     
+    def invalidate_all_user_sessions_on_password_change(self, user_id: int) -> int:
+        """
+        Invalidate all sessions when password changes
+        
+        Args:
+            user_id: User ID whose password changed
+            
+        Returns:
+            Number of sessions invalidated
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE sessions 
+                    SET is_valid = FALSE, 
+                        last_activity = CURRENT_TIMESTAMP
+                    WHERE user_id = %s AND is_valid = TRUE
+                    RETURNING id
+                """, (user_id,))
+                
+                count = cursor.rowcount
+                self.conn.commit()
+                
+                print(f"🔒 Invalidated {count} sessions for user {user_id} due to password change")
+                return count
+                
+        except Exception as e:
+            self.conn.rollback()
+            print(f"❌ Failed to invalidate sessions on password change: {e}")
+            return 0
+    
     def health_check(self) -> bool:
         """Perform a health check on the database"""
         try:

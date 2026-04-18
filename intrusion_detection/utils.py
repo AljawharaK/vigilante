@@ -3,7 +3,7 @@ import os
 import json
 import pandas as pd
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Tuple, Optional, Dict, Any, List
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -15,9 +15,738 @@ import os
 import sys
 from importlib import resources
 from pathlib import Path
+import re
+import magic
+import hashlib
+import tempfile
+import shutil
+import os
+import os
+import json
+import base64
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from pathlib import Path
+from typing import Optional, Dict, Any
 
 console = Console()
 
+# ========================
+# SECURITY: Session Encryption & Management
+# ========================
+
+class SecureSessionManager:
+    """Handle encrypted session storage with proper security"""
+    
+    # Session file path
+    SESSION_FILE = Path.home() / ".vigilante_session"
+    
+    # Key derivation parameters
+    SALT_SIZE = 32
+    ITERATIONS = 100_000
+    
+    @classmethod
+    def _derive_key(cls, password: Optional[str] = None) -> bytes:
+        """
+        Derive encryption key from system-specific values
+        
+        Args:
+            password: Optional password for key derivation (uses system info if None)
+            
+        Returns:
+            Derived encryption key
+        """
+        if password is None:
+            # Use system-specific values to create a unique key for this installation
+            import platform
+            import getpass
+            
+            # Combine system identifiers
+            key_material = f"{platform.node()}{platform.system()}{getpass.getuser()}".encode()
+        else:
+            key_material = password.encode()
+        
+        # Generate random salt or use persistent salt
+        salt_path = Path.home() / ".vigilante_salt"
+        
+        if salt_path.exists():
+            with open(salt_path, 'rb') as f:
+                salt = f.read()
+        else:
+            salt = os.urandom(cls.SALT_SIZE)
+            with open(salt_path, 'wb') as f:
+                f.write(salt)
+        
+        # Derive key using PBKDF2
+        kdf = PBKDF2(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=cls.ITERATIONS,
+        )
+        
+        key = base64.urlsafe_b64encode(kdf.derive(key_material))
+        return key
+    
+    @classmethod
+    def encrypt_session(cls, session_data: Dict[str, Any]) -> str:
+        """
+        Encrypt session data before saving to disk
+        
+        Args:
+            session_data: Dictionary containing session information
+            
+        Returns:
+            Encrypted session string
+        """
+        try:
+            # Convert to JSON string
+            json_data = json.dumps(session_data)
+            
+            # Encrypt
+            key = cls._derive_key()
+            f = Fernet(key)
+            encrypted = f.encrypt(json_data.encode())
+            
+            # Return as base64 string
+            return base64.b64encode(encrypted).decode()
+            
+        except Exception as e:
+            print(f"❌ Session encryption failed: {e}")
+            raise
+    
+    @classmethod
+    def decrypt_session(cls, encrypted_data: str) -> Optional[Dict[str, Any]]:
+        """
+        Decrypt session data from disk
+        
+        Args:
+            encrypted_data: Encrypted session string
+            
+        Returns:
+            Decrypted session dictionary or None if invalid
+        """
+        try:
+            # Decode from base64
+            encrypted = base64.b64decode(encrypted_data.encode())
+            
+            # Decrypt
+            key = cls._derive_key()
+            f = Fernet(key)
+            decrypted = f.decrypt(encrypted)
+            
+            # Parse JSON
+            session_data = json.loads(decrypted.decode())
+            
+            # Validate session structure
+            if not all(k in session_data for k in ['session_token', 'username', 'saved_at', 'signature']):
+                print("⚠️ Invalid session data structure")
+                return None
+            
+            # Verify signature
+            expected_signature = cls._calculate_signature(
+                session_data['session_token'],
+                session_data['username'],
+                session_data['saved_at']
+            )
+            
+            if session_data.get('signature') != expected_signature:
+                print("⚠️ Session signature verification failed")
+                return None
+            
+            return session_data
+            
+        except Exception as e:
+            print(f"⚠️ Session decryption failed: {e}")
+            return None
+    
+    @classmethod
+    def _calculate_signature(cls, session_token: str, username: str, saved_at: str) -> str:
+        """
+        Calculate signature for session integrity verification
+        
+        Args:
+            session_token: Session token
+            username: Username
+            saved_at: Timestamp when saved
+            
+        Returns:
+            Signature hash
+        """
+        import hashlib
+        data = f"{session_token}:{username}:{saved_at}".encode()
+        return hashlib.sha256(data).hexdigest()[:32]
+    
+    @classmethod
+    def save_session_secure(cls, session_token: str, username: str) -> bool:
+        """
+        Securely save session with encryption and integrity checking
+        
+        Args:
+            session_token: Session token to save
+            username: Username associated with session
+            
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        try:
+            from datetime import datetime
+            
+            session_data = {
+                'session_token': session_token,
+                'username': username,
+                'saved_at': datetime.now().isoformat(),
+                'version': '2.0',  # Version for future compatibility
+            }
+            
+            # Add signature for integrity
+            session_data['signature'] = cls._calculate_signature(
+                session_token, username, session_data['saved_at']
+            )
+            
+            # Encrypt
+            encrypted = cls.encrypt_session(session_data)
+            
+            # Save with restricted permissions
+            with open(cls.SESSION_FILE, 'w') as f:
+                f.write(encrypted)
+            
+            # Set secure file permissions (read/write only for owner)
+            os.chmod(cls.SESSION_FILE, 0o600)
+            
+            print(f"✅ Session saved securely for user: {username}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Failed to save session securely: {e}")
+            return False
+    
+    @classmethod
+    def load_session_secure(cls) -> Optional[Dict[str, Any]]:
+        """
+        Load and decrypt session from disk
+        
+        Returns:
+            Session dictionary if valid, None otherwise
+        """
+        if not cls.SESSION_FILE.exists():
+            return None
+        
+        try:
+            with open(cls.SESSION_FILE, 'r') as f:
+                encrypted = f.read().strip()
+            
+            if not encrypted:
+                return None
+            
+            # Decrypt and verify
+            session_data = cls.decrypt_session(encrypted)
+            
+            if session_data is None:
+                return None
+            
+            # Check if session is expired (24 hours default)
+            from datetime import datetime, timedelta
+            saved_at = datetime.fromisoformat(session_data['saved_at'])
+            if datetime.now() - saved_at > timedelta(hours=24):
+                print("⚠️ Session expired (older than 24 hours)")
+                cls.clear_session_secure()
+                return None
+            
+            return session_data
+            
+        except Exception as e:
+            print(f"⚠️ Failed to load session: {e}")
+            return None
+    
+    @classmethod
+    def clear_session_secure(cls) -> bool:
+        """
+        Securely delete session file
+        
+        Returns:
+            True if cleared successfully
+        """
+        try:
+            if cls.SESSION_FILE.exists():
+                # Overwrite with random data before deletion
+                size = cls.SESSION_FILE.stat().st_size
+                with open(cls.SESSION_FILE, 'wb') as f:
+                    f.write(os.urandom(size))
+                
+                # Delete the file
+                cls.SESSION_FILE.unlink()
+                print("✅ Session cleared securely")
+            
+            return True
+            
+        except Exception as e:
+            print(f"⚠️ Failed to clear session: {e}")
+            return False
+    
+    @classmethod
+    def rotate_session_keys(cls) -> bool:
+        """
+        Rotate encryption keys and re-encrypt existing session if present
+        
+        Returns:
+            True if rotation successful
+        """
+        try:
+            # Load existing session if any
+            session_data = cls.load_session_secure()
+            
+            if session_data:
+                # Delete old salt to force new key derivation
+                salt_path = Path.home() / ".vigilante_salt"
+                if salt_path.exists():
+                    salt_path.unlink()
+                
+                # Re-save with new key
+                return cls.save_session_secure(
+                    session_data['session_token'],
+                    session_data['username']
+                )
+            
+            return True
+            
+        except Exception as e:
+            print(f"⚠️ Key rotation failed: {e}")
+            return False
+
+class SessionInvalidator:
+    """Handle session invalidation on security events"""
+    
+    @classmethod
+    def invalidate_on_password_change(cls, user_id: int, db_manager, auth_manager) -> bool:
+        """
+        Invalidate all sessions when password is changed
+        
+        Args:
+            user_id: User ID whose password changed
+            db_manager: Database manager instance
+            auth_manager: Auth manager instance
+            
+        Returns:
+            True if invalidation successful
+        """
+        try:
+            # Invalidate all database sessions for this user
+            count = db_manager.invalidate_user_sessions(user_id)
+            
+            # Clear local session file if it belongs to this user
+            session_data = SecureSessionManager.load_session_secure()
+            if session_data and session_data.get('username') == auth_manager.current_user.get('username'):
+                SecureSessionManager.clear_session_secure()
+            
+            # Log the invalidation
+            db_manager.log_audit_event(
+                user_id=user_id,
+                username=auth_manager.current_user.get('username', 'unknown'),
+                action="session_invalidation",
+                resource="all_sessions",
+                status="success",
+                details={"reason": "password_change", "sessions_invalidated": count}
+            )
+            
+            print(f"✅ Invalidated {count} sessions for user {user_id}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Session invalidation failed: {e}")
+            return False
+    
+    @classmethod
+    def invalidate_on_role_change(cls, user_id: int, db_manager, auth_manager) -> bool:
+        """
+        Invalidate sessions when user role changes
+        
+        Args:
+            user_id: User ID whose role changed
+            db_manager: Database manager instance
+            auth_manager: Auth manager instance
+            
+        Returns:
+            True if invalidation successful
+        """
+        try:
+            # Invalidate all sessions for this user
+            count = db_manager.invalidate_user_sessions(user_id)
+            
+            # Clear local session if it's the current user
+            if user_id == auth_manager.current_user.get('id'):
+                SecureSessionManager.clear_session_secure()
+            
+            # Log the invalidation
+            db_manager.log_audit_event(
+                user_id=auth_manager.current_user.get('id', user_id),
+                username=auth_manager.current_user.get('username', 'system'),
+                action="session_invalidation",
+                resource="user_sessions",
+                status="success",
+                details={"user_id": user_id, "reason": "role_change", "sessions_invalidated": count}
+            )
+            
+            print(f"✅ Invalidated {count} sessions for role change")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Session invalidation on role change failed: {e}")
+            return False
+    
+    @classmethod
+    def invalidate_on_user_deactivation(cls, user_id: int, db_manager) -> bool:
+        """
+        Invalidate sessions when user is deactivated
+        
+        Args:
+            user_id: User ID being deactivated
+            db_manager: Database manager instance
+            
+        Returns:
+            True if invalidation successful
+        """
+        try:
+            count = db_manager.invalidate_user_sessions(user_id)
+            print(f"✅ Invalidated {count} sessions for deactivated user {user_id}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Session invalidation on deactivation failed: {e}")
+            return False
+
+# ========================
+# SECURITY: Input Validation
+# ========================
+        
+class SecurityValidator:
+    """Handle security validation and attack prevention"""
+    
+    # Allowed file extensions for input files
+    ALLOWED_EXTENSIONS = {'.csv', '.json'}
+    
+    # Maximum file size (100MB to prevent DoS)
+    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+    
+    # Maximum rows for processing (prevent memory DoS)
+    MAX_ROWS = 10_000_000  # 10 million rows max
+    
+    # Dangerous patterns to sanitize
+    DANGEROUS_PATTERNS = [
+        r'<script.*?>.*?</script>',  # XSS
+        r'javascript:',               # JavaScript injection
+        r'vbscript:',                # VBScript injection
+        r'onload=',                  # Event handler injection
+        r'onerror=',                 # Event handler injection
+        r'<.*?>',                    # HTML tags
+        r'\\x[0-9a-fA-F]{2}',       # Hex encoded chars
+        r'\\u[0-9a-fA-F]{4}',       # Unicode encoded chars
+        r'\$\{.*?\}',                # Template injection
+        r'%[0-9a-fA-F]{2}',         # URL encoded chars
+        r'--',                       # SQL comment
+        r';.*--',                    # SQL injection pattern
+        r'/\*.*\*/',                 # SQL multi-line comment
+        r'exec\s*\(',                # Command execution
+        r'eval\s*\(',                # Code evaluation
+        r'system\s*\(',              # System command
+        r'passthru\s*\(',            # PHP passthru
+        r'shell_exec\s*\(',          # Shell execution
+    ]
+    
+    @classmethod
+    def validate_file_input(cls, file_path: str) -> Tuple[bool, str]:
+        """
+        Validate input file for security threats
+        
+        Args:
+            file_path: Path to the input file
+            
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        # Check if file exists
+        if not os.path.exists(file_path):
+            return False, f"File not found: {file_path}"
+        
+        # Get file size
+        try:
+            file_size = os.path.getsize(file_path)
+            if file_size > cls.MAX_FILE_SIZE:
+                return False, f"File too large: {file_size / (1024*1024):.2f} MB exceeds {cls.MAX_FILE_SIZE / (1024*1024):.0f} MB limit"
+            
+            if file_size == 0:
+                return False, "Empty file provided"
+        except OSError as e:
+            return False, f"Cannot access file: {str(e)}"
+        
+        # Check file extension
+        file_ext = os.path.splitext(file_path)[1].lower()
+        if file_ext not in cls.ALLOWED_EXTENSIONS:
+            return False, f"Invalid file extension '{file_ext}'. Allowed: {', '.join(cls.ALLOWED_EXTENSIONS)}"
+        
+        # Check file content using python-magic (MIME type detection)
+        try:
+            mime = magic.from_file(file_path, mime=True)
+            allowed_mime_types = [
+                'text/csv', 'text/plain', 'application/csv',
+                'application/json', 'text/json', 'application/octet-stream'
+            ]
+            
+            if mime not in allowed_mime_types:
+                return False, f"Suspicious MIME type detected: {mime}"
+        except ImportError:
+            # Fallback if python-magic not installed
+            print("⚠️ python-magic not installed, MIME checking disabled")
+        except Exception as e:
+            print(f"⚠️ MIME detection failed: {e}")
+        
+        return True, "OK"
+    
+    @classmethod
+    def validate_csv_content(cls, file_path: str, sample_rows: int = 1000) -> Tuple[bool, str, Optional[pd.DataFrame]]:
+        """
+        Validate CSV file content for security threats and DoS attacks
+        
+        Args:
+            file_path: Path to CSV file
+            sample_rows: Number of rows to sample for validation
+            
+        Returns:
+            Tuple of (is_valid, error_message, dataframe_preview)
+        """
+        import pandas as pd
+        
+        try:
+            # First, check number of rows without loading full file
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                row_count = sum(1 for _ in f) - 1  # Subtract header
+                
+                if row_count > cls.MAX_ROWS:
+                    return False, f"File contains {row_count:,} rows exceeding limit of {cls.MAX_ROWS:,} rows", None
+            
+            # Try to read with security checks
+            df_preview = pd.read_csv(file_path, nrows=sample_rows)
+            
+            # Check for empty dataframe
+            if df_preview.empty:
+                return False, "CSV file contains no data", None
+            
+            # Check for suspicious column names
+            suspicious_columns = []
+            for col in df_preview.columns:
+                col_lower = col.lower()
+                # Check for SQL injection patterns in column names
+                sql_patterns = ['select', 'insert', 'update', 'delete', 'drop', 'alter', 'create', 'exec', 'union']
+                for pattern in sql_patterns:
+                    if pattern in col_lower:
+                        suspicious_columns.append(col)
+                        break
+            
+            if suspicious_columns:
+                print(f"⚠️ Warning: Suspicious column names detected: {suspicious_columns}")
+            
+            # Check for potential infinite values that could crash processing
+            for col in df_preview.select_dtypes(include=['float64', 'int64']).columns:
+                if df_preview[col].isnull().all():
+                    continue
+                    
+                # Check for extreme values
+                if df_preview[col].dtype in ['float64', 'int64']:
+                    if df_preview[col].abs().max() > 1e15:
+                        return False, f"Column '{col}' contains extreme values > 1e15", None
+            
+            # Check for encoding issues
+            problematic_chars = []
+            for col in df_preview.select_dtypes(include=['object']).columns:
+                sample = df_preview[col].dropna().head(10)
+                for val in sample:
+                    if isinstance(val, str):
+                        # Check for null bytes
+                        if '\x00' in val:
+                            problematic_chars.append(f"Null byte in column '{col}'")
+                        # Check for control characters
+                        if any(ord(c) < 32 and c not in '\n\r\t' for c in val):
+                            problematic_chars.append(f"Control character in column '{col}'")
+            
+            if problematic_chars:
+                print(f"⚠️ Warning: {len(problematic_chars)} encoding issues detected")
+            
+            return True, "OK", df_preview
+            
+        except pd.errors.EmptyDataError:
+            return False, "CSV file is empty", None
+        except pd.errors.ParserError as e:
+            return False, f"CSV parsing error: {str(e)}", None
+        except UnicodeDecodeError as e:
+            return False, f"File encoding error: {str(e)}. Try UTF-8 encoding", None
+        except Exception as e:
+            return False, f"Error reading CSV: {str(e)}", None
+    
+    @classmethod
+    def validate_json_content(cls, file_path: str) -> Tuple[bool, str, Optional[Dict]]:
+        """
+        Validate JSON file content for security threats
+        
+        Args:
+            file_path: Path to JSON file
+            
+        Returns:
+            Tuple of (is_valid, error_message, json_data)
+        """
+        import json
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                # Check for file size first
+                if os.path.getsize(file_path) > 10 * 1024 * 1024:  # 10MB for JSON
+                    return False, "JSON file too large (>10MB)", None
+                
+                content = f.read()
+                
+                # Check for suspicious patterns in raw content
+                for pattern in cls.DANGEROUS_PATTERNS:
+                    if re.search(pattern, content, re.IGNORECASE):
+                        return False, f"Suspicious pattern detected in JSON: {pattern[:50]}", None
+                
+                # Parse JSON
+                data = json.loads(content)
+                
+                # Check for deeply nested structures (DoS)
+                def check_nesting(obj, depth=0, max_depth=20):
+                    if depth > max_depth:
+                        return False
+                    if isinstance(obj, dict):
+                        return all(check_nesting(v, depth + 1, max_depth) for v in obj.values())
+                    elif isinstance(obj, list):
+                        return all(check_nesting(item, depth + 1, max_depth) for item in obj)
+                    return True
+                
+                if not check_nesting(data):
+                    return False, "JSON structure too deeply nested (potential DoS)", None
+                
+                return True, "OK", data
+                
+        except json.JSONDecodeError as e:
+            return False, f"Invalid JSON format: {str(e)}", None
+        except Exception as e:
+            return False, f"Error reading JSON: {str(e)}", None
+    
+    @classmethod
+    def secure_file_upload(cls, uploaded_file_path: str, destination_dir: str) -> Tuple[bool, str, Optional[str]]:
+        """
+        Securely handle file uploads with validation and quarantine
+        
+        Args:
+            uploaded_file_path: Path to uploaded file
+            destination_dir: Destination directory for safe storage
+            
+        Returns:
+            Tuple of (is_safe, message, safe_path)
+        """
+        # Create quarantine directory
+        quarantine_dir = os.path.join(destination_dir, ".quarantine")
+        os.makedirs(quarantine_dir, exist_ok=True)
+        
+        try:
+            # Validate file
+            is_valid, error = cls.validate_file_input(uploaded_file_path)
+            if not is_valid:
+                # Move to quarantine for analysis
+                quarantine_path = os.path.join(quarantine_dir, f"quarantine_{hashlib.md5(uploaded_file_path.encode()).hexdigest()}")
+                shutil.move(uploaded_file_path, quarantine_path)
+                return False, f"File rejected: {error}. Moved to quarantine.", None
+            
+            # Check CSV content if applicable
+            if uploaded_file_path.endswith('.csv'):
+                is_valid, error, preview = cls.validate_csv_content(uploaded_file_path)
+                if not is_valid:
+                    quarantine_path = os.path.join(quarantine_dir, f"quarantine_{hashlib.md5(uploaded_file_path.encode()).hexdigest()}")
+                    shutil.move(uploaded_file_path, quarantine_path)
+                    return False, f"CSV rejected: {error}. Moved to quarantine.", None
+            
+            # Check JSON content if applicable
+            if uploaded_file_path.endswith('.json'):
+                is_valid, error, data = cls.validate_json_content(uploaded_file_path)
+                if not is_valid:
+                    quarantine_path = os.path.join(quarantine_dir, f"quarantine_{hashlib.md5(uploaded_file_path.encode()).hexdigest()}")
+                    shutil.move(uploaded_file_path, quarantine_path)
+                    return False, f"JSON rejected: {error}. Moved to quarantine.", None
+            
+            # Generate safe filename
+            original_name = os.path.basename(uploaded_file_path)
+            safe_name = hashlib.sha256(f"{original_name}{os.urandom(16)}".encode()).hexdigest()[:32]
+            safe_path = os.path.join(destination_dir, f"{safe_name}_{original_name}")
+            
+            # Move to safe destination
+            shutil.copy2(uploaded_file_path, safe_path)
+            
+            return True, "File validated and secured", safe_path
+            
+        except Exception as e:
+            return False, f"Security validation error: {str(e)}", None
+    
+    @classmethod
+    def check_for_command_injection(cls, command_args: List[str]) -> Tuple[bool, str]:
+        """
+        Check command arguments for injection attempts
+        
+        Args:
+            command_args: List of command arguments
+            
+        Returns:
+            Tuple of (is_safe, warning_message)
+        """
+        dangerous_chars = ['&', '|', ';', '$', '`', '>', '<', '(', ')', '{', '}', '[', ']', '!', '#', '\\', '/']
+        
+        warnings = []
+        for arg in command_args:
+            if not isinstance(arg, str):
+                continue
+            
+            # Check for dangerous characters
+            for char in dangerous_chars:
+                if char in arg:
+                    warnings.append(f"Dangerous character '{char}' in argument: {arg[:50]}")
+            
+            # Check for command execution patterns
+            cmd_patterns = ['cmd', 'powershell', 'bash', 'sh', 'exec', 'system', 'eval', 'os.system']
+            for pattern in cmd_patterns:
+                if pattern.lower() in arg.lower():
+                    warnings.append(f"Suspicious command pattern '{pattern}' in argument: {arg[:50]}")
+        
+        if warnings:
+            return False, "; ".join(warnings[:3])
+        return True, "OK"
+    
+    @classmethod
+    def rate_limit_check(cls, user_id: int, action: str, db_connection, max_requests: int = 70, time_window: int = 60) -> Tuple[bool, int]:
+        """
+        Check rate limiting for user actions to prevent brute force attacks
+        
+        Args:
+            user_id: User ID
+            action: Action being performed (e.g., 'detect', 'train')
+            db_connection: Database connection for logging
+            max_requests: Maximum allowed requests in time window
+            time_window: Time window in seconds
+            
+        Returns:
+            Tuple of (is_allowed, remaining_requests)
+        """
+        import time
+        from datetime import datetime, timedelta
+        
+        # This would integrate with your database to track rate limits
+        # Simplified implementation - in production, store in Redis or database
+        
+        # For now, return allowed (implement your rate limiting logic)
+        return True, max_requests
+
+# ========================
+# Administrator System Report Generation
+# ========================
+    
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

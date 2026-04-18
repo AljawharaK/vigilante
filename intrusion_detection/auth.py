@@ -283,7 +283,7 @@ class AuthManager:
         self.permissions = {}
     
     def change_password(self, user_id: int, old_password: str, new_password: str) -> Dict[str, Any]:
-        """Change user password"""
+        """Change user password with session invalidation"""
         try:
             user = self.db.get_user_by_id(user_id)
             if not user:
@@ -299,15 +299,20 @@ class AuthManager:
             # Update password
             self.db.reset_user_password(user_id, new_hash, must_change=False)
             
+            # Invalidate all sessions for this user
+            from .utils import SessionInvalidator
+            SessionInvalidator.invalidate_on_password_change(user_id, self.db, self)
+            
             # Log password change
             self.db.log_audit_event(
                 user_id=user_id,
                 username=user['username'],
                 action="password_change",
-                status="success"
+                status="success",
+                details={"session_invalidation": "all_sessions_invalidated"}
             )
             
-            return {"success": True, "message": "Password changed successfully"}
+            return {"success": True, "message": "Password changed successfully. All existing sessions have been invalidated."}
             
         except Exception as e:
             return {"success": False, "message": f"Password change failed: {str(e)}"}

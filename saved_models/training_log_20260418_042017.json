@@ -1,0 +1,65 @@
+{
+  "model_path": "saved_models\\UnifiedDatasetNIDS Model v3_20260418_042017.joblib",
+  "model_name": "UnifiedDatasetNIDS Model v3_20260418_042017",
+  "training_samples": 203762,
+  "validation_samples": 50941,
+  "features_count": 5,
+  "features_used": [
+    "Flow Duration",
+    "Fwd Packet Length Mean",
+    "Bwd Packet Length Mean",
+    "Init_Win_bytes_forward",
+    "Init_Win_bytes_backward"
+  ],
+  "metrics": {
+    "train_accuracy": 0.9952395441740854,
+    "test_accuracy": 0.9939145285722699,
+    "detection_rate": 0.9977492790659508,
+    "false_alarm_rate": 0.02582046332046332,
+    "auc": 0.9942529783422424,
+    "precision": 0.9949966098524702,
+    "recall": 0.9977492790659508,
+    "f1_score": 0.9963710432665294,
+    "detectors": 1000,
+    "optimal_dr": 0.9977492790659508,
+    "optimal_far": 0.02582046332046332,
+    "training_samples": 203762,
+    "features_count": 5
+  },
+  "feature_analysis": {
+    "total_columns": 83,
+    "available_features": [
+      "Flow Duration",
+      "Fwd Packet Length Mean",
+      "Bwd Packet Length Mean",
+      "Init_Win_bytes_forward",
+      "Init_Win_bytes_backward"
+    ],
+    "missing_features": [],
+    "feature_mapping": {
+      "Flow Duration": "Flow Duration",
+      "Fwd Packet Length Mean": "Fwd Packet Length Mean",
+      "Bwd Packet Length Mean": "Bwd Packet Length Mean",
+      "Init_Win_bytes_forward": "Init_Win_bytes_forward",
+      "Init_Win_bytes_backward": "Init_Win_bytes_backward"
+    },
+    "coverage": 100.0,
+    "custom_features_used": true
+  },
+  "parameters": {
+    "r_s": 0.05,
+    "max_detectors": 1000,
+    "k": 5,
+    "model_type": "rnsa_knn",
+    "training_samples": 203762,
+    "custom_features": [
+      "Flow Duration",
+      "Fwd Packet Length Mean",
+      "Bwd Packet Length Mean",
+      "Init_Win_bytes_forward",
+      "Init_Win_bytes_backward"
+    ]
+  },
+  "dataset_name": "uds_ids_dataset.csv",
+  "timestamp": "20260418_042017"
+}

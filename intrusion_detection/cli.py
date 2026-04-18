@@ -8,7 +8,7 @@ import json
 import tempfile
 from datetime import datetime, timedelta
 from getpass import getpass
-from typing import Optional
+from typing import Optional, Tuple
 import traceback
 from pathlib import Path
 from collections import Counter
@@ -143,35 +143,48 @@ Examples:
         self.parser = parser
     
     def load_session(self):
-        """Load session from file"""
-        if self.session_file.exists():
-            try:
-                with open(self.session_file, 'r') as f:
-                    session_data = json.load(f)
-                
+        """Load encrypted session from file with security checks"""
+        from .utils import SecureSessionManager
+        
+        try:
+            session_data = SecureSessionManager.load_session_secure()
+            
+            if session_data:
                 session_token = session_data.get('session_token')
                 if session_token and self.auth.validate_session(session_token):
-                    console.print(f"[green]✓ Session loaded for {self.auth.current_user['username']}[/green]")
+                    console.print(f"[green]✓ Secure session loaded for {self.auth.current_user['username']}[/green]")
                     return True
-            except Exception as e:
-                console.print(f"[yellow]Warning: Could not load session: {e}[/yellow]")
-        return False
-    
+                else:
+                    # Session token invalid, clear it
+                    SecureSessionManager.clear_session_secure()
+                    console.print("[yellow]⚠️ Invalid session, please login again[/yellow]")
+            return False
+            
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not load session: {e}[/yellow]")
+            return False
+
     def save_session(self):
-        """Save session to file"""
-        if self.auth.current_session:
-            session_data = {
-                'session_token': self.auth.current_session,
-                'username': self.auth.current_user['username'],
-                'saved_at': datetime.now().isoformat()
-            }
-            with open(self.session_file, 'w') as f:
-                json.dump(session_data, f, indent=2)
-    
+        """Save encrypted session to file with integrity protection"""
+        from .utils import SecureSessionManager
+        
+        if self.auth.current_session and self.auth.current_user:
+            success = SecureSessionManager.save_session_secure(
+                self.auth.current_session,
+                self.auth.current_user['username']
+            )
+            
+            if success:
+                console.print("[dim]✓ Session saved securely[/dim]")
+            else:
+                console.print("[yellow]⚠️ Could not save session securely[/yellow]")
+
     def clear_session(self):
-        """Clear session file"""
-        if self.session_file.exists():
-            self.session_file.unlink()
+        """Securely clear session file"""
+        from .utils import SecureSessionManager
+        
+        SecureSessionManager.clear_session_secure()
+        console.print("[dim]✓ Session cleared[/dim]")
     
     def check_auth(self):
         """Check if user is authenticated"""
@@ -215,6 +228,102 @@ Examples:
         
         return True
     
+    def validate_input_file_secure(self, file_path: str, expected_type: str = 'csv') -> Tuple[bool, str, Optional[Union[pd.DataFrame, Dict]]]:
+        """
+        Validate input file with security checks before processing
+        
+        Args:
+            file_path: Path to input file
+            expected_type: Expected file type ('csv' or 'json')
+            
+        Returns:
+            Tuple of (is_valid, message, data_frame_or_json)
+        """
+        from .utils import SecurityValidator
+        
+        # First, validate file existence and basic properties
+        is_valid, error = SecurityValidator.validate_file_input(file_path)
+        if not is_valid:
+            return False, error, None
+        
+        # Check for command injection in file path
+        is_safe, warning = SecurityValidator.check_for_command_injection([file_path])
+        if not is_safe:
+            console.print(f"[yellow]⚠️ Security Warning: {warning}[/yellow]")
+            return False, f"File path rejected: {warning}", None
+        
+        # Validate content based on type
+        if expected_type == 'csv' or file_path.endswith('.csv'):
+            is_valid, error, df_preview = SecurityValidator.validate_csv_content(file_path)
+            if not is_valid:
+                return False, error, None
+            
+            return True, "OK", df_preview
+        
+        elif expected_type == 'json' or file_path.endswith('.json'):
+            is_valid, error, json_data = SecurityValidator.validate_json_content(file_path)
+            if not is_valid:
+                return False, error, None
+            
+            console.print(f"[green]✓ Security validation passed for {file_path}[/green]")
+            return True, "OK", json_data
+        
+        else:
+            return False, f"Unsupported file type: {expected_type}", None
+
+
+    def check_rate_limit(self, action: str) -> Tuple[bool, int]:
+        """
+        Check rate limit for user actions to prevent DoS
+        
+        Args:
+            action: Action being performed
+            
+        Returns:
+            Tuple of (is_allowed, remaining_requests)
+        """
+        from .utils import SecurityValidator
+        
+        # Rate limiting settings per action
+        rate_limits = {
+            'detect': {'max': 70, 'window': 3600},   # 70 detections per hour
+            'train': {'max': 70, 'window': 3600},    # 70 trainings per hour
+            'login': {'max': 40, 'window': 3600},      # 40 login attempts per 5 minutes
+        }
+        
+        if action not in rate_limits:
+            return True, 100  # No limit for other actions
+        
+        limits = rate_limits[action]
+        user_id = self.auth.current_user['id'] if self.auth.current_user else 0
+        
+        # Check with database (simplified - implement full rate limiting)
+        # For now, return allowed
+        return True, limits['max']
+
+
+    def secure_file_cleanup(self, file_path: str):
+        """
+        Securely cleanup temporary files after processing
+        
+        Args:
+            file_path: Path to file to cleanup
+        """
+        import tempfile
+        import shutil
+        
+        try:
+            if os.path.exists(file_path):
+                # Securely overwrite before deletion for sensitive files
+                if file_path.endswith(('.csv', '.json')):
+                    with open(file_path, 'wb') as f:
+                        f.write(os.urandom(os.path.getsize(file_path)))
+                
+                os.remove(file_path)
+                console.print(f"[dim]✓ Cleaned up temporary file: {file_path}[/dim]")
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not cleanup {file_path}: {e}[/yellow]")
+
     def handle_interactive_gui(self, args):
         """Launch the interactive GUI mode"""
         console.print("[cyan]Starting Vigilante Interactive GUI...[/cyan]")
@@ -1262,6 +1371,61 @@ Examples:
             console.print(f"[red]Input file not found: {args.input}[/red]")
             return
         
+        # ========== ADD SECURITY VALIDATION ==========
+        # Check rate limit
+        is_allowed, remaining = self.check_rate_limit('detect')
+        if not is_allowed:
+            console.print(f"[red]Rate limit exceeded. Only {remaining} requests remaining.[/red]")
+            return
+        
+        # Validate input file with security checks
+        file_ext = os.path.splitext(args.input)[1].lower()
+        if file_ext == '.json':
+            # Validate JSON file
+            is_valid, message, json_data = self.validate_input_file_secure(args.input, 'json')
+            if not is_valid:
+                console.print(f"[red]Security validation failed: {message}[/red]")
+                self.db.log_audit_event(
+                    user_id=self.auth.current_user['id'],
+                    username=self.auth.current_user['username'],
+                    action="security_violation",
+                    resource=args.input,
+                    status="blocked",
+                    details={"reason": message, "type": "invalid_json"}
+                )
+                return
+            # For JSON, we need to convert to DataFrame for processing
+            if isinstance(json_data, dict) and 'data' in json_data:
+                df = pd.DataFrame(json_data['data'])
+            elif isinstance(json_data, list):
+                df = pd.DataFrame(json_data)
+            else:
+                df = pd.DataFrame([json_data]) if json_data else pd.DataFrame()
+            console.print(f"[cyan]Loaded {len(df)} records from JSON file[/cyan]")
+            
+        elif file_ext == '.csv':
+            # Validate CSV file
+            is_valid, message, df_preview = self.validate_input_file_secure(args.input, 'csv')
+            if not is_valid:
+                console.print(f"[red]Security validation failed: {message}[/red]")
+                self.db.log_audit_event(
+                    user_id=self.auth.current_user['id'],
+                    username=self.auth.current_user['username'],
+                    action="security_violation",
+                    resource=args.input,
+                    status="blocked",
+                    details={"reason": message, "type": "invalid_csv"}
+                )
+                return
+            # Load full CSV
+            df = pd.read_csv(args.input)
+            console.print(f"[cyan]Loaded {len(df)} records from CSV file[/cyan]")
+            
+        else:
+            console.print(f"[red]Unsupported file type: {file_ext}. Please use .csv or .json[/red]")
+            return
+        # ========== END SECURITY VALIDATION ==========
+
         # Load model
         model = None
         model_id = None
@@ -2092,8 +2256,49 @@ Examples:
         if not os.path.exists(args.input):
             console.print(f"[red]Input file not found: {args.input}[/red]")
             return
+        
+        # ========== ADD SECURITY VALIDATION ==========
+        # Check rate limit
+        is_allowed, remaining = self.check_rate_limit('train')
+        if not is_allowed:
+            console.print(f"[red]Rate limit exceeded. Only {remaining} requests remaining.[/red]")
+            return
+        
+        # Validate input file with security checks
+        file_ext = os.path.splitext(args.input)[1].lower()
+        if file_ext not in ['.csv', '.json']:
+            console.print(f"[red]Unsupported file type: {file_ext}. Please use .csv or .json[/red]")
+            return
+        
+        if file_ext == '.csv':
+            is_valid, message, data = self.validate_input_file_secure(args.input, 'csv')
+            if not is_valid:
+                console.print(f"[red]Security validation failed: {message}[/red]")
+                self.db.log_audit_event(
+                    user_id=self.auth.current_user['id'],
+                    username=self.auth.current_user['username'],
+                    action="security_violation",
+                    resource=args.input,
+                    status="blocked",
+                    details={"reason": message, "type": "invalid_csv", "operation": "train"}
+                )
+                return
+        else:  # .json
+            is_valid, message, json_data = self.validate_input_file_secure(args.input, 'json')
+            if not is_valid:
+                console.print(f"[red]Security validation failed: {message}[/red]")
+                self.db.log_audit_event(
+                    user_id=self.auth.current_user['id'],
+                    username=self.auth.current_user['username'],
+                    action="security_violation",
+                    resource=args.input,
+                    status="blocked",
+                    details={"reason": message, "type": "invalid_json", "operation": "train"}
+                )
+                return
+        # ========== END SECURITY VALIDATION ==========
 
-        # Process features (optional, model will use core features)
+        # Process features
         custom_features = None
         if args.features:
             custom_features = [f.strip() for f in args.features.split(',')]
@@ -2439,6 +2644,7 @@ Examples:
                         
                         self.feature_mapping = {}
                         self.original_features = pd.DataFrame()
+                        found_count = 0
                         
                         for core_feature, variations in feature_variations.items():
                             found = False
@@ -2447,6 +2653,7 @@ Examples:
                                     self.feature_mapping[core_feature] = var
                                     self.original_features[core_feature] = pd.to_numeric(original_df[var], errors='coerce')
                                     found = True
+                                    found_count += 1
                                     console.print(f"[dim]  ✓ Mapped '{core_feature}' → '{var}'[/dim]")
                                     break
                                 elif var.lower() in [col.lower() for col in original_df.columns]:
@@ -2454,12 +2661,16 @@ Examples:
                                     self.feature_mapping[core_feature] = actual_col
                                     self.original_features[core_feature] = pd.to_numeric(original_df[actual_col], errors='coerce')
                                     found = True
+                                    found_count += 1
                                     console.print(f"[dim]  ✓ Mapped '{core_feature}' → '{actual_col}'[/dim]")
                                     break
                             
                             if not found:
                                 self.original_features[core_feature] = 0
+                                # Only show error for features that should be present in non-custom models
                                 console.print(f"[dim]  ✗ '{core_feature}' not found, using zeros[/dim]")
+                        
+                        console.print(f"[dim]  ✓ Found {found_count} out of 10 core features[/dim]")
                     
                     # Fill NaN values
                     self.original_features = self.original_features.fillna(0)

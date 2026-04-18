@@ -151,6 +151,33 @@ class VigilanteGUI:
         
         # Start background task processor
         self.page.run_task(self.process_tasks)
+    
+    def handle_session_invalidation(self):
+        """Handle session invalidation events - check if current session is still valid"""
+        from .utils import SecureSessionManager
+        
+        # Check if current session is still valid
+        if self.auth.current_session and not self.auth.validate_session(self.auth.current_session):
+            # Session invalidated (password change, role change, etc.)
+            self.auth.logout()
+            SecureSessionManager.clear_session_secure()
+            
+            self.show_dialog(
+                "Session Expired", 
+                "Your session has been invalidated due to a security event (password change, role change, or account deactivation). Please login again."
+            )
+            
+            # Return to login screen
+            self.setup_login_ui()
+            return True
+        
+        return False
+
+    def check_session_valid(self) -> bool:
+        """Check if current session is still valid"""
+        if self.handle_session_invalidation():
+            return False
+        return True
 
     def setup_page(self):
         """Configure page settings"""
@@ -628,6 +655,11 @@ class VigilanteGUI:
     def navigate_to(self, view: str):
         """Handle navigation between views"""
         
+        # ========== ADD SESSION VALIDATION ==========
+        if not self.check_session_valid():
+            return
+        # ========== END SESSION VALIDATION ==========
+
         # Check permissions for admin-only pages
         if view in ["manage_users", "system_admin"] and not self.auth.is_admin():
             self.show_dialog("Access Denied", "This page is only accessible to Administrators.")
@@ -1044,6 +1076,11 @@ Path: {model.get('model_path', 'N/A')}
     def create_manage_users_content(self) -> Container:
         """Create user management view (Admin only)"""
         
+        # ========== ADD SESSION VALIDATION ==========
+        if not self.check_session_valid():
+            return Container()  # Return empty container if session invalid
+        # ========== END SESSION VALIDATION ==========
+
         # Get all users
         users = self.db.get_all_users()
         
@@ -1548,6 +1585,11 @@ Path: {model.get('model_path', 'N/A')}
     def create_settings_content(self) -> Container:
         """Create settings interface"""
         
+        # ========== ADD SESSION VALIDATION ==========
+        if not self.check_session_valid():
+            return Container()  # Return empty container if session invalid
+        # ========== END SESSION VALIDATION ==========
+
         # Get fresh user data from database to ensure email is available
         user_id = self.auth.current_user.get('id') if self.auth.current_user else None
         email_display = "Not available"
