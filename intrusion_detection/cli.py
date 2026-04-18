@@ -8,7 +8,7 @@ import json
 import tempfile
 from datetime import datetime, timedelta
 from getpass import getpass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union, Dict
 import traceback
 from pathlib import Path
 from collections import Counter
