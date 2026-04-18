@@ -2,7 +2,7 @@
 import os
 import json
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Tuple, Optional, Dict, Any, List
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4
@@ -18,13 +18,11 @@ import hashlib
 import tempfile
 import shutil
 import base64
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+import hashlib
+import secrets
 
 # ========================
-# FIX: Use filetype library instead of python-magic
-# filetype is pure Python, no external dependencies, works on all platforms
+# Handle optional filetype library for MIME type detection
 # ========================
 try:
     import filetype
@@ -40,129 +38,89 @@ console = Console()
 # ========================
 
 class SecureSessionManager:
-    """Handle encrypted session storage with proper security"""
+    """Handle secure session storage with simpler cryptography (no external deps)"""
     
     # Session file path
     SESSION_FILE = Path.home() / ".vigilante_session"
     
-    # Key derivation parameters
-    SALT_SIZE = 32
-    ITERATIONS = 100_000
-    
     @classmethod
-    def _derive_key(cls, password: Optional[str] = None) -> bytes:
+    def _derive_key_from_system(cls) -> str:
         """
-        Derive encryption key from system-specific values
+        Derive a unique key from system-specific values
         
-        Args:
-            password: Optional password for key derivation (uses system info if None)
-            
         Returns:
-            Derived encryption key
+            Derived key string
         """
-        if password is None:
-            # Use system-specific values to create a unique key for this installation
-            import platform
-            import getpass
-            
-            # Combine system identifiers
-            key_material = f"{platform.node()}{platform.system()}{getpass.getuser()}".encode()
-        else:
-            key_material = password.encode()
+        import platform
+        import getpass
         
-        # Generate random salt or use persistent salt
+        # Combine system identifiers
+        system_info = f"{platform.node()}{platform.system()}{platform.machine()}{getpass.getuser()}"
+        
+        # Create a hash that will be consistent for this installation
+        key_hash = hashlib.sha256(system_info.encode()).hexdigest()
+        
+        # Also use a salt file for additional security
         salt_path = Path.home() / ".vigilante_salt"
         
         if salt_path.exists():
             with open(salt_path, 'rb') as f:
                 salt = f.read()
         else:
-            salt = os.urandom(cls.SALT_SIZE)
+            salt = os.urandom(32)
             with open(salt_path, 'wb') as f:
                 f.write(salt)
         
-        # Derive key using PBKDF2
-        kdf = PBKDF2(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            iterations=cls.ITERATIONS,
-        )
-        
-        key = base64.urlsafe_b64encode(kdf.derive(key_material))
-        return key
+        # Combine with salt
+        combined = key_hash + salt.hex()
+        return hashlib.sha256(combined.encode()).hexdigest()[:32]
     
     @classmethod
-    def encrypt_session(cls, session_data: Dict[str, Any]) -> str:
+    def _simple_encrypt(cls, data: str, key: str) -> str:
         """
-        Encrypt session data before saving to disk
+        Simple XOR-based encryption (for session data only - not for sensitive passwords)
         
         Args:
-            session_data: Dictionary containing session information
+            data: String to encrypt
+            key: Encryption key
             
         Returns:
-            Encrypted session string
+            Encrypted string (hex encoded)
         """
-        try:
-            # Convert to JSON string
-            json_data = json.dumps(session_data)
-            
-            # Encrypt
-            key = cls._derive_key()
-            f = Fernet(key)
-            encrypted = f.encrypt(json_data.encode())
-            
-            # Return as base64 string
-            return base64.b64encode(encrypted).decode()
-            
-        except Exception as e:
-            print(f"❌ Session encryption failed: {e}")
-            raise
+        import itertools
+        
+        # Convert to bytes
+        data_bytes = data.encode('utf-8')
+        key_bytes = key.encode('utf-8')
+        
+        # XOR encryption
+        encrypted = bytes([a ^ b for a, b in zip(data_bytes, itertools.cycle(key_bytes))])
+        
+        # Return hex encoded
+        return encrypted.hex()
     
     @classmethod
-    def decrypt_session(cls, encrypted_data: str) -> Optional[Dict[str, Any]]:
+    def _simple_decrypt(cls, encrypted_hex: str, key: str) -> str:
         """
-        Decrypt session data from disk
+        Simple XOR-based decryption
         
         Args:
-            encrypted_data: Encrypted session string
+            encrypted_hex: Hex encoded encrypted string
+            key: Encryption key
             
         Returns:
-            Decrypted session dictionary or None if invalid
+            Decrypted string
         """
-        try:
-            # Decode from base64
-            encrypted = base64.b64decode(encrypted_data.encode())
-            
-            # Decrypt
-            key = cls._derive_key()
-            f = Fernet(key)
-            decrypted = f.decrypt(encrypted)
-            
-            # Parse JSON
-            session_data = json.loads(decrypted.decode())
-            
-            # Validate session structure
-            if not all(k in session_data for k in ['session_token', 'username', 'saved_at', 'signature']):
-                print("⚠️ Invalid session data structure")
-                return None
-            
-            # Verify signature
-            expected_signature = cls._calculate_signature(
-                session_data['session_token'],
-                session_data['username'],
-                session_data['saved_at']
-            )
-            
-            if session_data.get('signature') != expected_signature:
-                print("⚠️ Session signature verification failed")
-                return None
-            
-            return session_data
-            
-        except Exception as e:
-            print(f"⚠️ Session decryption failed: {e}")
-            return None
+        import itertools
+        
+        # Convert from hex
+        encrypted = bytes.fromhex(encrypted_hex)
+        key_bytes = key.encode('utf-8')
+        
+        # XOR decryption (same as encryption)
+        decrypted = bytes([a ^ b for a, b in zip(encrypted, itertools.cycle(key_bytes))])
+        
+        return decrypted.decode('utf-8')
     
     @classmethod
     def _calculate_signature(cls, session_token: str, username: str, saved_at: str) -> str:
@@ -177,7 +135,6 @@ class SecureSessionManager:
         Returns:
             Signature hash
         """
-        import hashlib
         data = f"{session_token}:{username}:{saved_at}".encode()
         return hashlib.sha256(data).hexdigest()[:32]
     
@@ -194,13 +151,11 @@ class SecureSessionManager:
             True if saved successfully, False otherwise
         """
         try:
-            from datetime import datetime
-            
             session_data = {
                 'session_token': session_token,
                 'username': username,
                 'saved_at': datetime.now().isoformat(),
-                'version': '2.0',  # Version for future compatibility
+                'version': '2.0',
             }
             
             # Add signature for integrity
@@ -208,8 +163,12 @@ class SecureSessionManager:
                 session_token, username, session_data['saved_at']
             )
             
+            # Convert to JSON
+            json_data = json.dumps(session_data)
+            
             # Encrypt
-            encrypted = cls.encrypt_session(session_data)
+            key = cls._derive_key_from_system()
+            encrypted = cls._simple_encrypt(json_data, key)
             
             # Save with restricted permissions
             with open(cls.SESSION_FILE, 'w') as f:
@@ -218,7 +177,6 @@ class SecureSessionManager:
             # Set secure file permissions (read/write only for owner)
             os.chmod(cls.SESSION_FILE, 0o600)
             
-            print(f"✅ Session saved securely for user: {username}")
             return True
             
         except Exception as e:
@@ -243,17 +201,30 @@ class SecureSessionManager:
             if not encrypted:
                 return None
             
-            # Decrypt and verify
-            session_data = cls.decrypt_session(encrypted)
+            # Decrypt
+            key = cls._derive_key_from_system()
+            json_data = cls._simple_decrypt(encrypted, key)
             
-            if session_data is None:
+            # Parse JSON
+            session_data = json.loads(json_data)
+            
+            # Validate session structure
+            if not all(k in session_data for k in ['session_token', 'username', 'saved_at', 'signature']):
+                return None
+            
+            # Verify signature
+            expected_signature = cls._calculate_signature(
+                session_data['session_token'],
+                session_data['username'],
+                session_data['saved_at']
+            )
+            
+            if session_data.get('signature') != expected_signature:
                 return None
             
             # Check if session is expired (24 hours default)
-            from datetime import datetime, timedelta
             saved_at = datetime.fromisoformat(session_data['saved_at'])
             if datetime.now() - saved_at > timedelta(hours=24):
-                print("⚠️ Session expired (older than 24 hours)")
                 cls.clear_session_secure()
                 return None
             
@@ -280,7 +251,6 @@ class SecureSessionManager:
                 
                 # Delete the file
                 cls.SESSION_FILE.unlink()
-                print("✅ Session cleared securely")
             
             return True
             
