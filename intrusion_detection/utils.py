@@ -414,16 +414,14 @@ class SecurityValidator:
         r'vbscript:',                # VBScript injection
         r'onload=',                  # Event handler injection
         r'onerror=',                 # Event handler injection
-        r'<.*?>',                    # HTML tags
-        r'\\x[0-9a-fA-F]{2}',       # Hex encoded chars
-        r'\\u[0-9a-fA-F]{4}',       # Unicode encoded chars
-        r'--',                       # SQL comment
-        r';.*--',                    # SQL injection pattern
-        r'exec\s*\(',                # Command execution
+        r'<\?php',                   # PHP code injection
         r'eval\s*\(',                # Code evaluation
         r'system\s*\(',              # System command
+        r'exec\s*\(',                # Command execution
         r'passthru\s*\(',            # PHP passthru
         r'shell_exec\s*\(',          # Shell execution
+        r'base64_decode\s*\(',       # Base64 decode (potential obfuscation)
+        r'\\\\x[0-9a-fA-F]{2}',      # Hex encoded chars (if escaped)
     ]
     
     @classmethod
@@ -505,7 +503,8 @@ class SecurityValidator:
     @classmethod
     def validate_csv_content(cls, file_path: str, sample_rows: int = 1000) -> Tuple[bool, str, Optional[pd.DataFrame]]:
         """
-        Validate CSV file content for security threats and DoS attacks
+        Validate CSV file content for security threats and DoS attacks in
+        NETWORK DATASETS (e.g., flow durations in microseconds, total bytes)
         
         Args:
             file_path: Path to CSV file
@@ -545,16 +544,6 @@ class SecurityValidator:
             if suspicious_columns:
                 print(f"⚠️ Warning: Suspicious column names detected: {suspicious_columns}")
             
-            # Check for potential infinite values that could crash processing
-            for col in df_preview.select_dtypes(include=['float64', 'int64']).columns:
-                if df_preview[col].isnull().all():
-                    continue
-                    
-                # Check for extreme values
-                if df_preview[col].dtype in ['float64', 'int64']:
-                    if df_preview[col].abs().max() > 1e15:
-                        return False, f"Column '{col}' contains extreme values > 1e15", None
-            
             # Check for encoding issues
             problematic_chars = []
             for col in df_preview.select_dtypes(include=['object']).columns:
@@ -564,9 +553,6 @@ class SecurityValidator:
                         # Check for null bytes
                         if '\x00' in val:
                             problematic_chars.append(f"Null byte in column '{col}'")
-                        # Check for control characters
-                        if any(ord(c) < 32 and c not in '\n\r\t' for c in val):
-                            problematic_chars.append(f"Control character in column '{col}'")
             
             if problematic_chars:
                 print(f"⚠️ Warning: {len(problematic_chars)} encoding issues detected")
@@ -585,7 +571,8 @@ class SecurityValidator:
     @classmethod
     def validate_json_content(cls, file_path: str) -> Tuple[bool, str, Optional[Dict]]:
         """
-        Validate JSON file content for security threats
+        Validate JSON file content for security threats in
+        NETWORK DATASETS (e.g., flow durations in microseconds, total bytes)
         
         Args:
             file_path: Path to JSON file
@@ -597,10 +584,6 @@ class SecurityValidator:
         
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                # Check for file size first
-                if os.path.getsize(file_path) > 10 * 1024 * 1024:  # 10MB for JSON
-                    return False, "JSON file too large (>10MB)", None
-                
                 content = f.read()
                 
                 # Check for suspicious patterns in raw content
@@ -611,8 +594,9 @@ class SecurityValidator:
                 # Parse JSON
                 data = json.loads(content)
                 
-                # Check for deeply nested structures (DoS)
-                def check_nesting(obj, depth=0, max_depth=20):
+                # Check for deeply nested structures (DoS prevention)
+                def check_nesting(obj, depth=0, max_depth=50):  # Increased max_depth for network datasets
+                    """Check for excessive nesting that could cause DoS"""
                     if depth > max_depth:
                         return False
                     if isinstance(obj, dict):
@@ -627,7 +611,11 @@ class SecurityValidator:
                 return True, "OK", data
                 
         except json.JSONDecodeError as e:
-            return False, f"Invalid JSON format: {str(e)}", None
+            return False, f"Invalid JSON format at line {e.lineno}, column {e.colno}: {str(e)}", None
+        except UnicodeDecodeError as e:
+            return False, f"File encoding error: {str(e)}. Try UTF-8 encoding", None
+        except MemoryError:
+            return False, "JSON file too large to parse in memory", None
         except Exception as e:
             return False, f"Error reading JSON: {str(e)}", None
     
