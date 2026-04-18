@@ -246,12 +246,6 @@ Examples:
         if not is_valid:
             return False, error, None
         
-        # Check for command injection in file path
-        is_safe, warning = SecurityValidator.check_for_command_injection([file_path])
-        if not is_safe:
-            console.print(f"[yellow]⚠️ Security Warning: {warning}[/yellow]")
-            return False, f"File path rejected: {warning}", None
-        
         # Validate content based on type
         if expected_type == 'csv' or file_path.endswith('.csv'):
             is_valid, error, df_preview = SecurityValidator.validate_csv_content(file_path)
