@@ -11,9 +11,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from rich.table import Table as RichTable
 from rich.console import Console
-import os
 import sys
-from importlib import resources
 from pathlib import Path
 import re
 import hashlib
@@ -23,23 +21,17 @@ import base64
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
-from typing import Optional, Dict, Any
 
 # ========================
-# Handle python-magic import gracefully on Windows
+# FIX: Use filetype library instead of python-magic
+# filetype is pure Python, no external dependencies, works on all platforms
 # ========================
-_magic_available = False
 try:
-    import magic
-    _magic_available = True
+    import filetype
+    _filetype_available = True
 except ImportError:
-    # python-magic not installed, will use fallback
-    print("⚠️ python-magic not installed. MIME detection disabled. Install with: pip install python-magic-bin")
-except Exception as e:
-    # libmagic not found on Windows
-    print(f"⚠️ libmagic not found: {e}. MIME detection disabled.")
-    print("   On Windows, install with: pip install python-magic-bin")
-    _magic_available = False
+    print("⚠️ filetype not installed. Installing recommended: pip install filetype")
+    _filetype_available = False
 
 console = Console()
 
@@ -468,6 +460,30 @@ class SecurityValidator:
     ]
     
     @classmethod
+    def _detect_file_mime_type(cls, file_path: str) -> Optional[str]:
+        """
+        Detect file MIME type using filetype library (pure Python, no dependencies)
+        
+        Args:
+            file_path: Path to the file
+            
+        Returns:
+            MIME type string or None if detection fails
+        """
+        if not _filetype_available:
+            return None
+        
+        try:
+            # Guess the file type using magic bytes
+            kind = filetype.guess(file_path)
+            if kind is not None:
+                return kind.mime
+            return None
+        except Exception as e:
+            print(f"⚠️ File type detection failed: {e}")
+            return None
+    
+    @classmethod
     def validate_file_input(cls, file_path: str) -> Tuple[bool, str]:
         """
         Validate input file for security threats
@@ -498,22 +514,24 @@ class SecurityValidator:
         if file_ext not in cls.ALLOWED_EXTENSIONS:
             return False, f"Invalid file extension '{file_ext}'. Allowed: {', '.join(cls.ALLOWED_EXTENSIONS)}"
         
-        # Check file content using python-magic (MIME type detection) - FIXED with fallback
-        if _magic_available:
-            try:
-                mime = magic.from_file(file_path, mime=True)
-                allowed_mime_types = [
-                    'text/csv', 'text/plain', 'application/csv',
-                    'application/json', 'text/json', 'application/octet-stream'
-                ]
-                
-                if mime not in allowed_mime_types:
-                    return False, f"Suspicious MIME type detected: {mime}"
-            except Exception as e:
-                print(f"⚠️ MIME detection failed: {e}")
-        else:
-            # Fallback: check file extension only
-            print("ℹ️ python-magic not available, MIME checking skipped")
+        # Check file content using filetype (magic bytes detection)
+        mime = cls._detect_file_mime_type(file_path)
+        
+        if mime:
+            allowed_mime_types = [
+                'text/csv', 'text/plain', 'application/csv',
+                'application/json', 'text/json', 'application/octet-stream',
+                'text/x-csv', 'text/x-json'
+            ]
+            
+            if mime not in allowed_mime_types:
+                # For CSV files, sometimes filetype detects as text/plain which is fine
+                if file_ext == '.csv' and mime == 'text/plain':
+                    pass  # Accept text/plain as valid for CSV
+                elif file_ext == '.json' and mime == 'text/plain':
+                    pass  # Accept text/plain as valid for JSON
+                else:
+                    return False, f"Suspicious file type detected: {mime}"
         
         return True, "OK"
     
