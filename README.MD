@@ -90,9 +90,11 @@ vigilante admin system-report --period 30d --output monthly_report.pdf
 # Analyst Detection & Analysis
 # 1. Train a model on your dataset
 vigilante train --input training_data.csv --model-name "Network Traffic Model"
+vigilante train --input training_data.csv --model-name "Network Traffic Model" --features "Flow Duration,Fwd Packets,Bwd Packets"
+
 # 2. List available models to get the ID
 vigilante list-models
 # 3. Run detection on new traffic
-vigilante detect --input new_traffic.csv --model-id 1 --output results.json
+vigilante detect --input new_traffic.csv --model-id 1 --threshold 0.6 --output results.json
 # 4. Check summary of detections
 vigilante summary --period 7d

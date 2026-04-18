@@ -50,8 +50,11 @@ class VigilanteCLI:
             epilog="""
 Examples:
   vigilante login                                      # Interactive login
-  vigilante train --input training_data.csv --model-name "Network Traffic Model"              # Train model
-  vigilante detect --input new_traffic.csv --model-id 1 --output results.json                 # Detect anomalies
+  vigilante train --input training_data.csv 
+  --model-name "Network Traffic Model" 
+  --features "Flow Duration,Fwd Packets,Bwd Packets"    # Train model
+  vigilante detect --input new_traffic.csv 
+  --model-id 1 --threshold 0.6 --output results.json   # Detect anomalies
   vigilante admin user-create --username analyst1 --email analyst@company.com --role Analyst  # Create user (admin only)
   vigilante summary --period 7d                        # Weekly summary
   vigilante explain --detection-id 1                   # Explain detection
@@ -2582,7 +2585,7 @@ Examples:
                         features_data = model_info['features_used']
                         if isinstance(features_data, dict):
                             model_features = features_data.get('features_list', [])
-                            console.print(f"[cyan]Model was trained with {len(model_features)} custom features: {model_features}[/cyan]")
+                            console.print(f"[cyan]Model was trained with {len(model_features)} features: {model_features}[/cyan]")
                         elif isinstance(features_data, list):
                             model_features = features_data
                     elif model_info.get('features'):
@@ -2604,6 +2607,7 @@ Examples:
                         console.print(f"[cyan]Using model's features for explanation: {model_features}[/cyan]")
                         self.original_features = pd.DataFrame()
                         self.feature_mapping = {}
+                        missing_features = []
                         
                         for feature in model_features:
                             if feature in original_df.columns:
@@ -2619,7 +2623,11 @@ Examples:
                                     console.print(f"[dim]  ✓ Mapped '{feature}' → '{matching_col}'[/dim]")
                                 else:
                                     self.original_features[feature] = 0
-                                    console.print(f"[dim]  ✗ '{feature}' not found, using zeros[/dim]")
+                                    missing_features.append(feature)
+                        
+                        # Only show missing features message if there are actual missing features
+                        if missing_features:
+                            console.print(f"[dim] ✗ {len(missing_features)} feature(s) not found, using zeros as placeholders[/dim]")
                     else:
                         # Fall back to core features with mapping
                         console.print(f"[cyan]Using core features with mapping for explanation[/cyan]")
@@ -2639,6 +2647,7 @@ Examples:
                         self.feature_mapping = {}
                         self.original_features = pd.DataFrame()
                         found_count = 0
+                        missing_features = []
                         
                         for core_feature, variations in feature_variations.items():
                             found = False
@@ -2661,9 +2670,11 @@ Examples:
                             
                             if not found:
                                 self.original_features[core_feature] = 0
-                                # Only show error for features that should be present in non-custom models
-                                console.print(f"[dim]  ✗ '{core_feature}' not found, using zeros[/dim]")
+                                missing_features.append(core_feature)
                         
+                        # Show a summary instead of individual messages
+                        if missing_features:
+                            console.print(f"[dim]  ℹ️ {len(missing_features)} core feature(s) not found (using zeros): {', '.join(missing_features[:5])}{'...' if len(missing_features) > 5 else ''}[/dim]")
                         console.print(f"[dim]  ✓ Found {found_count} out of 10 core features[/dim]")
                     
                     # Fill NaN values
