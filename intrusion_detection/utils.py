@@ -417,11 +417,8 @@ class SecurityValidator:
         r'<.*?>',                    # HTML tags
         r'\\x[0-9a-fA-F]{2}',       # Hex encoded chars
         r'\\u[0-9a-fA-F]{4}',       # Unicode encoded chars
-        r'\$\{.*?\}',                # Template injection
-        r'%[0-9a-fA-F]{2}',         # URL encoded chars
         r'--',                       # SQL comment
         r';.*--',                    # SQL injection pattern
-        r'/\*.*\*/',                 # SQL multi-line comment
         r'exec\s*\(',                # Command execution
         r'eval\s*\(',                # Code evaluation
         r'system\s*\(',              # System command
@@ -687,40 +684,7 @@ class SecurityValidator:
             
         except Exception as e:
             return False, f"Security validation error: {str(e)}", None
-    
-    @classmethod
-    def check_for_command_injection(cls, command_args: List[str]) -> Tuple[bool, str]:
-        """
-        Check command arguments for injection attempts
-        
-        Args:
-            command_args: List of command arguments
-            
-        Returns:
-            Tuple of (is_safe, warning_message)
-        """
-        dangerous_chars = ['&', '|', ';', '$', '`', '>', '<', '(', ')', '{', '}', '[', ']', '!', '#', '\\', '/']
-        
-        warnings = []
-        for arg in command_args:
-            if not isinstance(arg, str):
-                continue
-            
-            # Check for dangerous characters
-            for char in dangerous_chars:
-                if char in arg:
-                    warnings.append(f"Dangerous character '{char}' in argument: {arg[:50]}")
-            
-            # Check for command execution patterns
-            cmd_patterns = ['cmd', 'powershell', 'bash', 'sh', 'exec', 'system', 'eval', 'os.system']
-            for pattern in cmd_patterns:
-                if pattern.lower() in arg.lower():
-                    warnings.append(f"Suspicious command pattern '{pattern}' in argument: {arg[:50]}")
-        
-        if warnings:
-            return False, "; ".join(warnings[:3])
-        return True, "OK"
-    
+
     @classmethod
     def rate_limit_check(cls, user_id: int, action: str, db_connection, max_requests: int = 70, time_window: int = 60) -> Tuple[bool, int]:
         """
