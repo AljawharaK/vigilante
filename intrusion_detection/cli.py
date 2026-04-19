@@ -476,6 +476,20 @@ Examples:
             results["failed"].append(f"Session file: {e}")
             console.print(f"[red]  ✗ Failed to remove session file: {e}[/red]")
         
+        console.print("[cyan]→ Removing salt file...[/cyan]")
+        try:
+            salt_file = Path.home() / ".vigilante_salt"
+            if salt_file.exists():
+                salt_file.unlink()
+                results["success"].append("Removed salt file")
+                console.print("[green]  ✓ Salt file removed[/green]")
+            else:
+                results["skipped"].append("Salt file not found")
+                console.print("[yellow]  ! Salt file not found[/yellow]")
+        except Exception as e:
+            results["failed"].append(f"Salt file: {e}")
+            console.print(f"[red]  ✗ Failed to remove salt file: {e}[/red]")
+        
         # 3. Remove ~/.local/bin/vigilante.exe
         console.print("[cyan]→ Removing vigilante executable...[/cyan]")
         local_bin = Path.home() / ".local" / "bin" / "vigilante.exe"
@@ -1630,15 +1644,14 @@ Examples:
                 serializable_results = self.make_json_serializable(results)
         
                 # Save to database
+                save_db = DatabaseManager()
                 try:
-                    save_db = DatabaseManager()
                     detection_id = save_db.save_detection(
                         user_id=self.auth.current_user['id'],
                         model_id=model_id,
                         input_file=args.input,
                         results=serializable_results
                     )
-                    save_db.close()
                     detection_success = True
                     anomalies_count = results['anomalies_detected']
                     total_flows = results['total_flows']
@@ -1648,7 +1661,7 @@ Examples:
                 progress.update(task, completed=100)
             
             # Log detection event
-            self.db.log_audit_event(
+            save_db.log_audit_event(
                 user_id=self.auth.current_user['id'],
                 username=self.auth.current_user['username'],
                 action="detect",
@@ -1665,10 +1678,12 @@ Examples:
                     "features_count": len(model.CORE_FEATURES)
                 }
             )
+            # Close database connection
+            save_db.close()
             
         except Exception as e:
             # Log failed detection attempt
-            self.db.log_audit_event(
+            save_db.log_audit_event(
                 user_id=self.auth.current_user['id'],
                 username=self.auth.current_user['username'],
                 action="detect",
@@ -1676,6 +1691,8 @@ Examples:
                 status="failed",
                 details={"error": str(e)}
             )
+            # Close database connection
+            save_db.close()
             console.print(f"[red]Detection failed: {e}[/red]")
             if hasattr(self.args, 'verbose') and self.args.verbose:
                 console.print(traceback.format_exc())
@@ -2392,11 +2409,8 @@ Examples:
                     }
                 )
                 
-                # Close the fresh connection
-                fresh_db.close()
-                
                 # Log training event with correct details
-                self.db.log_audit_event(
+                fresh_db.log_audit_event(
                     user_id=self.auth.current_user['id'],
                     username=self.auth.current_user['username'],
                     action="model_train",
@@ -2413,10 +2427,12 @@ Examples:
                 )
                 
                 progress.update(task, completed=100)
+                # Close the fresh connection
+                fresh_db.close()
 
             except Exception as e:
                 # Log failed training attempt
-                self.db.log_audit_event(
+                fresh_db.log_audit_event(
                     user_id=self.auth.current_user['id'],
                     username=self.auth.current_user['username'],
                     action="model_train",
@@ -2424,6 +2440,7 @@ Examples:
                     status="failed",
                     details={"error": str(e)}
                 )
+                fresh_db.close()
                 console.print(f"[red]Training failed: {e}[/red]")
                 if hasattr(self.args, 'verbose') and self.args.verbose:
                     console.print(traceback.format_exc())
