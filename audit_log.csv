@@ -1,4 +1,9 @@
 id,user_id,username,action,resource,status,details,ip_address,user_agent,created_at
+157,1,admin1,detect,C:\Users\USER\Downloads\uds_ids_dataset.csv,success,"{'model_id': 1, 'total_flows': 254452, 'detection_id': 8, 'features_count': 10, 'threshold_used': 0.65, 'anomalies_detected': 3386, 'custom_features_used': False, 'execution_time_seconds': 2101.3697185516357}",,,2026-04-19 04:26:23.359382+00:00
+156,1,admin1,detect,C:\Users\USER\Downloads\uds_ids_dataset.csv,failed,{'error': 'connection already closed'},,,2026-04-19 03:28:25.454770+00:00
+155,1,admin1,login,,success,{'method': 'otp'},,,2026-04-19 00:19:46.810716+00:00
+154,2,analyst1,login,,success,{'method': 'otp'},,,2026-04-18 23:56:28.772598+00:00
+153,1,admin1,user_deactivate,analyst5,success,,,,2026-04-18 18:40:07.375941+00:00
 152,1,admin1,login,,success,{'method': 'otp'},,,2026-04-18 18:36:49.440688+00:00
 151,2,analyst1,login,,success,{'method': 'otp'},,,2026-04-18 18:36:07.397229+00:00
 150,14,analyst5,password_change,,success,{'session_invalidation': 'all_sessions_invalidated'},,,2026-04-18 18:33:34.935277+00:00
@@ -47,5 +52,3 @@ id,user_id,username,action,resource,status,details,ip_address,user_agent,created
 107,13,tester,login,,success,{'method': 'otp'},,,2026-04-12 05:22:23.733525+00:00
 106,13,tester,login,,success,{'method': 'otp'},,,2026-04-12 05:13:55.736825+00:00
 105,13,tester,login,,success,{'method': 'otp'},,,2026-04-12 04:47:35.844180+00:00
-104,13,tester,login,,success,{'method': 'otp'},,,2026-04-12 03:28:14.954805+00:00
-103,13,tester,login,,success,{'method': 'otp'},,,2026-04-12 01:05:53.947912+00:00

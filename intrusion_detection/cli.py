@@ -939,6 +939,12 @@ Examples:
             console.print(f"[red]User '{args.username}' not found[/red]")
             return
         
+        # ADD THIS CHECK: Prevent self-deactivation
+        if user['id'] == self.auth.current_user['id']:
+            console.print("[red]Error: You cannot deactivate your own account[/red]")
+            console.print("[yellow]System requires at least one active Administrator[/yellow]")
+            return
+        
         console.print(f"Role: [cyan]{user.get('role_name', 'Unknown')}[/cyan]")
         
         # Prevent deactivating the only admin

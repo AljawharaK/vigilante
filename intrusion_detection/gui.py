@@ -1330,20 +1330,20 @@ Path: {model.get('model_path', 'N/A')}
     
     # Delete button - Pass user dict correctly
     def delete_user_working(self, user: Dict):
-        """Delete/deactivate a user with confirmation"""
+        """Deactivate a user with confirmation"""
         def confirm_delete(e):
             try:
                 # Prevent deleting the only admin
                 if user.get('role_name') == 'Administrator':
                     admin_count = self.db.count_admins()
                     if admin_count <= 1:
-                        self.show_dialog("Error", "Cannot delete the only Administrator")
+                        self.show_dialog("Error", "Cannot deactivate the only Administrator")
                         self._close_dialog(dialog)
                         return
                 
                 # Prevent self-deletion
                 if user['id'] == self.auth.current_user['id']:
-                    self.show_dialog("Error", "You cannot delete your own account")
+                    self.show_dialog("Error", "You cannot deactivate your own account")
                     self._close_dialog(dialog)
                     return
                 
