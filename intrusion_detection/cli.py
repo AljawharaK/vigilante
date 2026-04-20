@@ -1391,6 +1391,8 @@ Examples:
         
         # Validate input file with security checks
         file_ext = os.path.splitext(args.input)[1].lower()
+        df = None  # Initialize df here
+        
         if file_ext == '.json':
             # Validate JSON file
             is_valid, message, json_data = self.validate_input_file_secure(args.input, 'json')
@@ -1405,11 +1407,21 @@ Examples:
                     details={"reason": message, "type": "invalid_json"}
                 )
                 return
-            # For JSON, we need to convert to DataFrame for processing
+            # For JSON, convert to DataFrame for processing
             if isinstance(json_data, dict) and 'data' in json_data:
                 df = pd.DataFrame(json_data['data'])
+            elif isinstance(json_data, dict) and 'flows' in json_data:
+                df = pd.DataFrame(json_data['flows'])
+            elif isinstance(json_data, dict) and 'samples' in json_data:
+                df = pd.DataFrame(json_data['samples'])
             elif isinstance(json_data, list):
                 df = pd.DataFrame(json_data)
+            elif isinstance(json_data, dict):
+                # Try to convert dict to DataFrame - check if values are lists
+                if any(isinstance(v, list) for v in json_data.values()):
+                    df = pd.DataFrame(json_data)
+                else:
+                    df = pd.DataFrame([json_data])
             else:
                 df = pd.DataFrame([json_data]) if json_data else pd.DataFrame()
             console.print(f"[cyan]Loaded {len(df)} records from JSON file[/cyan]")
@@ -1434,6 +1446,10 @@ Examples:
             
         else:
             console.print(f"[red]Unsupported file type: {file_ext}. Please use .csv or .json[/red]")
+            return
+        
+        if df is None or df.empty:
+            console.print(f"[red]No data loaded from file: {args.input}[/red]")
             return
         # ========== END SECURITY VALIDATION ==========
 
@@ -1521,6 +1537,7 @@ Examples:
             console.print(f"[cyan]Model expects {feature_info['features_count']} core features (with mapping)[/cyan]")
 
         # Apply custom threshold if provided
+        original_threshold = None
         if hasattr(args, 'threshold') and args.threshold is not None:
             original_threshold = model.threshold
             model.threshold = args.threshold
@@ -1536,6 +1553,7 @@ Examples:
         detection_success = False
         anomalies_count = 0
         total_flows = 0
+        save_db = None  # Initialize save_db outside try block
 
         try:
             with Progress(
@@ -1545,17 +1563,13 @@ Examples:
             ) as progress:
                 task = progress.add_task("[cyan]Analyzing traffic...", total=None)
 
-                # Load data
-                df = pd.read_csv(args.input)
-                console.print(f"[cyan]Loaded {len(df)} records from {args.input}[/cyan]")
-            
                 # Check if data has labels
                 has_labels = False
                 y_true = None
                 label_column_name = None
 
                 # Look for label columns (case-insensitive)
-                possible_label_cols = ['label', 'Label', ' Label', 'attack_type', 'class', 'Label.1', 'LABEL', 'attack', 'Attack']
+                possible_label_cols = ['label', 'Label', ' Label', 'attack_type', 'class', 'Label.1', 'LABEL', 'attack', 'Attack', 'attack_cat']
                 for col in possible_label_cols:
                     if col in df.columns:
                         has_labels = True
@@ -1568,7 +1582,7 @@ Examples:
                         console.print(f"  Original labels: {np.unique(original_labels)}")
 
                         # Convert string labels to binary (0 for normal/benign, 1 for attack/malicious)
-                        if original_labels.dtype == 'object' or isinstance(original_labels[0], str):
+                        if len(original_labels) > 0 and (original_labels.dtype == 'object' or isinstance(original_labels[0], str)):
                             normal_terms = ['benign', 'Benign', 'BENIGN', 'normal', 'Normal', '0', 'false', 'no', 'legitimate']
                     
                             y_true_binary = []
@@ -1655,51 +1669,55 @@ Examples:
                     detection_success = True
                     anomalies_count = results['anomalies_detected']
                     total_flows = results['total_flows']
+                    console.print(f"[green]✓ Detection results saved to database (ID: {detection_id})[/green]")
                 except Exception as e:
                     console.print(f"[yellow]Warning: Could not save detection to database: {e}[/yellow]")
         
                 progress.update(task, completed=100)
             
-            # Log detection event
-            save_db.log_audit_event(
-                user_id=self.auth.current_user['id'],
-                username=self.auth.current_user['username'],
-                action="detect",
-                resource=args.input,
-                status="success" if detection_success else "partial",
-                details={
-                    "model_id": model_id,
-                    "total_flows": total_flows,
-                    "anomalies_detected": anomalies_count,
-                    "execution_time_seconds": execution_time,
-                    "detection_id": detection_id,
-                    "threshold_used": model.threshold,
-                    "custom_features_used": custom_features_used or len(model.CORE_FEATURES) != 10,
-                    "features_count": len(model.CORE_FEATURES)
-                }
-            )
-            # Close database connection
-            save_db.close()
+            # Log detection event (only if save_db was created)
+            if save_db:
+                save_db.log_audit_event(
+                    user_id=self.auth.current_user['id'],
+                    username=self.auth.current_user['username'],
+                    action="detect",
+                    resource=args.input,
+                    status="success" if detection_success else "partial",
+                    details={
+                        "model_id": model_id,
+                        "total_flows": total_flows,
+                        "anomalies_detected": anomalies_count,
+                        "execution_time_seconds": execution_time,
+                        "detection_id": detection_id,
+                        "threshold_used": model.threshold,
+                        "custom_features_used": custom_features_used or len(model.CORE_FEATURES) != 10,
+                        "features_count": len(model.CORE_FEATURES)
+                    }
+                )
             
         except Exception as e:
-            # Log failed detection attempt
-            save_db.log_audit_event(
-                user_id=self.auth.current_user['id'],
-                username=self.auth.current_user['username'],
-                action="detect",
-                resource=args.input,
-                status="failed",
-                details={"error": str(e)}
-            )
-            # Close database connection
-            save_db.close()
+            # Log failed detection attempt (only if save_db was created)
+            if save_db:
+                save_db.log_audit_event(
+                    user_id=self.auth.current_user['id'],
+                    username=self.auth.current_user['username'],
+                    action="detect",
+                    resource=args.input,
+                    status="failed",
+                    details={"error": str(e)}
+                )
             console.print(f"[red]Detection failed: {e}[/red]")
             if hasattr(self.args, 'verbose') and self.args.verbose:
                 console.print(traceback.format_exc())
             return
+        
+        finally:
+            # Close database connection if it was created
+            if save_db:
+                save_db.close()
 
         # Restore original threshold if changed
-        if hasattr(args, 'threshold') and args.threshold is not None:
+        if original_threshold is not None:
             model.threshold = original_threshold
 
         # Display results
@@ -2274,7 +2292,7 @@ Examples:
             return obj
     
     def handle_train(self, args):
-        """Handle model training with feature alignment"""
+        """Handle model training with feature alignment - supports both CSV and JSON"""
         if not self.check_permission('train_models'):
             return
 
@@ -2343,15 +2361,42 @@ Examples:
             task = progress.add_task("[cyan]Training RNSA+KNN model...", total=100)
 
             try:
-                # Analyze dataset first
-                console.print("[cyan]Analyzing dataset features...[/cyan]")
-                df_preview = pd.read_csv(args.input, nrows=1000)
-                
-                from .model import IntrusionDetectionModel
+                # Load data preview to analyze features
+                if file_ext == '.json':
+                    # Load JSON file for preview
+                    with open(args.input, 'r') as f:
+                        json_preview = json.load(f)
+                    if isinstance(json_preview, dict):
+                        if 'data' in json_preview:
+                            df_preview = pd.DataFrame(json_preview['data'][:1000])
+                        else:
+                            df_preview = pd.DataFrame([json_preview]) if not any(isinstance(v, list) for v in json_preview.values()) else pd.DataFrame(json_preview)
+                    elif isinstance(json_preview, list):
+                        df_preview = pd.DataFrame(json_preview[:1000])
+                    else:
+                        df_preview = pd.DataFrame([json_preview])
+                else:
+                    df_preview = pd.read_csv(args.input, nrows=1000)
                 
                 # Load full data to get training samples count
-                df_full = pd.read_csv(args.input)
-                total_samples = len(df_full)
+                if file_ext == '.json':
+                    with open(args.input, 'r') as f:
+                        json_full = json.load(f)
+                    if isinstance(json_full, dict):
+                        if 'data' in json_full:
+                            df_full = pd.DataFrame(json_full['data'])
+                        else:
+                            df_full = pd.DataFrame([json_full]) if not any(isinstance(v, list) for v in json_full.values()) else pd.DataFrame(json_full)
+                    elif isinstance(json_full, list):
+                        df_full = pd.DataFrame(json_full)
+                    else:
+                        df_full = pd.DataFrame([json_full])
+                    total_samples = len(df_full)
+                else:
+                    df_full = pd.read_csv(args.input)
+                    total_samples = len(df_full)
+                
+                from .model import IntrusionDetectionModel
                 
                 if custom_features:
                     console.print(f"\n[cyan]Feature Analysis (Custom):[/cyan]")
@@ -2411,7 +2456,8 @@ Examples:
                         'max_detectors': 1000,
                         'k': 5,
                         'training_samples': total_samples,
-                        'custom_features': custom_features if custom_features else None
+                        'custom_features': custom_features if custom_features else None,
+                        'file_type': file_ext  # Store file type used for training
                     }
                 )
                 
@@ -2428,7 +2474,8 @@ Examples:
                         "training_samples": total_samples,
                         "features_used": len(result.get('features_used', [])),
                         "custom_features": custom_features is not None,
-                        "accuracy": result['metrics'].get('test_accuracy', 0)
+                        "accuracy": result['metrics'].get('test_accuracy', 0),
+                        "file_type": file_ext
                     }
                 )
                 

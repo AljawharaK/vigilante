@@ -19,13 +19,39 @@ class ModelTrainer:
         os.makedirs(model_dir, exist_ok=True)
     
     def load_data(self, data_path: str, has_labels: bool = True) -> Tuple[pd.DataFrame, Optional[np.ndarray]]:
-        """Load and validate data"""
+        """Load and validate data from CSV or JSON file"""
         print(f"Loading data from {data_path}")
         
-        # Load data
-        df = pd.read_csv(data_path)
+        # Determine file type by extension
+        file_ext = os.path.splitext(data_path)[1].lower()
         
-        print(f"Loaded {len(df)} rows with {len(df.columns)} columns")
+        # Load data based on file type
+        if file_ext == '.json':
+            # Load JSON file - handle different JSON structures
+            with open(data_path, 'r') as f:
+                json_data = json.load(f)
+            
+            # Handle different JSON structures
+            if isinstance(json_data, dict):
+                if 'data' in json_data:
+                    df = pd.DataFrame(json_data['data'])
+                elif 'flows' in json_data:
+                    df = pd.DataFrame(json_data['flows'])
+                elif 'samples' in json_data:
+                    df = pd.DataFrame(json_data['samples'])
+                else:
+                    # Try to convert dict to DataFrame
+                    df = pd.DataFrame([json_data]) if not any(isinstance(v, list) for v in json_data.values()) else pd.DataFrame(json_data)
+            elif isinstance(json_data, list):
+                df = pd.DataFrame(json_data)
+            else:
+                df = pd.DataFrame([json_data])
+            
+            print(f"Loaded {len(df)} rows with {len(df.columns)} columns from JSON")
+        else:
+            # Load CSV file (default)
+            df = pd.read_csv(data_path)
+            print(f"Loaded {len(df)} rows with {len(df.columns)} columns from CSV")
         
         # Extract labels if present
         y = None
@@ -41,9 +67,7 @@ class ModelTrainer:
                     print(f"  Original labels: {np.unique(original_labels)}")
                     
                     # Convert string labels to binary (0 for normal/benign, 1 for attack/malicious)
-                    # MATCHES the logic in cli.py handle_detect method
                     if original_labels.dtype == 'object' or (len(original_labels) > 0 and isinstance(original_labels[0], str)):
-                        # Define what counts as normal/benign (case-insensitive) - SAME AS CLI
                         normal_terms = ['benign', 'Benign', 'BENIGN', 'normal', 'Normal', '0', 'false', 'no', 'legitimate']
                         
                         y_binary = []
@@ -56,15 +80,14 @@ class ModelTrainer:
                                     break
                             
                             if is_normal:
-                                y_binary.append(0)  # Normal/Benign
+                                y_binary.append(0)
                             else:
-                                y_binary.append(1)  # Attack/Malicious
+                                y_binary.append(1)
                         
                         y = np.array(y_binary, dtype=np.int32)
                         print(f"  Converted to binary: 0=normal/benign, 1=attack/malicious")
                         print(f"  Class distribution: Normal={np.sum(y==0)}, Attack={np.sum(y==1)}")
                     else:
-                        # Already numeric, just convert to int
                         y = original_labels.astype(np.int32)
                         print(f"  Numeric labels: 0={np.sum(y==0)}, 1={np.sum(y==1)}")
                     
