@@ -2329,6 +2329,12 @@ Examples:
             custom_features = [f.strip() for f in args.features.split(',')]
             console.print(f"[cyan]Using specified features: {custom_features}[/cyan]")
 
+        # Initialize fresh_db to None before try block
+        fresh_db = None
+        model_id = None
+        result = None
+        total_samples = 0
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -2427,44 +2433,49 @@ Examples:
                 )
                 
                 progress.update(task, completed=100)
-                # Close the fresh connection
-                fresh_db.close()
 
             except Exception as e:
                 # Log failed training attempt
-                fresh_db.log_audit_event(
-                    user_id=self.auth.current_user['id'],
-                    username=self.auth.current_user['username'],
-                    action="model_train",
-                    resource=args.input,
-                    status="failed",
-                    details={"error": str(e)}
-                )
-                fresh_db.close()
+                if fresh_db is not None:
+                    fresh_db.log_audit_event(
+                        user_id=self.auth.current_user['id'],
+                        username=self.auth.current_user['username'],
+                        action="model_train",
+                        resource=args.input,
+                        status="failed",
+                        details={"error": str(e)}
+                    )
                 console.print(f"[red]Training failed: {e}[/red]")
                 if hasattr(self.args, 'verbose') and self.args.verbose:
                     console.print(traceback.format_exc())
                 return
+            
+            finally:
+                # Always close the fresh connection if it was created
+                if fresh_db is not None:
+                    fresh_db.close()
 
-        console.print(f"[green]✓ RNSA+KNN Model trained successfully[/green]")
-        console.print(f"Model ID: [cyan]{model_id}[/cyan]")
-        console.print(f"Model saved to: [cyan]{result['model_path']}[/cyan]")
-        console.print(f"Training samples: [cyan]{total_samples:,}[/cyan]")
-        console.print(f"Features used: [cyan]{len(result.get('features_used', []))}[/cyan]")
+        # Only proceed if training was successful and we have model_id and result
+        if model_id is not None and result is not None:
+            console.print(f"[green]✓ RNSA+KNN Model trained successfully[/green]")
+            console.print(f"Model ID: [cyan]{model_id}[/cyan]")
+            console.print(f"Model saved to: [cyan]{result['model_path']}[/cyan]")
+            console.print(f"Training samples: [cyan]{total_samples:,}[/cyan]")
+            console.print(f"Features used: [cyan]{len(result.get('features_used', []))}[/cyan]")
 
-        # Show metrics
-        self.display_training_metrics(result['metrics'])
+            # Show metrics
+            self.display_training_metrics(result['metrics'])
 
-        # Show feature summary
-        if 'feature_analysis' in result:
-            fa = result['feature_analysis']
-            console.print(f"\n[cyan]Feature Summary:[/cyan]")
-            if fa.get('custom_features_used'):
-                console.print(f"  Custom features mode: enabled")
-                console.print(f"  Features used: {fa.get('available_features', [])}")
-            else:
-                console.print(f"  Coverage: {fa.get('coverage', 0):.1f}%")
-                console.print(f"  Features found: {len(fa.get('available_features', []))}")
+            # Show feature summary
+            if 'feature_analysis' in result:
+                fa = result['feature_analysis']
+                console.print(f"\n[cyan]Feature Summary:[/cyan]")
+                if fa.get('custom_features_used'):
+                    console.print(f"  Custom features mode: enabled")
+                    console.print(f"  Features used: {fa.get('available_features', [])}")
+                else:
+                    console.print(f"  Coverage: {fa.get('coverage', 0):.1f}%")
+                    console.print(f"  Features found: {len(fa.get('available_features', []))}")
 
     # Show RNSA+KNN specific metrics
     def display_training_metrics(self, metrics):
