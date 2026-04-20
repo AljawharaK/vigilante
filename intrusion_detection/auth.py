@@ -45,11 +45,10 @@ class AuthManager:
             return False
     
     def generate_otp(self) -> tuple:
-        """Generate OTP code and secret"""
+        """Generate OTP code"""
         otp_code = str(secrets.randbelow(900000) + 100000)  # 6-digit code
-        otp_secret = secrets.token_urlsafe(32)
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
-        return otp_code, otp_secret, expires_at
+        return otp_code, expires_at
     
     def send_otp_email(self, email: str, otp_code: str, username: str):
         """Send OTP code to user's email"""
@@ -116,6 +115,8 @@ class AuthManager:
             print(f"❌ Failed to send OTP email: {e}")
             return False
     
+    # intrusion_detection/auth.py - Fix the login and verify_otp methods
+
     def login(self, username: str, password: str) -> Dict[str, Any]:
         """Login user - Step 1: Verify credentials"""
         try:
@@ -144,9 +145,11 @@ class AuthManager:
                     "requires_password_change": True
                 }
             
-            # Generate and send OTP
-            otp_code, otp_secret, expires_at = self.generate_otp()
-            self.db.update_user_otp(user['id'], otp_secret, expires_at)
+            # Generate OTP code and store it (not just a secret)
+            otp_code, expires_at = self.generate_otp()
+            
+            # Store the OTP code in the database (you'll need to add this column)
+            self.db.update_user_otp(user['id'], otp_code, expires_at)
             
             # Send OTP email
             email_sent = self.send_otp_email(user['email'], otp_code, user['username'])
@@ -160,7 +163,6 @@ class AuthManager:
                 "username": user['username'],
                 "email": user['email'],
                 "role_id": user['role_id'],
-                "otp_secret": otp_secret,
                 "requires_otp": True
             }
             
@@ -174,7 +176,7 @@ class AuthManager:
             
         except Exception as e:
             return {"success": False, "message": f"Login failed: {str(e)}"}
-    
+
     def verify_otp(self, otp_code: str) -> Dict[str, Any]:
         """Verify OTP - Step 2: Complete login"""
         if not self.current_user or not self.current_user.get('requires_otp'):
@@ -182,8 +184,8 @@ class AuthManager:
         
         user_id = self.current_user['id']
         
-        # Verify OTP
-        if not self.db.verify_user_otp(user_id, self.current_user['otp_secret']):
+        # Verify the actual OTP code, not a secret
+        if not self.db.verify_user_otp(user_id, otp_code):
             return {"success": False, "message": "Invalid or expired OTP"}
         
         # Create session
@@ -199,6 +201,9 @@ class AuthManager:
         self.current_session = session_token
         self.current_role = user.get('role_name', 'Analyst')
         self.permissions = role_permissions
+        
+        # Clear the OTP from database after successful verification
+        self.db.clear_user_otp(user_id)
         
         # Log successful login
         self.db.log_audit_event(

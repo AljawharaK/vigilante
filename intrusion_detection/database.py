@@ -360,34 +360,60 @@ class DatabaseManager:
             self.conn.rollback()
             print(f"⚠️ Failed to update last login for user {user_id}: {e}")
     
-    def update_user_otp(self, user_id: int, otp_secret: str, expires_at: datetime):
-        """Update user OTP secret and expiration"""
+    def update_user_otp(self, user_id: int, otp_code: str, expires_at: datetime):
+        """Update user OTP code and expiration"""
         try:
             with self.conn.cursor() as cursor:
+                # First, ensure the column exists (run this once)
+                cursor.execute("""
+                    DO $$ 
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                    WHERE table_name = 'users' AND column_name = 'otp_code') THEN
+                            ALTER TABLE users ADD COLUMN otp_code VARCHAR(10);
+                        END IF;
+                    END $$;
+                """)
+                
                 cursor.execute("""
                     UPDATE users 
-                    SET otp_secret = %s, otp_expires_at = %s
+                    SET otp_code = %s, otp_expires_at = %s
                     WHERE id = %s
-                """, (otp_secret, expires_at, user_id))
+                """, (otp_code, expires_at, user_id))
                 self.conn.commit()
         except Exception as e:
             self.conn.rollback()
             raise
     
-    def verify_user_otp(self, user_id: int, otp_secret: str) -> bool:
-        """Verify user OTP"""
+    def verify_user_otp(self, user_id: int, otp_code: str) -> bool:
+        """Verify user OTP code"""
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute("""
                     SELECT 1 FROM users 
-                    WHERE id = %s AND otp_secret = %s 
+                    WHERE id = %s AND otp_code = %s 
                     AND otp_expires_at > CURRENT_TIMESTAMP
-                """, (user_id, otp_secret))
+                    AND is_active = TRUE
+                """, (user_id, otp_code))
                 return cursor.fetchone() is not None
         except Exception as e:
             print(f"Error verifying OTP: {e}")
             return False
     
+    def clear_user_otp(self, user_id: int):
+        """Clear OTP after successful verification"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE users 
+                    SET otp_code = NULL, otp_expires_at = NULL
+                    WHERE id = %s
+                """, (user_id,))
+                self.conn.commit()
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Error clearing OTP: {e}")
+
     def update_user_failed_attempts(self, user_id: int):
         """Update user's failed login attempts"""
         try:

@@ -618,60 +618,6 @@ class SecurityValidator:
             return False, "JSON file too large to parse in memory", None
         except Exception as e:
             return False, f"Error reading JSON: {str(e)}", None
-    
-    @classmethod
-    def secure_file_upload(cls, uploaded_file_path: str, destination_dir: str) -> Tuple[bool, str, Optional[str]]:
-        """
-        Securely handle file uploads with validation and quarantine
-        
-        Args:
-            uploaded_file_path: Path to uploaded file
-            destination_dir: Destination directory for safe storage
-            
-        Returns:
-            Tuple of (is_safe, message, safe_path)
-        """
-        # Create quarantine directory
-        quarantine_dir = os.path.join(destination_dir, ".quarantine")
-        os.makedirs(quarantine_dir, exist_ok=True)
-        
-        try:
-            # Validate file
-            is_valid, error = cls.validate_file_input(uploaded_file_path)
-            if not is_valid:
-                # Move to quarantine for analysis
-                quarantine_path = os.path.join(quarantine_dir, f"quarantine_{hashlib.md5(uploaded_file_path.encode()).hexdigest()}")
-                shutil.move(uploaded_file_path, quarantine_path)
-                return False, f"File rejected: {error}. Moved to quarantine.", None
-            
-            # Check CSV content if applicable
-            if uploaded_file_path.endswith('.csv'):
-                is_valid, error, preview = cls.validate_csv_content(uploaded_file_path)
-                if not is_valid:
-                    quarantine_path = os.path.join(quarantine_dir, f"quarantine_{hashlib.md5(uploaded_file_path.encode()).hexdigest()}")
-                    shutil.move(uploaded_file_path, quarantine_path)
-                    return False, f"CSV rejected: {error}. Moved to quarantine.", None
-            
-            # Check JSON content if applicable
-            if uploaded_file_path.endswith('.json'):
-                is_valid, error, data = cls.validate_json_content(uploaded_file_path)
-                if not is_valid:
-                    quarantine_path = os.path.join(quarantine_dir, f"quarantine_{hashlib.md5(uploaded_file_path.encode()).hexdigest()}")
-                    shutil.move(uploaded_file_path, quarantine_path)
-                    return False, f"JSON rejected: {error}. Moved to quarantine.", None
-            
-            # Generate safe filename
-            original_name = os.path.basename(uploaded_file_path)
-            safe_name = hashlib.sha256(f"{original_name}{os.urandom(16)}".encode()).hexdigest()[:32]
-            safe_path = os.path.join(destination_dir, f"{safe_name}_{original_name}")
-            
-            # Move to safe destination
-            shutil.copy2(uploaded_file_path, safe_path)
-            
-            return True, "File validated and secured", safe_path
-            
-        except Exception as e:
-            return False, f"Security validation error: {str(e)}", None
 
     @classmethod
     def rate_limit_check(cls, user_id: int, action: str, db_connection, max_requests: int = 70, time_window: int = 60) -> Tuple[bool, int]:
