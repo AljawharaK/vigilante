@@ -1,0 +1,74 @@
+{
+  "model_path": "saved_models\\CIC IDS 2018 Model_20260516_164128.joblib",
+  "model_name": "CIC IDS 2018 Model_20260516_164128",
+  "training_samples": 3096,
+  "validation_samples": 774,
+  "features_count": 10,
+  "features_used": [
+    "dur",
+    "spkts",
+    "dpkts",
+    "sbytes",
+    "dbytes",
+    "rate",
+    "smean",
+    "dmean",
+    "swin",
+    "dwin"
+  ],
+  "metrics": {
+    "train_accuracy": 0.9993540051679587,
+    "test_accuracy": 0.9987080103359173,
+    "detection_rate": 1.0,
+    "false_alarm_rate": 0.002583979328165375,
+    "auc": 1.0,
+    "precision": 0.9974226804123711,
+    "recall": 1.0,
+    "f1_score": 0.9987096774193548,
+    "detectors": 2,
+    "optimal_dr": 1.0,
+    "optimal_far": 0.002583979328165375,
+    "training_samples": 3096,
+    "features_count": 10
+  },
+  "feature_analysis": {
+    "total_columns": 79,
+    "available_features": [
+      "dur",
+      "spkts",
+      "dpkts",
+      "sbytes",
+      "dbytes",
+      "rate",
+      "smean",
+      "dmean",
+      "swin",
+      "dwin"
+    ],
+    "missing_features": [],
+    "feature_mapping": {
+      "dur": "Flow Duration",
+      "spkts": "Tot Fwd Pkts",
+      "dpkts": "Tot Bwd Pkts",
+      "sbytes": "TotLen Fwd Pkts",
+      "dbytes": "TotLen Bwd Pkts",
+      "rate": "Flow Byts/s",
+      "smean": "Fwd Pkt Len Mean",
+      "dmean": "Bwd Pkt Len Mean",
+      "swin": "Init Fwd Win Byts",
+      "dwin": "Init Bwd Win Byts"
+    },
+    "coverage": 100.0,
+    "custom_features_used": false
+  },
+  "parameters": {
+    "r_s": 0.05,
+    "max_detectors": 1000,
+    "k": 5,
+    "model_type": "rnsa_knn",
+    "training_samples": 3096,
+    "custom_features": null
+  },
+  "dataset_name": "Train_02-04-2018.csv",
+  "timestamp": "20260516_164128"
+}
