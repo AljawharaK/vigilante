@@ -17,7 +17,7 @@ class ConfigValidator:
     OPTIONAL_VARS = {
         'RESEND_FROM_EMAIL': 'noreply@updates.vigilanteapps.com',
         'APP_NAME': 'Vigilante',
-        'APP_ENV': 'production',
+        'APP_ENV': 'Development',
         'SESSION_EXPIRY_HOURS': '24',
         'OTP_EXPIRY_MINUTES': '10',
         'LOG_LEVEL': 'INFO',

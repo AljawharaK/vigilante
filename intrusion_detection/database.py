@@ -981,24 +981,6 @@ class DatabaseManager:
             print(f"Error counting admins: {e}")
             return 0
     
-    def get_user_activity(self, period_days: int) -> Dict:
-        """Get user activity statistics"""
-        try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT 
-                        COUNT(DISTINCT CASE WHEN action = 'login' THEN id END) as total_logins,
-                        COUNT(DISTINCT CASE WHEN action = 'model_train' THEN id END) as models_trained,
-                        COUNT(DISTINCT CASE WHEN action = 'detect' THEN id END) as detection_jobs_run
-                    FROM audit_logs
-                    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
-                """, (period_days,))
-                result = cursor.fetchone()
-                return dict(result) if result else {}
-        except Exception as e:
-            print(f"Error getting user activity: {e}")
-            return {}
-    
     def get_recent_anomalies(self, period_days: int, limit: int = 20):
         """Get recent anomalies"""
         try:
@@ -1093,49 +1075,6 @@ class DatabaseManager:
         except Exception as e:
             print(f"❌ Error getting database stats: {e}")
             return {}
-    
-    def invalidate_all_user_sessions_on_password_change(self, user_id: int) -> int:
-        """
-        Invalidate all sessions when password changes
-        
-        Args:
-            user_id: User ID whose password changed
-            
-        Returns:
-            Number of sessions invalidated
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute("""
-                    UPDATE sessions 
-                    SET is_valid = FALSE, 
-                        last_activity = CURRENT_TIMESTAMP
-                    WHERE user_id = %s AND is_valid = TRUE
-                    RETURNING id
-                """, (user_id,))
-                
-                count = cursor.rowcount
-                self.conn.commit()
-                
-                print(f"🔒 Invalidated {count} sessions for user {user_id} due to password change")
-                return count
-                
-        except Exception as e:
-            self.conn.rollback()
-            print(f"❌ Failed to invalidate sessions on password change: {e}")
-            return 0
-    
-    def health_check(self) -> bool:
-        """Perform a health check on the database"""
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-                cursor.fetchone()
-                print("✅ Database health check: PASSED")
-                return True
-        except Exception as e:
-            print(f"❌ Database health check: FAILED - {e}")
-            return False
     
     def close(self):
         """Close database connection"""

@@ -5,21 +5,15 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import Tuple, Optional, Dict, Any, List
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from rich.table import Table as RichTable
 from rich.console import Console
 import sys
 from pathlib import Path
 import re
 import hashlib
-import tempfile
-import shutil
-import base64
 import hashlib
-import secrets
 
 # ========================
 # Handle optional filetype library for MIME type detection
@@ -634,14 +628,33 @@ class SecurityValidator:
         Returns:
             Tuple of (is_allowed, remaining_requests)
         """
-        import time
         from datetime import datetime, timedelta
         
-        # This would integrate with your database to track rate limits
-        # Simplified implementation - in production, store in Redis or database
-        
-        # For now, return allowed (implement your rate limiting logic)
-        return True, max_requests
+        try:
+            # Get recent requests count from audit logs
+            cutoff_time = datetime.now() - timedelta(seconds=time_window)
+            
+            with db_connection.conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT COUNT(*) FROM audit_logs 
+                    WHERE user_id = %s 
+                    AND action = %s 
+                    AND created_at >= %s
+                """, (user_id, action, cutoff_time))
+                
+                count = cursor.fetchone()[0]
+                
+                remaining = max_requests - count
+                is_allowed = count < max_requests
+                
+                if not is_allowed:
+                    print(f"⚠️ Rate limit exceeded for user {user_id}: {count}/{max_requests} requests in {time_window}s")
+                
+                return is_allowed, max(0, remaining)
+                
+        except Exception as e:
+            print(f"⚠️ Rate limit check failed: {e}")
+            return True, max_requests  # Allow on error
 
 # ========================
 # Administrator System Report Generation
@@ -650,7 +663,7 @@ class SecurityValidator:
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def _resolve_logo_path() -> str:
+def resolve_logo_path() -> str:
     """Resolve the path to Vigilante_logo.png - checks root directory first"""
     
     # Get the project root directory (where setup.py is located)
@@ -698,7 +711,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     WHITE = colors.white
     
     # Try to load and add logo
-    logo_path = _resolve_logo_path()
+    logo_path = resolve_logo_path()
     
     # Add logo centered (without using tables)
     if logo_path and os.path.exists(logo_path):
@@ -977,26 +990,6 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     
     return output_path
 
-def format_table(data: List[Dict], title: str = "") -> RichTable:
-    """Format data as a rich table"""
-    if not data:
-        table = RichTable(title=title)
-        table.add_column("No data", style="yellow")
-        return table
-    
-    # Create table with columns from first data item
-    table = RichTable(title=title, show_header=True, header_style="bold cyan")
-    
-    # Add columns
-    for key in data[0].keys():
-        table.add_column(str(key), style="green")
-    
-    # Add rows
-    for item in data:
-        table.add_row(*[str(item.get(key, '')) for key in data[0].keys()])
-    
-    return table
-
 def get_system_info() -> Dict[str, Any]:
     """Get system information"""
     import platform
@@ -1018,26 +1011,10 @@ def get_system_info() -> Dict[str, Any]:
     
     return info
 
-def save_detection_to_csv(results: Dict[str, Any], output_path: str):
-    """Save detection results to CSV"""
-    # Extract anomalies
-    anomalies = results.get('anomalies', [])
-    
-    if not anomalies:
-        # Create empty CSV with headers
-        pd.DataFrame(columns=['flow_id', 'src_ip', 'dst_ip', 'confidence_score', 'severity']).to_csv(output_path, index=False)
-    else:
-        # Convert to DataFrame and save
-        df = pd.DataFrame(anomalies)
-        df.to_csv(output_path, index=False)
-    
-    return output_path
-
 def json_serializable(obj):
     """Convert numpy and pandas objects to JSON serializable types"""
     import numpy as np
     import pandas as pd
-    
     if isinstance(obj, dict):
         return {k: json_serializable(v) for k, v in obj.items()}
     elif isinstance(obj, list):

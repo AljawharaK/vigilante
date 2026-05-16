@@ -2,10 +2,8 @@
 """Main CLI interface for Vigilante Intrusion Detection System"""
 
 import argparse
-import sys
 import os
 import json
-import tempfile
 from datetime import datetime, timedelta
 from getpass import getpass
 from typing import Optional, Tuple, Union, Dict
@@ -17,7 +15,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
-from rich.syntax import Syntax
 from rich.box import ROUNDED
 import pandas as pd
 import numpy as np
@@ -25,7 +22,7 @@ from .database import DatabaseManager
 from .auth import AuthManager
 from .model_trainer import ModelTrainer
 from .model import IntrusionDetectionModel
-from .utils import generate_pdf_report, format_table, get_system_info, json_serializable
+from .utils import get_system_info, json_serializable
 
 console = Console()
 
@@ -271,55 +268,26 @@ Examples:
 
     def check_rate_limit(self, action: str) -> Tuple[bool, int]:
         """
-        Check rate limit for user actions to prevent DoS
-        
-        Args:
-            action: Action being performed
-            
-        Returns:
-            Tuple of (is_allowed, remaining_requests)
+        Check rate limit for user actions using SecurityValidator from utils
         """
         from .utils import SecurityValidator
         
-        # Rate limiting settings per action
         rate_limits = {
-            'detect': {'max': 70, 'window': 3600},   # 70 detections per hour
-            'train': {'max': 70, 'window': 3600},    # 70 trainings per hour
-            'login': {'max': 40, 'window': 3600},      # 40 login attempts per 5 minutes
+            'detect': {'max': 70, 'window': 3600},
+            'train': {'max': 70, 'window': 3600},
+            'login': {'max': 40, 'window': 300},
         }
         
         if action not in rate_limits:
-            return True, 100  # No limit for other actions
+            return True, 100
         
         limits = rate_limits[action]
         user_id = self.auth.current_user['id'] if self.auth.current_user else 0
         
-        # Check with database (simplified - implement full rate limiting)
-        # For now, return allowed
-        return True, limits['max']
-
-
-    def secure_file_cleanup(self, file_path: str):
-        """
-        Securely cleanup temporary files after processing
-        
-        Args:
-            file_path: Path to file to cleanup
-        """
-        import tempfile
-        import shutil
-        
-        try:
-            if os.path.exists(file_path):
-                # Securely overwrite before deletion for sensitive files
-                if file_path.endswith(('.csv', '.json')):
-                    with open(file_path, 'wb') as f:
-                        f.write(os.urandom(os.path.getsize(file_path)))
-                
-                os.remove(file_path)
-                console.print(f"[dim]✓ Cleaned up temporary file: {file_path}[/dim]")
-        except Exception as e:
-            console.print(f"[yellow]Warning: Could not cleanup {file_path}: {e}[/yellow]")
+        # Use the SecurityValidator.rate_limit_check
+        return SecurityValidator.rate_limit_check(
+            user_id, action, self.db, limits['max'], limits['window']
+        )
 
     def handle_interactive_gui(self, args):
         """Launch the interactive GUI mode"""
@@ -1661,7 +1629,7 @@ Examples:
                 }
 
                 # Convert to JSON serializable
-                serializable_results = self.make_json_serializable(results)
+                serializable_results = json_serializable(results)
         
                 # Save to database
                 save_db = DatabaseManager()
@@ -1824,7 +1792,7 @@ Examples:
         # Save results if requested
         if args.output:
             try:
-                serializable_results = self.make_json_serializable(results)
+                serializable_results = json_serializable(results)
                 with open(args.output, 'w') as f:
                     json.dump(serializable_results, f, indent=2)
                 console.print(f"[green]✓ Full results saved to: {args.output}[/green]")
@@ -2032,232 +2000,6 @@ Examples:
 
         return result
 
-    def calculate_roc_metrics(self, y_true, y_scores, algorithm_name):
-        """
-        Calculate detailed ROC metrics for an algorithm
-        """
-        from sklearn.metrics import roc_curve, auc, confusion_matrix
-        import numpy as np
-    
-        # Calculate ROC curve
-        fpr, tpr, thresholds = roc_curve(y_true, y_scores)
-
-        # Calculate AUC
-        roc_auc = auc(fpr, tpr)
-
-        # Find optimal threshold (Youden's J statistic)
-        threshold = tpr - fpr
-        optimal_idx = np.argmax(threshold)
-        optimal_threshold = thresholds[optimal_idx]
-
-        # Calculate metrics at optimal threshold
-        y_pred_optimal = (y_scores >= optimal_threshold).astype(int)
-        cm = confusion_matrix(y_true, y_pred_optimal)
-    
-        if cm.shape == (2, 2):
-            TN, FP, FN, TP = cm.ravel()
-            detection_rate_optimal = TP / (TP + FN) if (TP + FN) > 0 else 0
-            false_alarm_rate_optimal = FP / (FP + TN) if (FP + TN) > 0 else 0
-            precision_optimal = TP / (TP + FP) if (TP + FP) > 0 else 0
-        else:
-            detection_rate_optimal = false_alarm_rate_optimal = precision_optimal = 0
-
-        console.print(f"\n{'-'*60}")
-        console.print(f"[bold cyan]ROC Analysis for {algorithm_name}[/bold cyan]")
-        console.print(f"{'-'*60}")
-        console.print(f"AUC: [green]{roc_auc:.4f}[/green]")
-        console.print(f"Optimal Threshold: [yellow]{optimal_threshold:.4f}[/yellow]")
-        console.print(f"Detection Rate at Optimal Threshold: {detection_rate_optimal:.4f}")
-        console.print(f"False Alarm Rate at Optimal Threshold: {false_alarm_rate_optimal:.4f}")
-        console.print(f"Precision at Optimal Threshold: {precision_optimal:.4f}")
-
-        return {
-            'fpr': fpr.tolist(),
-            'tpr': tpr.tolist(),
-            'thresholds': thresholds.tolist(),
-            'auc': float(roc_auc),
-            'optimal_threshold': float(optimal_threshold),
-            'optimal_dr': float(detection_rate_optimal),
-            'optimal_far': float(false_alarm_rate_optimal),
-            'optimal_precision': float(precision_optimal)
-        }
-
-    def plot_roc_curve(self, y_true, y_scores, dataset_name, save_path=None):
-        """
-        Plot ROC curves for the algorithm
-        """
-        try:
-            import matplotlib.pyplot as plt
-            from sklearn.metrics import roc_curve, auc
-        
-            plt.figure(figsize=(10, 8))
-
-            # Calculate ROC curve
-            fpr, tpr, thresholds = roc_curve(y_true, y_scores)
-
-            # Calculate AUC
-            roc_auc = auc(fpr, tpr)
-
-            # Plot ROC curve
-            plt.plot(fpr, tpr, color='blue', lw=2,
-                     label=f'Single Model (AUC = {roc_auc:.4f})')
-
-            # Plot diagonal line (random classifier)
-            plt.plot([0, 1], [0, 1], color='gray', lw=1, linestyle='--', 
-                     label='Random (AUC = 0.5)')
-
-            # Customize plot
-            plt.xlim([0.0, 1.0])
-            plt.ylim([0.0, 1.05])
-            plt.xlabel('False Positive Rate (False Alarm Rate)', fontsize=12)
-            plt.ylabel('True Positive Rate (Detection Rate)', fontsize=12)
-            plt.title(f'ROC Curve for Single Model on {dataset_name}', fontsize=14, fontweight='bold')
-            plt.legend(loc="lower right", fontsize=11)
-            plt.grid(True, alpha=0.3)
-
-            # Add AUC values in text box
-            plt.text(0.6, 0.15, f'AUC: {roc_auc:.4f}',
-                     bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5'),
-                     fontsize=10)
-
-            plt.tight_layout()
-        
-            if save_path:
-                plt.savefig(save_path, dpi=300, bbox_inches='tight')
-                console.print(f"[green]✓ ROC curve saved to: {save_path}[/green]")
-        
-            plt.show()
-        
-        except ImportError:
-            console.print("[yellow]Matplotlib not available for plotting ROC curve[/yellow]")
-        except Exception as e:
-            console.print(f"[yellow]Could not plot ROC curve: {e}[/yellow]")
-
-    def alternative_preprocessing(self, df: pd.DataFrame, model) -> np.ndarray:
-        """Alternative preprocessing when standard preprocessing fails"""
-        console.print("[yellow]Using alternative preprocessing...[/yellow]")
-    
-        # Select only numeric columns
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-    
-        if len(numeric_cols) == 0:
-            # If no numeric columns, try to convert everything to numeric
-            df_numeric = df.apply(pd.to_numeric, errors='coerce').fillna(0)
-            numeric_cols = df_numeric.columns
-        else:
-            df_numeric = df[numeric_cols].copy()
-    
-        # Fill NaN values
-        df_numeric = df_numeric.fillna(0)
-        df_numeric = df_numeric.replace([np.inf, -np.inf], 0)
-    
-        # Use the model's scaler if available
-        if hasattr(model, 'scaler') and model.scaler:
-            X_scaled = model.scaler.transform(df_numeric)
-        elif hasattr(model, 'model') and hasattr(model.model, 'scaler') and model.model.scaler:
-            X_scaled = model.model.scaler.transform(df_numeric)
-        else:
-            # Create new scaler
-            from sklearn.preprocessing import MinMaxScaler
-            scaler = MinMaxScaler()
-            X_scaled = scaler.fit_transform(df_numeric)
-    
-        console.print(f"[green]✓ Alternative preprocessing complete: {X_scaled.shape}[/green]")
-        return X_scaled
-
-    def validate_and_prepare_data(self, df: pd.DataFrame, model) -> pd.DataFrame:
-        """Validate and prepare input data for detection"""
-        console.print("[cyan]Validating input data...[/cyan]")
-    
-        # Make a copy to avoid modifying original
-        df_processed = df.copy()
-    
-        # Add flow_id if not present
-        if 'flow_id' not in df_processed.columns:
-            df_processed = df_processed.reset_index().rename(columns={'index': 'flow_id'})
-    
-        # Check for label column and remove it if present
-        label_cols = ['label', 'Label', ' Label', 'attack_cat', 'Label.1']
-        for col in label_cols:
-            if col in df_processed.columns:
-                df_processed = df_processed.drop(columns=[col])
-                console.print(f"[yellow]Removed label column: {col}[/yellow]")
-    
-        # Check for timestamp columns and remove them
-        time_cols = ['timestamp', 'Timestamp', 'timestamp', 'StartTime', 'EndTime', ' Timestamp']
-        for col in time_cols:
-            if col in df_processed.columns:
-                df_processed = df_processed.drop(columns=[col])
-    
-        # Handle IP address columns
-        ip_cols = ['srcip', 'dstip', 'src_ip', 'dst_ip', 'srcip', 'dstip', 
-                'Source IP', 'Destination IP', ' Source IP', ' Destination IP']
-    
-        for col in ip_cols:
-            if col in df_processed.columns:
-                try:
-                    # Convert IP addresses to numeric representation
-                    if df_processed[col].dtype == 'object':
-                        df_processed[col] = pd.factorize(df_processed[col])[0]
-                        console.print(f"[cyan]Converted {col} to numeric[/cyan]")
-                except:
-                    # If conversion fails, drop the column
-                    df_processed = df_processed.drop(columns=[col])
-                    console.print(f"[yellow]Dropped problematic column: {col}[/yellow]")
-    
-        # Handle protocol and port columns
-        proto_port_cols = ['proto', 'protocol', 'Protocol', 'sport', 'dport', 
-                        'src_port', 'dst_port', ' Source Port', ' Destination Port']
-    
-        for col in proto_port_cols:
-            if col in df_processed.columns:
-                try:
-                    if df_processed[col].dtype == 'object':
-                        # For protocol names (tcp, udp, etc.)
-                        if df_processed[col].nunique() < 20:
-                            df_processed[col] = pd.factorize(df_processed[col])[0]
-                        else:
-                            # For port numbers, ensure they're numeric
-                            df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').fillna(0)
-                except:
-                    df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').fillna(0)
-    
-        # Check which model features are available in the data
-        if hasattr(model, 'feature_names') and model.feature_names:
-            model_features = model.feature_names
-            available_features = [f for f in model_features if f in df_processed.columns]
-        
-            console.print(f"[cyan]Model expects {len(model_features)} features[/cyan]")
-            console.print(f"[cyan]Found {len(available_features)} matching features in input data[/cyan]")
-        
-            if len(available_features) < len(model_features) * 0.3:  # Less than 30% match
-                console.print("[yellow]Warning: Low feature match between model and input data[/yellow]")
-                console.print("[cyan]Will use all available numeric features[/cyan]")
-    
-        # Ensure all columns are numeric
-        for col in df_processed.columns:
-            if df_processed[col].dtype == 'object':
-                # Try to convert to numeric
-                try:
-                    df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce')
-                except:
-                    # If conversion fails, use factorize for categorical data
-                    if df_processed[col].nunique() < 100:
-                        df_processed[col] = pd.factorize(df_processed[col])[0]
-                    else:
-                        # Too many unique values, drop the column
-                        df_processed = df_processed.drop(columns=[col])
-    
-        # Fill any NaN values
-        df_processed = df_processed.fillna(0)
-    
-        # Replace infinite values
-        df_processed = df_processed.replace([np.inf, -np.inf], 0)
-    
-        console.print(f"[green]✓ Data prepared: {len(df_processed)} rows, {len(df_processed.columns)} columns[/green]")
-    
-        return df_processed
-
     # Add this new method to format execution time
     def format_execution_time(self, seconds):
         """Format execution time in human-readable format"""
@@ -2271,31 +2013,6 @@ Examples:
         else:
             hours = seconds / 3600
             return f"{hours:.2f} hours"
-
-    def make_json_serializable(self, obj):
-        """Convert numpy and pandas objects to JSON serializable types"""
-        if isinstance(obj, dict):
-            return {k: self.make_json_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [self.make_json_serializable(v) for v in obj]
-        elif isinstance(obj, tuple):
-            return tuple(self.make_json_serializable(v) for v in obj)
-        elif isinstance(obj, (np.integer, np.int64, np.int32, np.int8)):
-            return int(obj)
-        elif isinstance(obj, (np.floating, np.float64, np.float32, np.float16)):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, np.bool_):
-            return bool(obj)
-        elif pd.isna(obj):
-            return None
-        elif isinstance(obj, pd.Timestamp):
-            return obj.isoformat()
-        elif hasattr(obj, 'to_dict'):  # Handle pandas Series/DataFrame
-            return obj.to_dict()
-        else:
-            return obj
     
     def handle_train(self, args):
         """Handle model training with feature alignment - supports both CSV and JSON"""
@@ -3029,26 +2746,6 @@ Examples:
             return "Low"
         else:
             return "Minimal"
-    
-    def get_important_features(self, row, model):
-        """Get important features for explanation with JSON serializable values"""
-        features = {}
-    
-        if hasattr(model, 'feature_names'):
-            for feature in model.feature_names:
-                if feature in row:
-                    value = row[feature]
-                    if pd.notna(value):
-                        # Convert to float for JSON serialization
-                        features[feature] = float(abs(float(value)))
-    
-        # Normalize to sum to 1
-        total = sum(features.values())
-        if total > 0:
-            features = {k: float(v/total) for k, v in features.items()}
-    
-        # Return sorted features (converted to regular dict)
-        return dict(sorted(features.items(), key=lambda x: x[1], reverse=True)[:5])
     
     def run(self):
         """Main CLI runner"""

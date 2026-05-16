@@ -1,66 +1,33 @@
 #!/usr/bin/env python3
 """
 Vigilante Intrusion Detection System - GUI
-Production version with real authentication and database integration
 """
 
 import flet as ft
 from flet import (
     Page, Container, Column, Row, Text, 
     TextField, Dropdown, dropdown,
-    AlertDialog, TextButton, ProgressRing,
-    Card, Icon, MainAxisAlignment, CrossAxisAlignment,
-    Alignment, ThemeMode, ProgressBar,
-    ButtonStyle, RoundedRectangleBorder, Animation, AnimationCurve,
-    ControlState,
+    AlertDialog, TextButton, Card, Icon, 
+    MainAxisAlignment, CrossAxisAlignment, Alignment, 
+    ThemeMode, ButtonStyle, RoundedRectangleBorder,
+    Animation, AnimationCurve, ControlState,
 )
 import asyncio
 import queue
 import os
 import sys
-import json
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Dict, Any, List
-from importlib import resources
 from pathlib import Path
+from .utils import resolve_logo_path
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def _resolve_logo_path() -> str:
-    """Resolve the path to Vigilante_logo.png for GUI - checks root directory first"""
-    
-    # Get the project root directory
-    current_dir = Path(__file__).parent.absolute()  # This is intrusion_detection/
-    project_root = current_dir.parent  # This is vigilante/
-    
-    # Method 1: Check in project root (simplest and most reliable)
-    logo = project_root / 'Vigilante_logo.png'
-    if logo.exists():
-        return str(logo)
-    
-    # Method 2: Check in intrusion_detection/assets/
-    assets_logo = current_dir / 'assets' / 'Vigilante_logo.png'
-    if assets_logo.exists():
-        return str(assets_logo)
-    
-    # Method 3: Check in current working directory
-    cwd_logo = Path.cwd() / 'Vigilante_logo.png'
-    if cwd_logo.exists():
-        return str(cwd_logo)
-    
-    print("GUI: Logo not found in any location")
-    return str(logo)  # Return the root path even if it doesn't exist
-
-logo_path = _resolve_logo_path()
+logo_path = resolve_logo_path()
 # Import real modules
 from intrusion_detection.database import DatabaseManager
 from intrusion_detection.auth import AuthManager
-from intrusion_detection.model import IntrusionDetectionModel
-from intrusion_detection.model_trainer import ModelTrainer
-from intrusion_detection.utils import json_serializable
 
 # =====================================================================
 # THEME CONSTANTS
@@ -134,7 +101,6 @@ class VigilanteGUI:
         self.train_file = None
         self.model_dropdown = None
         self.detection_results = None
-        self.trainer = ModelTrainer()
         
         # Queue for background tasks
         self.task_queue = queue.Queue()

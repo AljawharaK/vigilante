@@ -73,8 +73,6 @@ vigilante uninstall --force
 
 # Interactive GUI dashboard for both users
 vigilante interactive-gui
-# Running Interactive GUI as a website
-vigilante interactive-gui --web
 # Change the port of Interactive GUI
 vigilante interactive-gui --port 8550
 
