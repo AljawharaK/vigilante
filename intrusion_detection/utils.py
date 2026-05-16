@@ -6,13 +6,12 @@ from datetime import datetime, timedelta
 from typing import Tuple, Optional, Dict, Any, List
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from rich.console import Console
 import sys
 from pathlib import Path
 import re
-import hashlib
 import hashlib
 
 # ========================
@@ -917,66 +916,104 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         story.append(Paragraph("No user logs found for the specified period.", styles['Normal']))
     story.append(Spacer(1, 20))
     
-    # Recent Anomalies
-    story.append(Paragraph("Recent Anomalies", styles['Heading2']))
+    # All Anomalies
+    story.append(Paragraph("All Detected Anomalies", styles['Heading2']))
+    story.append(Paragraph("Complete list of all anomalies detected during the report period", 
+                          ParagraphStyle('Subheading', parent=styles['Normal'], fontSize=10, textColor=colors.gray)))
+    story.append(Spacer(1, 10))
 
     # Correct way to access total_anomalies_detected
     detection_summary = report_data.get('detection_summary', {})
     total_anomalies = detection_summary.get('total_anomalies_detected', 0)
 
-    anomalies = report_data.get('recent_anomalies', [])
+    anomalies = report_data.get('all_anomalies', [])
     if anomalies:
-        anomaly_data = [["Detected At", "Flow ID", "Confidence", "Severity"]]
+        # Define anomaly table columns
+        anomaly_headers = [["Detected At", "Flow ID", "Confidence", "Severity"]]
         
-        displayed_anomalies = anomalies  # Store for reference
-        for anomaly in displayed_anomalies:
-            if anomaly:
-                detected_at = anomaly.get('detected_at')
-                if detected_at and hasattr(detected_at, 'strftime'):
-                    detected_str = detected_at.strftime('%Y-%m-%d %H:%M')
-                else:
-                    detected_str = str(detected_at) if detected_at else 'N/A'
-                
-                confidence = anomaly.get('confidence', 0)
-                confidence_str = f"{confidence:.2f}" if confidence is not None else "0.00"
-                severity = anomaly.get('severity', 'Medium')
-                
-                anomaly_data.append([
-                    detected_str,
-                    str(anomaly.get('index', 'N/A')),
-                    confidence_str,
-                    severity
-                ])
+        # Calculate how many pages we need (30 anomalies per page)
+        ANOMALIES_PER_PAGE = 30
+        total_anomaly_count = len(anomalies)
+        total_pages = (total_anomaly_count + ANOMALIES_PER_PAGE - 1) // ANOMALIES_PER_PAGE
         
-        anomaly_table = Table(anomaly_data, colWidths=[130, 100, 100, 100])
-        anomaly_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
-            ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),
-            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-            ('FONTSIZE', (0, 1), (-1, -1), 9)
-        ]))
-        story.append(anomaly_table)
+        # Add a note about pagination at the beginning
+        if total_pages > 1:
+            story.append(Paragraph(
+                f"Total anomalies: {total_anomaly_count:,} (split across {total_pages} pages, {ANOMALIES_PER_PAGE} per page)",
+                ParagraphStyle('PaginationNote', parent=styles['Normal'], fontSize=9, 
+                              textColor=colors.darkblue, alignment=1)
+            ))
+            story.append(Spacer(1, 10))
+        
+        # Process anomalies in batches
+        for page_num in range(total_pages):
+            start_idx = page_num * ANOMALIES_PER_PAGE
+            end_idx = min(start_idx + ANOMALIES_PER_PAGE, total_anomaly_count)
+            page_anomalies = anomalies[start_idx:end_idx]
+            
+            # Build table data for this page
+            anomaly_data = anomaly_headers.copy()  # Start with headers
+            
+            for anomaly in page_anomalies:
+                if anomaly:
+                    detected_at = anomaly.get('detected_at')
+                    if detected_at and hasattr(detected_at, 'strftime'):
+                        detected_str = detected_at.strftime('%Y-%m-%d %H:%M')
+                    else:
+                        detected_str = str(detected_at) if detected_at else 'N/A'
+                    
+                    confidence = anomaly.get('confidence', 0)
+                    confidence_str = f"{confidence:.4f}" if confidence is not None else "0.0000"
+                    severity = anomaly.get('severity', 'Medium')
+                    flow_id = anomaly.get('index', anomaly.get('flow_id', 'N/A'))
+                    
+                    anomaly_data.append([
+                        detected_str,
+                        str(flow_id),
+                        confidence_str,
+                        severity
+                    ])
+            
+            # Create table for this page
+            anomaly_table = Table(anomaly_data, colWidths=[130, 100, 100, 100])
+            anomaly_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), NAVY_BLUE),
+                ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('TOPPADDING', (0, 0), (-1, 0), 8),
+                ('BACKGROUND', (0, 1), (-1, -1), LILAC_PURPLE),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [LILAC_PURPLE, colors.whitesmoke]),
+            ]))
+            
+            story.append(anomaly_table)
+            story.append(Spacer(1, 10))
+            
+            # Add page number footer for this page's anomalies
+            page_info = f"Page {page_num + 1} of {total_pages} - Anomalies {start_idx + 1} to {end_idx} of {total_anomaly_count}"
+            story.append(Paragraph(
+                page_info,
+                ParagraphStyle('PageInfo', parent=styles['Normal'], fontSize=8, 
+                              textColor=colors.gray, alignment=1)
+            ))
+            
+            # Add page break if not the last page
+            if page_num < total_pages - 1:
+                story.append(PageBreak())
+        
+        # Add final summary
         story.append(Spacer(1, 5))
+        story.append(Paragraph(
+            f"Showing all {total_anomaly_count} of {total_anomaly_count:,} anomalies across {total_pages} pages",
+            ParagraphStyle('FinalSummary', parent=styles['Normal'], fontSize=9, 
+                          textColor=colors.green, alignment=1)
+        ))
         
-        # Show appropriate message based on count
-        displayed_count = len(displayed_anomalies)
-        
-        if total_anomalies > 0:
-            if total_anomalies <= 10:
-                story.append(Paragraph(
-                    f"Showing {total_anomalies:,} total anomalies detected in this period", 
-                    ParagraphStyle('Footnote', parent=styles['Normal'], fontSize=8, textColor=colors.gray)
-                ))
-            else:
-                story.append(Paragraph(
-                    f"Showing {displayed_count} most recent of {total_anomalies:,} total anomalies detected in this period", 
-                    ParagraphStyle('Footnote', parent=styles['Normal'], fontSize=8, textColor=colors.gray)
-                ))
     else:
         story.append(Paragraph("No anomalies detected in the period.", styles['Normal']))
 

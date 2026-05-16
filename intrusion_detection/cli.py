@@ -1133,7 +1133,7 @@ Examples:
             
             progress.update(task, advance=1, description="Getting recent anomalies...")
             try:
-                recent_anomalies = self.db.get_recent_anomalies(period_days, limit=20)
+                recent_anomalies = self.db.get_all_anomalies(period_days)
             except Exception as e:
                 console.print(f"[yellow]Warning: Could not get recent anomalies: {e}[/yellow]")
                 recent_anomalies = []
@@ -1330,7 +1330,7 @@ Examples:
                 "detection_rate": anomaly_rate,
             },
             "user_logs": audit_logs,  # Changed from user_activity to user_logs
-            "recent_anomalies": recent_anomalies[:10],
+            "all_anomalies": recent_anomalies,
             "all_models": all_models,
             "all_detections": all_detections
         }

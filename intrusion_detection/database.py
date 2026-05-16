@@ -998,8 +998,8 @@ class DatabaseManager:
             print(f"Error counting admins: {e}")
             return 0
     
-    def get_recent_anomalies(self, period_days: int, limit: int = 20):
-        """Get recent anomalies"""
+    def get_all_anomalies(self, period_days: int):
+        """Get ALL anomalies from detection results for PDF report"""
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
@@ -1010,28 +1010,26 @@ class DatabaseManager:
                     WHERE dr.created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
                     AND dr.anomalies_detected > 0
                     ORDER BY dr.created_at DESC
-                    LIMIT %s
-                """, (period_days, limit))
+                """, (period_days,))
             
-                results = []
+                all_anomalies = []
                 for row in cursor.fetchall():
                     try:
-                        # Handle results - could be string or dict
                         results_data = row['results']
                         if isinstance(results_data, str):
                             results_data = json.loads(results_data)
-                    
+                        
                         anomalies = results_data.get('anomalies', [])
-                        for anomaly in anomalies[:5]:  # Get up to 5 per detection
+                        for anomaly in anomalies:
                             anomaly['detected_at'] = row['detected_at']
-                            results.append(anomaly)
+                            all_anomalies.append(anomaly)
                     except Exception as e:
-                        print(f"Warning: Could not parse results for row: {e}")
+                        print(f"Warning: Could not parse results: {e}")
                         continue
-            
-                return results[:limit]  # Ensure we don't exceed limit
+                
+                return all_anomalies
         except Exception as e:
-            print(f"Error getting recent anomalies: {e}")
+            print(f"Error getting all anomalies: {e}")
             return []
     
     def get_user_anomalies(self, user_id: int, period_days: int):
