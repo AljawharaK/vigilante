@@ -12,7 +12,14 @@ warnings.filterwarnings('ignore')
 from .model import IntrusionDetectionModel, find_matching_features, align_features_to_target
 
 class ModelTrainer:
-    """Train and manage intrusion detection models using RNSA+KNN with feature alignment"""
+    """Train and manage intrusion detection models using RNSA+KNN with feature alignment
+        Key features:
+        1. Label detection (handles 'label', 'attack_type', 'class', etc.)
+        2. Binary conversion (normal=0, attack=1)
+        3. Class balancing (downsamples majority if normal > 2× attack)
+        4. Train/validation split (80/20)
+        5. Feature alignment across different datasets
+    """
     
     def __init__(self, model_dir: str = "saved_models"):
         self.model_dir = model_dir
@@ -133,7 +140,25 @@ class ModelTrainer:
                 r_s: float = 0.05, max_detectors: int = 1000, 
                 k: int = 5, dataset_name: str = None, 
                 custom_features: List[str] = None) -> Dict[str, Any]:
-        """Train a complete intrusion detection model using RNSA+KNN with feature alignment"""
+        """
+        Train a complete intrusion detection model.
+        Parameters:
+        - data_path: Path to training CSV/JSON file
+        - model_name: Name prefix for saved model
+        - r_s: Self radius (safety margin around normal samples)
+        - max_detectors: Maximum number of detectors to generate
+        - k: Number of neighbors for KNN hole remediation
+        - dataset_name: Optional name for tracking
+        - custom_features: Optional list of features to use (overrides default 10)
+        
+        Training steps:
+        1. Load and preprocess data
+        2. Balance classes if needed (downsample majority)
+        3. Split into train (80%) and validation (20%)
+        4. Train RNSA+KNN model
+        5. Evaluate on validation set
+        6. Save model and training log
+        """
         print("\n" + "="*80)
         print(f"RNSA+KNN MODEL TRAINING: {model_name}")
         print("="*80)
@@ -173,8 +198,6 @@ class ModelTrainer:
         
         # Balance classes if needed (optional)
         if np.sum(y_train == 0) > 0 and np.sum(y_train == 1) > 0:
-            from sklearn.utils import resample
-            
             # Check if classes are imbalanced
             normal_count = np.sum(y_train == 0)
             attack_count = np.sum(y_train == 1)
@@ -291,7 +314,15 @@ class ModelTrainer:
 
     def detect_anomalies(self, model_path: str, data_path: str, 
                         threshold: float = None) -> Dict[str, Any]:
-        """Detect anomalies in new data - exactly like RNSA_KNN_training code"""
+        """
+        Detect anomalies in new data using a trained model.
+        Classification Steps:
+        1. Load the trained model
+        2. Load and preprocess new data (aligns features automatically)
+        3. Run detection (NSA + KNN for holes)
+        4. Apply threshold to get binary predictions
+        5. Generate detailed report with severity levels
+        """
         print("\n" + "="*80)
         print("ANOMALY DETECTION ON UNSEEN DATA")
         print("="*80)
@@ -534,7 +565,6 @@ class ModelTrainer:
             optimal_dr = 0
             optimal_far = 0
         
-        # Add ROC metrics
         metrics.update({
             'test_accuracy': metrics.get('accuracy', 0),
             'auc': float(roc_auc),

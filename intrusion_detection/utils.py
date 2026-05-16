@@ -151,7 +151,7 @@ class SecureSessionManager:
                 'version': '2.0',
             }
             
-            # Add signature for integrity
+            # Signature for integrity
             session_data['signature'] = cls._calculate_signature(
                 session_token, username, session_data['saved_at']
             )
@@ -659,7 +659,7 @@ class SecurityValidator:
 # Administrator System Report Generation
 # ========================
     
-# Add parent directory to path for imports
+# Parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def resolve_logo_path() -> str:
@@ -712,7 +712,6 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     # Try to load and add logo
     logo_path = resolve_logo_path()
     
-    # Add logo centered (without using tables)
     if logo_path and os.path.exists(logo_path):
         try:
             # Open with PIL to get dimensions
@@ -936,7 +935,6 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         total_anomaly_count = len(anomalies)
         total_pages = (total_anomaly_count + ANOMALIES_PER_PAGE - 1) // ANOMALIES_PER_PAGE
         
-        # Add a note about pagination at the beginning
         if total_pages > 1:
             story.append(Paragraph(
                 f"Total anomalies: {total_anomaly_count:,} (split across {total_pages} pages, {ANOMALIES_PER_PAGE} per page)",
@@ -1006,7 +1004,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
             if page_num < total_pages - 1:
                 story.append(PageBreak())
         
-        # Add final summary
+        # Final summary
         story.append(Spacer(1, 5))
         story.append(Paragraph(
             f"Showing all {total_anomaly_count} of {total_anomaly_count:,} anomalies across {total_pages} pages",

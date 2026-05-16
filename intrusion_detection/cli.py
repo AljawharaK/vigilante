@@ -628,7 +628,7 @@ Examples:
             results["failed"].append(f"Config removal: {e}")
             console.print(f"[red]  ✗ Failed to remove ~/.vigilante: {e}[/red]")
         
-        # 12. Optional: Database cleanup warning
+        # 12. Database cleanup warning
         console.print("\n[bold yellow]Database Notice:[/bold yellow]")
         console.print("Your Vigilante data in the PostgreSQL database (Neon) has NOT been deleted.")
         console.print("This includes user accounts, models, detection history, and audit logs.")
@@ -637,7 +637,7 @@ Examples:
         console.print("  2. Drop the vigilante tables manually if desired")
         console.print("  3. Or contact your database administrator")
         
-        # 13. Optional: Remove logs
+        # 13. Remove logs
         console.print("\n[cyan]→ Removing log files...[/cyan]")
         log_file = Path.cwd() / "viglante.log"
         try:
@@ -760,7 +760,6 @@ Examples:
                     console.print("[red]Password must be at least 8 characters.[/red]")
                     continue
                 
-                # Optional: Add password strength check
                 if not self.is_password_strong(password):
                     console.print("[yellow]Warning: Password is weak.[/yellow]")
                     proceed = input("Create user anyway? (y/n): ").strip().lower()
@@ -907,7 +906,7 @@ Examples:
             console.print(f"[red]User '{args.username}' not found[/red]")
             return
         
-        # ADD THIS CHECK: Prevent self-deactivation
+        # Prevent self-deactivation
         if user['id'] == self.auth.current_user['id']:
             console.print("[red]Error: You cannot deactivate your own account[/red]")
             console.print("[yellow]System requires at least one active Administrator[/yellow]")
@@ -1356,7 +1355,7 @@ Examples:
             console.print(f"[red]Input file not found: {args.input}[/red]")
             return
         
-        # ========== ADD SECURITY VALIDATION ==========
+        # ========== SECURITY VALIDATION ==========
         # Check rate limit
         is_allowed, remaining = self.check_rate_limit('detect')
         if not is_allowed:
@@ -2000,7 +1999,7 @@ Examples:
 
         return result
 
-    # Add this new method to format execution time
+    # Format execution time
     def format_execution_time(self, seconds):
         """Format execution time in human-readable format"""
         if seconds < 1:

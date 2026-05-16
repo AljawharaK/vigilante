@@ -145,10 +145,10 @@ class AuthManager:
                     "requires_password_change": True
                 }
             
-            # Generate OTP code and store it (not just a secret)
+            # Generate OTP code and store it
             otp_code, expires_at = self.generate_otp()
             
-            # Store the OTP code in the database (you'll need to add this column)
+            # Store the OTP code in the database
             self.db.update_user_otp(user['id'], otp_code, expires_at)
             
             # Send OTP email

@@ -62,22 +62,24 @@ FEATURE_VARIATIONS = {
 # ========================
 # Detector Class
 # ========================
-# intrusion_detection/model.py - ADD THESE CLASSES at the top of the file
-
+# A detector is a hypersphere in feature space
+# When a test sample falls inside this hypersphere → classified as ATTACK
 class Detector:
     """Represents a mature detector with center and radius"""
     def __init__(self, center: np.ndarray, radius: float):
-        self.center = center
-        self.radius = radius
+        self.center = center # Attack sample from training
+        self.radius = radius # Distance to nearest normal sample minus safety margin (r_s)
 
     def covers(self, sample: np.ndarray) -> bool:
         """Check if detector covers a sample"""
-        distance = np.linalg.norm(sample - self.center)
+        distance = np.linalg.norm(sample - self.center) # Euclidean distance used as the similarity metric
         return distance <= self.radius
 
     def coverage_score(self, sample: np.ndarray) -> float:
-        """Calculate how well a sample is covered by this detector (0 to 1)"""
-        distance = np.linalg.norm(sample - self.center)
+        """Calculate how well a sample is covered by this detector (0 to 1)
+           1.0 = exactly at center, 0.0 = outside radius.
+        """
+        distance = np.linalg.norm(sample - self.center) # Euclidean distance
         if distance <= self.radius:
             return 1.0 - (distance / self.radius)
         else:
@@ -86,11 +88,21 @@ class Detector:
 
 class ProposedRNSA_KNN:
     """
-    Implementation of the RNSA+KNN algorithm from the 2019 paper
-    Uses abnormal samples as detector centers + KNN for hole samples
+    Implementation of the RNSA+KNN algorithm based on the paper: "Generating detectors 
+    from anomaly samples via negative selection for network intrusion detection" 
+    by Li et al. (2025). Uses abnormal samples as detector centers + KNN for hole samples
     """
 
     def __init__(self, r_s: float = 0.05, max_detectors: int = 1000, k: int = 5):
+        """
+        Parameters:
+        - r_s: Self radius (safety margin around normal samples)
+               Larger r_s = bigger detectors = more coverage but higher false positives
+               Smaller r_s = tighter detectors = safer but more holes
+        - max_detectors: Maximum number of detectors to generate
+        - k: Number of neighbors for KNN (paper used k=1 for optimal results)
+        - scaler: StandardScaler for feature normalization
+        """
         self.r_s = r_s
         self.max_detectors = max_detectors
         self.k = k
@@ -109,7 +121,7 @@ class ProposedRNSA_KNN:
         self.feature_mapping = FEATURE_ALIGNMENT_MAP
         self.CORE_FEATURES = ['dur', 'spkts', 'dpkts', 'sbytes', 'dbytes', 
                               'rate', 'smean', 'dmean', 'swin', 'dwin']
-        self.threshold = 0.5
+        self.threshold = 0.5 # Default threshold for classification
         self.feature_stats = {}
 
     def _euclidean_distance(self, a: np.ndarray, b: np.ndarray) -> float:
@@ -117,16 +129,27 @@ class ProposedRNSA_KNN:
 
     def _calculate_radius(self, candidate_center: np.ndarray,
                           normal_samples: np.ndarray) -> Tuple[bool, float]:
+        """
+        calculate radius = euclidean_distance_to_nearest_normal - r_s
+        Step 1: Find closest normal sample to this attack candidate
+        Step 2: Calculate Euclidean distance to it
+        Step 3: Subtract r_s to create safety margin
+        Step 4: If radius > 0, detector is VALID
+        """
         min_distance = float('inf')
+        # Find the closest normal sample to this attack sample
         for normal_sample in normal_samples:
             distance = self._euclidean_distance(candidate_center, normal_sample)
             if distance < min_distance:
                 min_distance = distance
         radius = min_distance - self.r_s
-        is_valid = radius > 0
+        is_valid = radius > 0 # Invalid if radius <= 0 (no space to cover)
         return is_valid, radius
 
     def _is_redundant(self, candidate_center: np.ndarray) -> bool:
+        """
+        Check if a candidate detector is already covered by existing detectors.
+        """
         for detector in self.detectors:
             if detector.covers(candidate_center):
                 return True
@@ -152,7 +175,18 @@ class ProposedRNSA_KNN:
             return "LOW"
 
     def fit(self, X_train: np.ndarray, y_train: np.ndarray, dataset_name: str = None, feature_names=None):
+        """
+        TRAINING PHASE
+        Steps:
+        1. Separate normal (y=0) and abnormal (y=1) samples
+        2. For each abnormal sample (candidate detector center):
+           a. Check if redundant (already covered)
+           b. Calculate radius = distance_to_normal - r_s
+           c. If valid, add to detector set
+        3. Train KNN on ALL training data (for hole remediation)
+        """
         if dataset_name:
+            # Store dataset statistics for reference
             self.datasets_trained_on.append(dataset_name)
             self.feature_stats[dataset_name] = {
                 'mean': np.mean(X_train, axis=0),
@@ -165,6 +199,7 @@ class ProposedRNSA_KNN:
         if dataset_name == "UNSW-NB15" and feature_names is not None:
             self.unsw_feature_names = feature_names
 
+        # Feature alignment and scaling
         if not self.is_fitted:
             self.expected_n_features = X_train.shape[1]
             X_train_scaled = self.scaler.fit_transform(X_train)
@@ -174,6 +209,7 @@ class ProposedRNSA_KNN:
                 X_train = self._align_features(X_train, self.expected_n_features)
             X_train_scaled = self.scaler.transform(X_train)
 
+        # Separate normal and abnormal (attack) samples
         normal_mask = (y_train == 0)
         abnormal_mask = (y_train == 1)
         normal_samples = X_train_scaled[normal_mask]
@@ -181,17 +217,21 @@ class ProposedRNSA_KNN:
 
         if len(self.detectors) == 0:
             self.detectors = []
-
+        
+        # Generate Detectors from Abnormal Samples
         for i, abnormal_sample in enumerate(abnormal_samples):
             if len(self.detectors) >= self.max_detectors:
                 break
             if self._is_redundant(abnormal_sample):
                 continue
+            # Calculate radius and check validity
             is_valid, radius = self._calculate_radius(abnormal_sample, normal_samples)
             if is_valid:
+                # Use actual attack samples as detector centers
                 detector = Detector(abnormal_sample.copy(), radius)
                 self.detectors.append(detector)
 
+        # Store all training data for KNN (used for hole samples)
         if self.all_training_data is None:
             self.all_training_data = X_train_scaled
             self.all_training_labels = y_train
@@ -199,33 +239,51 @@ class ProposedRNSA_KNN:
             self.all_training_data = np.vstack([self.all_training_data, X_train_scaled])
             self.all_training_labels = np.hstack([self.all_training_labels, y_train])
 
+        # Train KNN on all data (will be used for samples in holes)
         self.knn.fit(self.all_training_data, self.all_training_labels)
         return self
 
     def _nsa_classify(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Classify samples based on detector coverage
+        Returns:
+        - predictions: 1 if covered by ANY detector, else 0
+        - hole_mask: True for samples NOT covered (these go to KNN)
+        - covered_mask: True for samples covered
+        """
         if X.shape[1] != self.expected_n_features:
             X = self._align_features(X, self.expected_n_features)
         X_scaled = self.scaler.transform(X)
         n_samples = len(X_scaled)
         predictions = np.zeros(n_samples, dtype=int)
         covered_mask = np.zeros(n_samples, dtype=bool)
+
+        # Check each sample against all detectors
         for i, sample in enumerate(X_scaled):
             for detector in self.detectors:
                 if detector.covers(sample):
-                    predictions[i] = 1
-                    covered_mask[i] = True
+                    predictions[i] = 1 # Classify as ATTACK
+                    covered_mask[i] = True # Mark as covered by detector
                     break
-        hole_mask = ~covered_mask
+        hole_mask = ~covered_mask # Uncovered by any detector (holes)
         return predictions, hole_mask, covered_mask
 
     def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Classify samples using the RNSA+KNN:
+        1. NSA classifies covered samples as attacks
+        2. Hole samples (uncovered) go to KNN for reclassification
+        3. Return final predictions
+        """
         nsa_predictions, hole_mask, _ = self._nsa_classify(X)
         if np.any(hole_mask):
+            # Reclassify hole samples using KNN
             if X.shape[1] != self.expected_n_features:
                 X = self._align_features(X, self.expected_n_features)
             X_scaled = self.scaler.transform(X)
             hole_samples = X_scaled[hole_mask]
             knn_predictions = self.knn.predict(hole_samples)
+            # Combine: RNSA predictions for covered, KNN for holes
             final_predictions = nsa_predictions.copy()
             final_predictions[hole_mask] = knn_predictions
         else:
@@ -233,10 +291,20 @@ class ProposedRNSA_KNN:
         return final_predictions
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """
+        Weighted Confidence Scoring:
+        - Covered samples: trust detector more (70% detector, 30% KNN)
+        - Hole samples: trust KNN more (30% detector, 70% KNN)
+        When a detector directly covers a sample, that's strong evidence.
+        When in a hole, we need to rely more on neighbor similarity.
+        """
         if X.shape[1] != self.expected_n_features:
             X = self._align_features(X, self.expected_n_features)
+        # Convert values such as Duration=5000 to probabilities between 0 and 1
         X_scaled = self.scaler.transform(X)
         n_samples = len(X_scaled)
+
+        # Calculate detector coverage confidence
         prob_scores = np.zeros(n_samples, dtype=float)
         for i, sample in enumerate(X_scaled):
             max_coverage = 0.0
@@ -245,19 +313,35 @@ class ProposedRNSA_KNN:
                 if coverage > max_coverage:
                     max_coverage = coverage
             prob_scores[i] = max_coverage
+
+        # Get KNN probabilities
         knn_proba = self.knn.predict_proba(X_scaled)
+
+        # Apply adaptive weighting based on coverage
         _, hole_mask, _ = self._nsa_classify(X)
         for i in range(n_samples):
             if not hole_mask[i]:
+                # COVERED: Trust detector more (70/30 split)
                 prob_scores[i] = 0.7 * prob_scores[i] + 0.3 * knn_proba[i, 1]
             else:
+                # HOLE: Trust KNN more (30/70 split)
                 prob_scores[i] = 0.3 * prob_scores[i] + 0.7 * knn_proba[i, 1]
+        # Return probability for both classes [P(normal), P(attack)]
         proba_array = np.zeros((n_samples, 2))
         proba_array[:, 0] = 1 - prob_scores
         proba_array[:, 1] = prob_scores
         return proba_array
 
     def evaluate(self, X_test: np.ndarray, y_test: np.ndarray) -> Dict[str, Any]:
+        """
+        Calculate Evaluation Metrics:
+        - Detection Rate (Recall) = TP / (TP + FN)
+        - False Alarm Rate (FAR) = FP / (FP + TN)
+        - Accuracy = (TP + TN) / Total
+        - F1-score = 2 * (Precision * Recall) / (Precision + Recall)
+        - AUC (Area Under ROC Curve)
+        - Optimal threshold (maximizing TPR - FPR)
+        """
         from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_curve, auc
         y_pred = self.predict(X_test)
         y_scores = self.predict_proba(X_test)[:, 1]
@@ -265,6 +349,8 @@ class ProposedRNSA_KNN:
         precision = precision_score(y_test, y_pred, zero_division=0)
         recall = recall_score(y_test, y_pred, zero_division=0)
         f1 = f1_score(y_test, y_pred, zero_division=0)
+
+        # Confusion matrix metrics 
         cm = confusion_matrix(y_test, y_pred)
         if cm.shape == (2, 2):
             TN, FP, FN, TP = cm.ravel()
@@ -272,8 +358,12 @@ class ProposedRNSA_KNN:
             false_alarm_rate = FP / (FP + TN) if (FP + TN) > 0 else 0
         else:
             detection_rate = false_alarm_rate = 0
+
+        # ROC and AUC
         fpr, tpr, thresholds = roc_curve(y_test, y_scores)
         roc_auc = auc(fpr, tpr)
+
+        # Find optimal threshold
         threshold = tpr - fpr
         optimal_idx = np.argmax(threshold)
         optimal_threshold = thresholds[optimal_idx] if len(thresholds) > 0 else 0.5
