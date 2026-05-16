@@ -911,7 +911,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         story.append(log_table)
         story.append(Spacer(1, 5))
         story.append(Paragraph(f"Showing {min(20, len(user_logs))} of {len(user_logs)} logs", 
-                              ParagraphStyle('Footnote', parent=styles['Normal'], fontSize=8, textColor=colors.gray)))
+                              ParagraphStyle('Footnote', parent=styles['Normal'], fontSize=9, textColor=colors.gray, alignment=1)))
     else:
         story.append(Paragraph("No user logs found for the specified period.", styles['Normal']))
     story.append(Spacer(1, 20))
@@ -931,8 +931,8 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         # Define anomaly table columns
         anomaly_headers = [["Detected At", "Flow ID", "Confidence", "Severity"]]
         
-        # Calculate how many pages we need (30 anomalies per page)
-        ANOMALIES_PER_PAGE = 30
+        # Calculate how many pages we need
+        ANOMALIES_PER_PAGE = 28
         total_anomaly_count = len(anomalies)
         total_pages = (total_anomaly_count + ANOMALIES_PER_PAGE - 1) // ANOMALIES_PER_PAGE
         
@@ -1011,7 +1011,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
         story.append(Paragraph(
             f"Showing all {total_anomaly_count} of {total_anomaly_count:,} anomalies across {total_pages} pages",
             ParagraphStyle('FinalSummary', parent=styles['Normal'], fontSize=9, 
-                          textColor=colors.green, alignment=1)
+                          textColor=colors.gray, alignment=1)
         ))
         
     else:
