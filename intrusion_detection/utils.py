@@ -826,10 +826,10 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     if all_models:
         model_data = [["ID", "Name", "User", "Type", "Accuracy", "Samples", "Created"]]
         
-        for model in all_models[:15]:
+        for model in all_models:
             if model:
                 name = model.get('name', 'N/A')
-                display_name = name[:25] + "..." if len(name) > 25 else name
+                display_name = name[:20] + "..." if len(name) > 25 else name
                 accuracy = model.get('accuracy')
                 accuracy_str = f"{accuracy:.2%}" if accuracy else "N/A"
                 training_samples = model.get('training_samples', 0)
@@ -870,7 +870,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     if user_logs:
         log_data = [["ID", "Timestamp", "User", "Action", "Resource", "Status"]]
         
-        for log in user_logs[:20]:
+        for log in user_logs:
             if log:
                 timestamp = log.get('created_at')
                 if timestamp and hasattr(timestamp, 'strftime'):
@@ -928,7 +928,7 @@ def generate_pdf_report(report_data: Dict[str, Any], output_path: str):
     if anomalies:
         anomaly_data = [["Detected At", "Flow ID", "Confidence", "Severity"]]
         
-        displayed_anomalies = anomalies[:10]  # Store for reference
+        displayed_anomalies = anomalies  # Store for reference
         for anomaly in displayed_anomalies:
             if anomaly:
                 detected_at = anomaly.get('detected_at')
