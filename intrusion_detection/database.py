@@ -192,21 +192,38 @@ class DatabaseManager:
                         permissions = EXCLUDED.permissions;
                 """)
                 
-                # Create admin user if not exists - FIXED: Set must_change_password = TRUE
+                # Create admin user if not exists
                 admin_password_hash = os.getenv("ADMIN_PASSWORD_HASH")
+                admin_email = os.getenv("ADMIN_EMAIL", "admin@vigilante.com")
+                admin_username = os.getenv("ADMIN_USERNAME", "admin")
+
                 if not admin_password_hash:
                     # Generate a secure default or raise error
                     admin_password_hash = bcrypt.hashpw(b"changeme123", bcrypt.gensalt()).decode('utf-8')
                     print("⚠️ No ADMIN_PASSWORD_HASH in .env, using default 'changeme123'")
-            
-                cursor.execute("""
-                    INSERT INTO users (username, password_hash, email, role_id, must_change_password)
-                    SELECT 'admin1', %s, %s, 1, FALSE
-                    WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin1');
-                """, (admin_password_hash, os.getenv("ADMIN_EMAIL", "admin@vigilante.com")))
-            
+
+                # Check if admin user exists
+                cursor.execute("SELECT id FROM users WHERE email = %s OR username = %s", 
+                            (admin_email, admin_username))
+                existing_admin = cursor.fetchone()
+
+                if not existing_admin:
+                    # Create admin user with email from .env
+                    cursor.execute("""
+                        INSERT INTO users (username, password_hash, email, role_id, must_change_password)
+                        VALUES (%s, %s, %s, 1, FALSE)
+                    """, (admin_username, admin_password_hash, admin_email))
+                    print(f"✅ Admin user created: {admin_username} ({admin_email})")
+                else:
+                    # Update existing admin if needed
+                    cursor.execute("""
+                        UPDATE users 
+                        SET password_hash = %s, email = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE email = %s OR username = %s
+                    """, (admin_password_hash, admin_email, admin_email, admin_username))
+                    print(f"✅ Admin user updated: {admin_username} ({admin_email})")
+
                 self.conn.commit()
-                print("✅ Database tables initialized successfully")
                 
         except Exception as e:
             self.conn.rollback()
