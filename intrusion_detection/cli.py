@@ -1204,7 +1204,7 @@ Examples:
         else:
             console.print("[yellow]No detection data found for the specified period[/yellow]")
 
-        # Display all models - FIXED: Handle None accuracy values
+        # Display all models
         if all_models:
             model_table = Table(title="All Models in System", box=ROUNDED)
             model_table.add_column("ID", style="cyan")
@@ -1291,7 +1291,7 @@ Examples:
         else:
             console.print("[yellow]No user activity logs found for the specified period[/yellow]")
 
-        # Display recent anomalies - FIXED: Handle None confidence values
+        # Display recent anomalies
         if recent_anomalies:
             anomaly_table = Table(title="Recent Anomalies", box=ROUNDED)
             anomaly_table.add_column("Detected At", style="cyan")
@@ -1329,7 +1329,7 @@ Examples:
                 "total_anomalies_detected": total_anomalies,
                 "detection_rate": anomaly_rate,
             },
-            "user_logs": audit_logs,  # Changed from user_activity to user_logs
+            "user_logs": audit_logs,
             "all_anomalies": recent_anomalies,
             "all_models": all_models,
             "all_detections": all_detections

@@ -21,7 +21,7 @@ class AuthManager:
         self.current_role = None
         self.permissions = {}
         
-        # Initialize Resend - FIX: Remove hardcoded fallback
+        # Initialize Resend
         resend.api_key = os.getenv("RESEND_API_KEY")
         if not resend.api_key:
             raise ValueError("RESEND_API_KEY not found in environment variables")
@@ -115,7 +115,7 @@ class AuthManager:
             print(f"❌ Failed to send OTP email: {e}")
             return False
     
-    # intrusion_detection/auth.py - Fix the login and verify_otp methods
+    # intrusion_detection/auth.py
 
     def login(self, username: str, password: str) -> Dict[str, Any]:
         """Login user - Step 1: Verify credentials"""
