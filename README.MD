@@ -1,14 +1,52 @@
-# Intrusion Detection CLI Tool
+# Vigilante
 
-A command-line tool for intrusion detection using Real-Valued Negative Selection (RNSA) + K-Nearest Neighbors (KNN).
+**Vigilante** is an Intrusion Detection System (IDS) developed at **King Abdulaziz University** as a Computer Science graduation project. The system combines **Real-Valued Negative Selection (RNSA)** and **K-Nearest Neighbors (KNN)** AI algorithems to detect anomalous network behavior and potential cyber threats.
 
-## Features
-- User authentication and management
-- Train new intrusion detection models
-- Load and use pre-trained models
-- Detect anomalies in uploaded data
-- Store models and user data in PostgreSQL
-- Interactive CLI with rich interface
+Designed using the **Waterfall Software Development Life Cycle (SDLC)**, Vigilante integrates machine learning, secure user management, audit logging, and explainable detection capabilities into a unified cybersecurity platform.
+
+## Key Highlights
+
+* AI-powered intrusion detection using **RNSA + KNN**
+* Explainable detection results for security analysts
+* Role-based access control (Administrator & Analyst)
+* Detection analytics, reporting, and audit logging
+* PostgreSQL-backed secure data storage
+* Multi-factor authentication using OTP verification
+* Interactive CLI and dashboard interface
+* Research-oriented architecture for cybersecurity experimentation
+
+## Technology Stack
+
+| Category                | Technologies                |
+| ----------------------- | --------------------------- |
+| Programming             | Python                      |
+| Machine Learning        | Scikit-learn, NumPy, Pandas |
+| Database                | PostgreSQL                  |
+| Authentication          | OTP Verification            |
+| Email Services          | Resend API                  |
+| Interface               | Argparse CLI, Rich UI       |
+| Reporting               | PDF & CSV Export            |
+| Development Methodology | Waterfall SDLC              |
+
+## Architecture
+
+1. User Authentication & Authorization
+2. Model Training (RNSA + KNN)
+3. Network Traffic Analysis
+4. Intrusion Detection & Classification
+5. Explainable AI Insights
+6. Reporting & Audit Logging
+
+## Research Contribution
+
+Vigilante explores the effectiveness of combining **Artificial Immune System concepts (Real-Valued Negative Selection)** with **Machine Learning classification (KNN)** for anomaly-based intrusion detection based on Li et al. with the paper: Generating detectors from anomaly samples via negative selection for network intrusion detection. The project demonstrates how hybrid detection approaches can improve the identification of previously unseen network threats while testing operational usability for cybersecurity analysts.
+
+## Intended Users
+
+* Security Analysts
+* Cybersecurity Researchers
+* Students studying Intrusion Detection Systems
+* Organizations seeking lightweight IDS experimentation platforms
 
 ## Installation
 
