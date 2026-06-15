@@ -39,13 +39,12 @@ Designed using the **Waterfall Software Development Life Cycle (SDLC)**, Vigilan
 
 ## Research Contribution
 
-Vigilante explores the effectiveness of combining **Artificial Immune System concepts (Real-Valued Negative Selection)** with **Machine Learning classification (KNN)** for anomaly-based intrusion detection based on Li et al. with the paper: Generating detectors from anomaly samples via negative selection for network intrusion detection. The project demonstrates how hybrid detection approaches can improve the identification of previously unseen network threats while testing operational usability for cybersecurity analysts.
+Vigilante explores the effectiveness of combining **Artificial Immune System concepts (Real-Valued Negative Selection)** with **Machine Learning classification (KNN)** for anomaly-based intrusion detection based on Li et al. with the paper: Generating detectors from anomaly samples via negative selection for network intrusion detection. The project demonstrates how artificial intelligence can improve the identification of unseen network threats while testing operational usability for cybersecurity analysts.
 
 ## Intended Users
 
 * Security Analysts
 * Cybersecurity Researchers
-* Students studying Intrusion Detection Systems
 * Organizations seeking lightweight IDS experimentation platforms
 
 ## Installation
