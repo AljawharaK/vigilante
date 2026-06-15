@@ -1,6 +1,6 @@
 # Vigilante
 
-**Vigilante** is an Intrusion Detection System (IDS) developed at **King Abdulaziz University** as a Computer Science graduation project. The system combines **Real-Valued Negative Selection (RNSA)** and **K-Nearest Neighbors (KNN)** AI algorithems to detect anomalous network behavior and potential cyber threats.
+**Vigilante** is an Intrusion Detection System (IDS) developed at **King Abdulaziz University** as a Computer Science graduation project. The system combines **Real-Valued Negative Selection (RNSA)** and **K-Nearest Neighbors (KNN)** AI algorithms to detect anomalous network behavior and potential cyber threats.
 
 Designed using the **Waterfall Software Development Life Cycle (SDLC)**, Vigilante integrates machine learning, secure user management, audit logging, and explainable detection capabilities into a unified cybersecurity platform.
 
