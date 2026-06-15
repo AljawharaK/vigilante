@@ -12,7 +12,7 @@ Designed using the **Waterfall Software Development Life Cycle (SDLC)**, Vigilan
 * Detection analytics, reporting, and audit logging
 * PostgreSQL-backed secure data storage
 * Multi-factor authentication using OTP verification
-* Interactive CLI and dashboard interface
+* Interactive CLI and GUI dashboard interface
 * Research-oriented architecture for cybersecurity experimentation
 
 ## Technology Stack
@@ -24,7 +24,7 @@ Designed using the **Waterfall Software Development Life Cycle (SDLC)**, Vigilan
 | Database                | PostgreSQL                  |
 | Authentication          | OTP Verification            |
 | Email Services          | Resend API                  |
-| Interface               | Argparse CLI, Rich UI       |
+| Interface               | Argparse CLI, Flet GUI      |
 | Reporting               | PDF & CSV Export            |
 | Development Methodology | Waterfall SDLC              |
 
