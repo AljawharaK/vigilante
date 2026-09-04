@@ -12,7 +12,7 @@
 
 ### *AI-Powered Intrusion Detection System*
 
-[Features](#-key-features) • [Quick Start](#-quick-start) • [Demo](#-live-demo) • [Contribute](#-contributing)
+[Features](#features) • [Quick Start](#quick-start) • [System Architecture](#system-architecture) • [Research Contribution](#research-contribution)
 
 ---
 
@@ -80,7 +80,7 @@ graph TB
     classDef output fill:#00D9FF,stroke:#0080FF,stroke-width:4px,color:#FFF
 ```
 
-### End-to-End Process
+### Features
 
 1. Data Upload: Users upload CSV files containing network traffic data
 
@@ -338,7 +338,7 @@ vigilante uninstall --force
 ---
 
 ## Research Contribution
-Vigilante explores the effectiveness of combining Artificial Immune System concepts with Machine Learning for anomaly-based intrusion detection, based on the approach described by Li et al. in "Generating detectors from anomaly samples via negative selection for network intrusion detection."
+Vigilante explores the effectiveness of combining Artificial Immune System concepts with Machine Learning for anomaly-based intrusion detection, based on the approach described by Li, Z., Wei, X., Li, C. et al. Generating detectors from anomaly samples via negative selection for network intrusion detection. Sci Rep 15, 36456 (2025). doi: doi.org/10.1038/s41598-025-20516-6
 
 Key Research Contributions
 - Hybrid Detection Approach: Combining biological immune system principles with traditional ML classification
