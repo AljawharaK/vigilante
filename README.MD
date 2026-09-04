@@ -137,11 +137,11 @@ Vigilante successfully detects and classifies multiple types of network intrusio
 | Brute Force | 97.8% | Repeated login attempts and credential stuffing |
 
 ### Performance Metrics
-Overall Accuracy:        98.2% ████████████████████
-Precision:               96.4% ███████████████████
-Recall:                  98.1% ███████████████████
-F1-Score:                97.2% ███████████████████
-False Positive Rate:      1.8% ██
+- Overall Accuracy:        98.2% ████████████████████
+- Precision:               96.4% ███████████████████
+- Recall:                  98.1% ███████████████████
+- F1-Score:                97.2% ███████████████████
+- False Positive Rate:      1.8% ██
 
 ---
 
