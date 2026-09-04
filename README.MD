@@ -53,27 +53,23 @@ The system processes network traffic data in CSV format, identifies anomalous pa
 graph TB
     A[📁 Upload CSV Dataset]:::input
     B[⚙️ Feature Extraction<br/>UNSW / CIC-IDS2018]:::process
-    C[🧠 Train RNSA Model<br/>Generate Detectors]:::train
-    D[🧠 Train KNN Model<br/>Classification]:::train
-    E[📤 Upload New Traffic]:::input
-    F[🔍 Anomaly Detection<br/>RNSA]:::detect
-    G{Anomaly?}:::decision
-    H[🎯 Classify Attack<br/>KNN]:::classify
-    I[📝 Store Detection<br/>with Explanation]:::store
-    J[📊 Generate Reports<br/>& Visualize]:::output
+    C[🧠 Train RNSA + KNN Model<br/>Generate Detectors]:::train
+    D[📤 Upload New Traffic]:::input
+    E[🔍 Anomaly Detection and Classification<br/>RNSA + KNN]:::detect
+    F{Anomaly?}:::decision
+    G[📝 Store Detection<br/>with Explanation]:::store
+    H[📊 Generate Reports<br/>& Visualize]:::output
 
     A --> B --> C
-    B --> D
-    E --> F --> G
-    G -->|Normal| J
-    G -->|Anomaly| H --> I --> J
+    D --> E --> F
+    F -->|Normal| H
+    F -->|Anomaly| G --> H
     
     classDef input fill:#FF6B9D,stroke:#FF1493,stroke-width:4px,color:#FFF
     classDef process fill:#FFD93D,stroke:#FFA500,stroke-width:4px,color:#FFF
     classDef train fill:#00D9FF,stroke:#0080FF,stroke-width:4px,color:#FFF
     classDef detect fill:#C77DFF,stroke:#9D4EDD,stroke-width:4px,color:#FFF
     classDef decision fill:#FFD93D,stroke:#FFA500,stroke-width:4px,color:#FFF
-    classDef classify fill:#00F5A0,stroke:#00C853,stroke-width:4px,color:#FFF
     classDef store fill:#FF6B9D,stroke:#FF1493,stroke-width:4px,color:#FFF
     classDef output fill:#00D9FF,stroke:#0080FF,stroke-width:4px,color:#FFF
 ```
@@ -202,7 +198,8 @@ The system has demonstrated:
 | Methodology | Waterfall SDLC |
 
 ### 👥 User Roles
-1. Administrator
+#### Administrator
+
 | Permission | Description |
 |:----------:|:------------------------------------|
 | User Management | Create, modify, and deactivate users |
@@ -211,7 +208,8 @@ The system has demonstrated:
 | Model Management | Full access to all models |
 | Detection Access | All detection, training, and analysis capabilities |
 
-2. Analyst
+#### Analyst
+
 | Permission | Description |
 |:----------:|:------------------------------------|
 | Model Training | Train new intrusion detection models |
