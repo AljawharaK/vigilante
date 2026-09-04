@@ -12,7 +12,7 @@
 
 ### *AI-Powered Intrusion Detection System*
 
-[Features](#features) • [Quick Start](#quick-start) • [System Architecture](#system-architecture) • [Research Contribution](#research-contribution)
+[Features](#features) • [Quick Start](#-quick-start) • [System Architecture](#system-architecture) • [Research Contribution](#research-contribution)
 
 ---
 
