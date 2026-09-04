@@ -18,8 +18,6 @@
 
 </div>
 
----
-
 ## 🚨 The Security Problem
 
 Network intrusion detection systems face significant challenges in identifying **unknown or zero-day attacks** that don't match existing signature databases. Traditional rule-based approaches struggle with:
@@ -190,7 +188,7 @@ The system has demonstrated:
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ### Technology Stack
 | Category | Technologies |
