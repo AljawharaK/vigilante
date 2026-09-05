@@ -6,8 +6,8 @@
 ![Scikit-learn](https://img.shields.io/badge/Scikit--learn-1.2.0-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white)
 ![NumPy](https://img.shields.io/badge/NumPy-1.24.0-013243?style=for-the-badge&logo=numpy&logoColor=white)
 ![Pandas](https://img.shields.io/badge/Pandas-2.0.0-150458?style=for-the-badge&logo=pandas&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15.0-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
-![Flet](https://img.shields.io/badge/Flet-0.8.0-00B4D8?style=for-the-badge&logo=flet&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17.0-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Flet](https://img.shields.io/badge/Flet-0.86.4-00B4D8?style=for-the-badge&logo=flet&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-Active-success?style=for-the-badge)
 
 ### *AI-Powered Intrusion Detection System*
@@ -20,14 +20,10 @@
 
 ## 🚨 The Security Problem
 
-Network intrusion detection systems face significant challenges in identifying **unknown or zero-day attacks** that don't match existing signature databases. Traditional rule-based approaches struggle with:
+Network intrusion detection systems face significant challenges in identifying novel attack patterns that don't match existing signature databases. Vigilante is an AI-powered cybersecurity system that monitors network traffic to detect malicious activities.
 
-- **Evolving attack patterns** that bypass static signatures
-- **High false positive rates** that overwhelm security analysts
-- **Limited adaptability** to new network environments
-- **Poor detection** of subtle anomalies that indicate compromise
-
-These limitations leave organizations vulnerable to sophisticated cyber threats that exploit unknown vulnerabilities or use evasion techniques to avoid detection.
+Why AI Over Traditional Intrusion Detection System?
+Unlike traditional Intrusion Detection System, which primarily rely on static, rule-based detection to identify known threats, AI-powered firewalls can analyze network behavior and recognize novel attack patterns. By using adaptive learning and anomaly detection, they can identify suspicious activity that may bypass predefined rules, reducing the risk of missed threats. AI also enables more automated threat recognition, reducing the need for frequent manual rule updates.
 
 ---
 
@@ -35,8 +31,9 @@ These limitations leave organizations vulnerable to sophisticated cyber threats 
 
 **Vigilante** solves this problem through a hybrid AI approach combining **Artificial Immune System concepts** with **Machine Learning**:
 
-- **Real-Valued Negative Selection (RNSA)**: Detects anomalies by learning the "self" pattern of normal traffic and identifying deviations
-- **K-Nearest Neighbors (KNN)**: Classifies detected anomalies as specific threat types based on similarity to known attack patterns
+- **Real-Valued Negative Selection (RNSA)**: Generates detectors from normal traffic patterns and identifies deviations from learned network behavior.
+- **K-Nearest Neighbors (KNN)**: Provides complementary neighborhood-based classification and helps address gaps in RNSA detector coverage.
+- **Hybrid Decision Mechanism**: Dynamically weights RNSA and KNN confidence based on RNSA detector coverage.
 - **Explainable AI**: Provides security analysts with human-readable explanations for every detection decision
 - **Role-based Access**: Separate Administrator and Analyst roles with appropriate permissions
 - **Secure User Management**: Multi-factor authentication with OTP verification and audit logging
@@ -52,24 +49,55 @@ The system processes network traffic data in CSV format, identifies anomalous pa
 ```mermaid
 graph TB
     A[📁 Upload CSV Dataset]:::input
-    B[⚙️ Feature Extraction<br/>UNSW / CIC-IDS2018]:::process
-    C[🧠 Train RNSA + KNN Model<br/>Generate Detectors]:::train
-    D[📤 Upload New Traffic]:::input
-    E[🔍 Anomaly Detection and Classification<br/>RNSA + KNN]:::detect
-    F{Anomaly?}:::decision
-    G[📝 Store Detection<br/>with Explanation]:::store
-    H[📊 Generate Reports<br/>& Visualize]:::output
+    B[⚙️ Feature Extraction & Preprocessing<br/>UNSW-NB15 / CIC-IDS2018]:::process
+    C[🧠 Train RNSA + KNN Models<br/>Generate RNSA Detectors]:::train
+
+    D[📤 Upload New Network Traffic]:::input
+    E[🔍 RNSA Detector Analysis<br/>Calculate RNSA Confidence]:::detect
+    F[🧠 KNN Neighborhood Analysis<br/>Calculate KNN Confidence]:::detect
+
+    G{RNSA Detector<br/>Covers Flow?}:::decision
+
+    H[⚖️ Hybrid Confidence<br/>70% RNSA + 30% KNN]:::process
+    I[⚖️ Hybrid Confidence<br/>30% RNSA + 70% KNN]:::process
+
+    J[📊 Calculate Final<br/>Hybrid Confidence Score]:::process
+
+    K{Confidence<br/>≥ 0.50?}:::decision
+
+    L[🔴 Anomalous<br/>Assign Severity Level]:::anomaly
+    M[🟢 Normal Traffic]:::normal
+
+    N[📝 Store Detection<br/>Classification + Confidence<br/>+ Explanation]:::store
+    O[📊 Generate Reports<br/>& Visualize Results]:::output
 
     A --> B --> C
-    D --> E --> F
-    F -->|Normal| H
-    F -->|Anomaly| G --> H
-    
+    D --> E
+    D --> F
+    E --> G
+
+    G -->|Yes| H
+    G -->|No| I
+
+    H --> J
+    I --> J
+
+    J --> K
+
+    K -->|Yes| L
+    K -->|No| M
+
+    L --> N
+    M --> O
+    N --> O
+
     classDef input fill:#FF6B9D,stroke:#FF1493,stroke-width:4px,color:#FFF
     classDef process fill:#FFD93D,stroke:#FFA500,stroke-width:4px,color:#FFF
     classDef train fill:#00D9FF,stroke:#0080FF,stroke-width:4px,color:#FFF
     classDef detect fill:#C77DFF,stroke:#9D4EDD,stroke-width:4px,color:#FFF
     classDef decision fill:#FFD93D,stroke:#FFA500,stroke-width:4px,color:#FFF
+    classDef anomaly fill:#FF6B6B,stroke:#C92A2A,stroke-width:4px,color:#FFF
+    classDef normal fill:#51CF66,stroke:#2B8A3E,stroke-width:4px,color:#FFF
     classDef store fill:#FF6B9D,stroke:#FF1493,stroke-width:4px,color:#FFF
     classDef output fill:#00D9FF,stroke:#0080FF,stroke-width:4px,color:#FFF
 ```
@@ -86,17 +114,23 @@ graph TB
 
 2. Model Training:
 
-- RNSA Model: Generates detectors from normal traffic samples using negative selection algorithm
+- RNSA Detection: New network traffic is evaluated against the generated RNSA detectors to determine whether the flow is covered and to calculate RNSA confidence
 
-- KNN Model: Trains on labeled attack data to classify detected anomalies
+- KNN Neighborhood Analysis: KNN evaluates the flow based on its nearest neighbors and produces a complementary confidence score
 
-- Models are stored and accessible for future detection
+- Adaptive Confidence Weighting: The confidence weights depend on RNSA detector coverage:
+    - Detector covered: RNSA 70% + KNN 30%
+    - Detector not covered: KNN 70% + RNSA 30%
+
+- Anomaly Decision: The resulting combined confidence score is compared against the default 0.5 threshold:
+    - Confidence ≥ 0.5: Anomalous
+    - Confidence < 0.5: Normal
+
+- Model is stored and accessible for future detection
 
 3. Detection Process:
 
-- New traffic data is passed through RNSA to identify anomalies
-
-- Detected anomalies are classified using KNN to determine attack type
+- New traffic data is passed through RNSA + KNN hybrid model to identify anomalies
 
 - Results include confidence scores and explainable AI insights
 
@@ -133,11 +167,20 @@ Vigilante successfully detects and classifies multiple types of network intrusio
 | Brute Force | 97.8% | Repeated login attempts and credential stuffing |
 
 ### Performance Metrics
-- Overall Accuracy:        98.2% ████████████████████
-- Precision:               96.4% ███████████████████
-- Recall:                  98.1% ███████████████████
-- F1-Score:                97.2% ███████████████████
-- False Positive Rate:      1.8% ██
+
+#### UNSW-NB15
+- Overall Accuracy:        92.15% ████████████████████
+- Precision:               95.47% ███████████████████
+- Recall:                  90.01% ███████████████████
+- F1-Score:                92.66% ███████████████████
+- False Positive Rate:      5.23% ██
+
+#### CIC-IDS-2018
+- Overall Accuracy:        99.85% ████████████████████
+- Precision:               99.76% ███████████████████
+- Recall:                  99.94% ███████████████████
+- F1-Score:                99.85% ███████████████████
+- False Positive Rate:      0.24% ██
 
 ---
 
@@ -176,9 +219,11 @@ The system has demonstrated:
 
 - Reduced incident response time from 45 minutes to 2 minutes
 
-- Increased detection accuracy by 23% compared to signature-based IDS
+- Automated anomaly detection using a hybrid RNSA–KNN approach
 
-- Zero false negatives for known attack patterns
+- Explainable detection results for analyst investigation
+
+- Increased detection accuracy by 23% compared to signature-based IDS
 
 - 100% audit trail coverage for all detection activities
 
@@ -334,16 +379,22 @@ vigilante uninstall --force
 ---
 
 ## Research Contribution
-Vigilante explores the effectiveness of combining Artificial Immune System concepts with Machine Learning for anomaly-based intrusion detection, based on the approach described by Li, Z., Wei, X., Li, C. et al. Generating detectors from anomaly samples via negative selection for network intrusion detection. Sci Rep 15, 36456 (2025). doi: doi.org/10.1038/s41598-025-20516-6
+Vigilante explores a hybrid approach to network intrusion detection by combining Real-Valued Negative Selection (RNSA), inspired by Artificial Immune System principles, with K-Nearest Neighbors (KNN) for anomaly classification and hole remediation.
+
+The approach is based on the research presented by Li, Z., Wei, X., Li, C. et al., Generating detectors from anomaly samples via negative selection for network intrusion detection, published in Scientific Reports (2025). The research investigates negative selection-based detector generation for network intrusion detection, which provides the foundation for Vigilante's use of RNSA.
 
 Key Research Contributions
-- Hybrid Detection Approach: Combining biological immune system principles with traditional ML classification
+- Hybrid RNSA–KNN Detection: Combines RNSA-based anomaly detection with KNN classification to improve coverage of anomalous traffic.
 
-- Self-Learning Capability: Models trained on organizational-specific traffic patterns
+- Hole Remediation: Uses KNN to address gaps in RNSA detector coverage where RNSA confidence is insufficient for a reliable classification.
 
-- Explainable Detection: Human-readable insights for security analysts
+- Confidence-Based Decision: Uses an RNSA confidence threshold of 70% to determine whether the final classification should rely on RNSA or KNN.
 
-- Operational Usability: Practical deployment for cybersecurity professionals
+- Anomaly Classification: Uses the combined approach to classify detected anomalous network traffic.
+
+- Explainable Detection: Presents detection results and supporting information to security analysts.
+
+- Operational Usability: Integrates the detection pipeline into a practical security monitoring application with authentication, audit logging, reporting, and analyst workflows.
 
 ### Areas for Contribution
 🐛 Bug fixes and testing
